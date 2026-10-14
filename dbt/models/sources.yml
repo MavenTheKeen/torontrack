@@ -1,0 +1,141 @@
+version: 2
+
+sources:
+  - name: normalized
+    schema: normalized
+    description: Validated records committed atomically by the Python collector.
+    tables:
+      - name: station_observations
+        description: >-
+          View: one row per station listed in a collection's metadata, with its status
+          report if there was one (observed). Rebuilt from the compact tables below.
+        columns:
+          - name: collection_id
+            data_tests:
+              - not_null
+          - name: station_id
+            data_tests:
+              - not_null
+          - name: observed
+            data_tests:
+              - not_null
+      - name: collections
+        description: Per-collection fetch times and raw lineage, stored once per collection.
+        columns:
+          - name: collection_key
+            data_tests:
+              - unique
+              - not_null
+          - name: collection_id
+            data_tests:
+              - unique
+              - not_null
+          - name: information_raw_id
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('raw', 'feed_payloads')
+                    field: raw_id
+          - name: status_raw_id
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('raw', 'feed_payloads')
+                    field: raw_id
+      - name: station_versions
+        description: Each distinct name, location and capacity a station has had.
+        columns:
+          - name: station_version_id
+            data_tests:
+              - unique
+              - not_null
+      - name: observations
+        description: Actual station availability reports; no synthetic observations.
+      - name: ttc_gtfs_versions
+        description: One row per loaded TTC static GTFS zip (subway subset), keyed by its SHA-256.
+        columns:
+          - name: feed_version
+            data_tests:
+              - unique
+              - not_null
+      - name: ttc_line_stops
+        description: Platform order along each line direction for a feed version.
+      - name: ttc_stops
+      - name: ttc_trips
+      - name: ttc_stop_times
+      - name: ttc_calendar
+      - name: ttc_calendar_dates
+      - name: ttc_train_stop_events
+        description: One row per train visit to a platform, keyed by train (vehicle label).
+        columns:
+          - name: event_id
+            data_tests:
+              - unique
+              - not_null
+      - name: ttc_alerts
+      - name: ttc_alert_versions
+      - name: ttc_official_delays
+        description: TTC's official subway delay log (current download), stations matched to keys.
+        columns:
+          - name: source_id
+            data_tests:
+              - unique
+              - not_null
+      - name: weather_hourly
+        description: Environment Canada hourly observations (Toronto City station), revised in place.
+        columns:
+          - name: observed_at
+            data_tests:
+              - not_null
+      - name: ttc_delay_codes
+        description: TTC's descriptions of the delay codes in the log.
+      - name: ttc_surface_patterns
+        description: Each stop pattern (exact stop sequence) of a bus or streetcar route.
+      - name: ttc_surface_pattern_stops
+        description: A pattern's stops in order with the mean scheduled offset from its start.
+      - name: ttc_surface_pattern_starts
+        description: Scheduled trips per pattern, service ID and hour of first departure.
+      - name: road_restrictions
+        description: City of Toronto construction zones and road closures, kept with history.
+      - name: road_restriction_routes
+        description: Bus and streetcar route directions each restriction lies along, per schedule version.
+      - name: ttc_surface_passages
+        description: >-
+          One row each time a matched bus or streetcar passes a measurement stop, timed by
+          interpolating between its position reports.
+        columns:
+          - name: passed_at
+            data_tests:
+              - not_null
+  - name: ops
+    schema: ops
+    tables:
+      - name: ingestion_runs
+        columns:
+          - name: collection_id
+            data_tests:
+              - unique
+              - not_null
+          - name: status
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ['running', 'succeeded', 'failed']
+      - name: ttc_poll_runs
+        description: One row per TTC realtime feed poll.
+      - name: ttc_feed_state
+        description: The newest normalized snapshot per TTC feed.
+  - name: raw
+    schema: raw
+    tables:
+      - name: feed_payloads
+        description: >-
+          One row per fetch: envelope JSON and fetch metadata, with the payload's data
+          member stored once per distinct content in payload_bodies (body_hash).
+        columns:
+          - name: raw_id
+            data_tests:
+              - unique
+              - not_null

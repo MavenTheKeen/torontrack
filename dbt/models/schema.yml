@@ -1,0 +1,107 @@
+version: 2
+
+models:
+  - name: stg_station_observations
+    description: >-
+      One row per station metadata snapshot from a succeeded collection.
+      Missing observations remain visible. Freshness is measured at the status
+      fetch time, so historical eligibility does not decay as the clock advances.
+    columns:
+      - name: collection_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: source('ops', 'ingestion_runs')
+                field: collection_id
+      - name: station_id
+        data_tests:
+          - not_null
+      - name: collected_at
+        description: Actual status collection time in UTC, not a scheduled logical date.
+        data_tests:
+          - not_null
+      - name: name
+        data_tests:
+          - not_null
+      - name: observed
+        data_tests:
+          - not_null
+      - name: information_raw_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: source('raw', 'feed_payloads')
+                field: raw_id
+      - name: status_raw_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: source('raw', 'feed_payloads')
+                field: raw_id
+      - name: source_fresh
+        data_tests:
+          - not_null
+      - name: station_fresh
+        data_tests:
+          - not_null
+      - name: rental_eligible
+        data_tests:
+          - not_null
+      - name: return_eligible
+        data_tests:
+          - not_null
+      - name: is_empty
+        data_tests:
+          - not_null
+      - name: is_full
+        data_tests:
+          - not_null
+  - name: station_hourly
+    description: >-
+      Station and UTC-hour counts, eligible sums and means. Empty and full use
+      separate eligible denominators. Missing snapshots do not become zero counts.
+    columns:
+      - name: station_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_station_observations')
+                field: station_id
+      - name: hour_utc
+        data_tests:
+          - not_null
+      - name: metadata_snapshots
+        data_tests:
+          - not_null
+      - name: observed_snapshots
+        data_tests:
+          - not_null
+      - name: rental_eligible_snapshots
+        data_tests:
+          - not_null
+      - name: return_eligible_snapshots
+        data_tests:
+          - not_null
+  - name: station_summary
+    description: >-
+      All-time station summary obtained by adding hourly counts before division.
+      Zero eligible denominators produce NULL percentages, not zero percent.
+    columns:
+      - name: station_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('station_hourly')
+                field: station_id
+      - name: first_collected_at
+        data_tests:
+          - not_null
+      - name: last_collected_at
+        data_tests:
+          - not_null

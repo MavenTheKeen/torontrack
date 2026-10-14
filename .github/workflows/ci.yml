@@ -1,0 +1,94 @@
+name: Verify pipeline
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-postgres-dbt:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        # Same mirror and digest as compose.yaml (see docs/decisions.md).
+        image: public.ecr.aws/docker/library/postgres:16.15-bookworm@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
+        env:
+          POSTGRES_USER: transit
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: transit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U transit -d transit_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgresql://transit:ci-only@localhost:5432/transit_test
+      DBT_EXECUTABLE: ${{ github.workspace }}/dbt/.venv/bin/dbt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.5"
+      - run: uv sync --locked
+      - run: uv sync --project dbt --locked
+      - run: uv run --locked ruff check src tests dashboard scripts airflow
+      - run: uv run --locked ruff format --check src tests dashboard scripts airflow
+      - run: uv run --locked pytest -q
+      - name: Audit installed application and dbt dependencies
+        run: |
+          uv tool run --from pip-audit==2.9.0 pip-audit --path .venv/lib/python3.12/site-packages
+          uv tool run --from pip-audit==2.9.0 pip-audit --path dbt/.venv/lib/python3.12/site-packages
+
+  airflow-import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      AIRFLOW_HOME: ${{ github.workspace }}/.local/airflow-test
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.5"
+      - run: uv venv --python 3.12.12 .airflow-venv
+      - name: Install Airflow with its official constraints, independently of app/dbt
+        run: >-
+          uv pip install --python .airflow-venv/bin/python apache-airflow==3.3.2
+          --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.12.txt
+      - run: uv pip install --python .airflow-venv/bin/python pytest==9.0.3
+      - run: .airflow-venv/bin/python -m pytest airflow/tests -q
+
+  compose-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      POSTGRES_PASSWORD: ci-only
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and build all images
+        run: |
+          docker compose --profile tools --profile airflow config --quiet
+          docker compose --profile tools --profile airflow build
+      - name: Start PostgreSQL and create schemas
+        run: |
+          docker compose up -d --wait postgres
+          docker compose run --rm init-db
+      - name: Build dbt views on an empty clean database
+        run: docker compose run --rm dbt
+      - name: Check dashboard, Airflow and web startup (DAG starts paused; no live API)
+        run: |
+          docker compose --profile airflow up -d --wait --wait-timeout 240 dashboard airflow web
+          curl --fail http://localhost:8501/_stcore/health
+          curl --fail http://localhost:8000/health
+          curl --fail --silent http://localhost:8000/ | grep -q "Toronto Transit Commission"
+      - name: Logs on failure
+        if: failure()
+        run: docker compose --profile airflow logs --no-color --tail 150
+      - name: Stop CI containers
+        if: always()
+        run: docker compose --profile airflow --profile tools down

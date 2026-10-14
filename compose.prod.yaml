@@ -1,0 +1,60 @@
+# Production overrides for a single server. Use with the base file:
+#   docker compose -f compose.yaml -f compose.prod.yaml --profile airflow up -d
+# Only Caddy is public (ports 80/443). PostgreSQL, the dashboard and Airflow keep the
+# base file's 127.0.0.1 bindings and are reached through an SSH tunnel.
+services:
+  init-db:
+    environment:
+      # init-db creates the site's read-only login when this is set.
+      WEB_DB_PASSWORD: ${WEB_DB_PASSWORD:?Set WEB_DB_PASSWORD in .env for production}
+
+  web:
+    environment:
+      DATABASE_URL: postgresql://transit_web:${WEB_DB_PASSWORD:?Set WEB_DB_PASSWORD in .env for production}@postgres:5432/transit
+    command:
+      - transit.web.app:app
+      - --host=0.0.0.0
+      - --port=8000
+      - --no-server-header
+      # Caddy replaces X-Forwarded-For with the connecting client's address and is the
+      # only thing that can reach this port, so the rate limit sees real visitors.
+      - --proxy-headers
+      - --forwarded-allow-ips=*
+
+  caddy:
+    image: public.ecr.aws/docker/library/caddy:2.11.4-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?Set SITE_ADDRESS in .env, e.g. 203-0-113-7.sslip.io}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backup:
+    image: public.ecr.aws/docker/library/postgres:16.15-bookworm@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
+    entrypoint: ["sh", "/backup.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: transit
+      PGDATABASE: transit
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
+    volumes:
+      - ./deploy/backup.sh:/backup.sh:ro
+      - ./backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:

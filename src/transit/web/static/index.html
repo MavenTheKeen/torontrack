@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Toronto subway service status, live train positions on a street map, next arrivals, reliability and Bike Share availability from TTC and Bike Share Toronto open data.">
+  <title>Torontrack</title>
+  <meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0d10" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/icons.js" defer></script>
+  <script src="/static/guidance.js" defer></script>
+  <script src="/static/motion.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="site-bar">
+    <header class="site">
+      <a class="brand" href="#/"><span class="brand-mark" aria-hidden="true">T</span><span class="brand-name">Torontrack</span></a>
+      <nav class="primary" aria-label="Main">
+        <a href="#/">Status</a>
+        <a href="#/map">Map</a>
+        <a href="#/report">Report</a>
+        <a href="#/reliability">Reliability</a>
+      </nav>
+      <nav aria-label="Lines" id="line-nav"></nav>
+    </header>
+  </div>
+  <main id="main" tabindex="-1">
+    <div class="skeleton" aria-hidden="true"><div></div><div></div><div></div></div>
+    <p class="sr-only">Loading…</p>
+  </main>
+  <p class="updated" id="updated" aria-live="polite"></p>
+  <footer class="site">
+    <p>Data: Toronto Transit Commission (GTFS and GTFS-Realtime open data) and Bike Share
+      Toronto. Predictions may be inaccurate. Train positions are estimated from predicted
+      arrival times. Data used in this product or service is provided with the permission
+      of Metrolinx; regional trains are placed by timetable. Map data © OpenStreetMap
+      contributors. Not affiliated with the TTC or Metrolinx.</p>
+    <p>No cookies, no tracking, no third-party requests. Refreshes while this tab is open.</p>
+    <p><a href="#/pipeline">Pipeline status</a> ·
+      <a href="https://github.com/MavenTheKeen/torontrack">Source code</a></p>
+  </footer>
+  <nav class="tabs" aria-label="Main">
+    <a href="#/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5 12 5l8 7.5V20a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z"/></svg>Status</a>
+    <a href="#/map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3.5 6v14L9 18l6 2 5.5-2V4L15 6zm0 0v14m6-12v14"/></svg>Map</a>
+    <a href="#/report"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M7 16v-5m5 5V6m5 10v-8"/></svg>Report</a>
+    <a href="#/reliability"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9M12 7v5l3 2"/></svg>Reliability</a>
+  </nav>
+  <noscript><p class="notice">This page needs JavaScript to load live data.</p></noscript>
+</body>
+</html>
