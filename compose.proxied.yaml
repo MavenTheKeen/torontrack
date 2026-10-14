@@ -1,0 +1,23 @@
+# Production behind a reverse proxy that already runs on the server's network, as a third
+# file after the production overrides:
+#   docker compose -f compose.yaml -f compose.prod.yaml -f compose.proxied.yaml --profile airflow up -d
+# That proxy terminates HTTPS and forwards to the site on this machine's LAN address, so
+# this file's Caddy is not started (docs/deploy.md#behind-an-existing-proxy).
+services:
+  caddy:
+    # Started only with --profile own-proxy, which this setup never uses.
+    profiles: ["own-proxy"]
+
+  web:
+    ports: !override
+      - "${WEB_BIND:?Set WEB_BIND in .env to this machine's LAN address}:8000:8000"
+    command:
+      - transit.web.app:app
+      - --host=0.0.0.0
+      - --port=8000
+      - --no-server-header
+      # The proxy replaces X-Forwarded-For with the connecting client's address. Only its
+      # address is trusted to set it, so other machines on the LAN cannot choose the
+      # address the rate limit sees.
+      - --proxy-headers
+      - --forwarded-allow-ips=${PROXY_IP:?Set PROXY_IP in .env to the proxy's LAN address}

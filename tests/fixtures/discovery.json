@@ -1,0 +1,41 @@
+{
+  "last_updated": "2026-10-09T09:39:34Z",
+  "ttl": 10,
+  "data": {
+    "feeds": [
+      {
+        "name": "gbfs_versions",
+        "url": "https://toronto.publicbikesystem.net/customer/gbfs/v3.0/gbfs_versions"
+      },
+      {
+        "name": "geofencing_zones",
+        "url": "https://toronto.publicbikesystem.net/customer/gbfs/v3.0/geofencing_zones"
+      },
+      {
+        "name": "station_information",
+        "url": "https://toronto.publicbikesystem.net/customer/gbfs/v3.0/station_information"
+      },
+      {
+        "name": "station_status",
+        "url": "https://toronto.publicbikesystem.net/customer/gbfs/v3.0/station_status"
+      },
+      {
+        "name": "system_information",
+        "url": "https://toronto.publicbikesystem.net/customer/gbfs/v3.0/system_information"
+      },
+      {
+        "name": "system_pricing_plans",
+        "url": "https://toronto.publicbikesystem.net/customer/gbfs/v3.0/system_pricing_plans"
+      },
+      {
+        "name": "system_regions",
+        "url": "https://toronto.publicbikesystem.net/customer/gbfs/v3.0/system_regions"
+      },
+      {
+        "name": "vehicle_types",
+        "url": "https://toronto.publicbikesystem.net/customer/gbfs/v3.0/vehicle_types"
+      }
+    ]
+  },
+  "version": "3.0"
+}

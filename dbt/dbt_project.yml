@@ -1,0 +1,21 @@
+name: transit
+version: '0.1.0'
+config-version: 2
+profile: transit
+require-dbt-version: ['>=1.11.15', '<1.12.0']
+model-paths: ['models']
+test-paths: ['tests']
+macro-paths: ['macros']
+clean-targets: ['target', 'dbt_packages']
+
+vars:
+  max_report_age_seconds: 1800
+  future_tolerance_seconds: 300
+
+models:
+  transit:
+    +materialized: view
+    staging:
+      +schema: staging
+    analytics:
+      +schema: analytics

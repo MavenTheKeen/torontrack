@@ -1,0 +1,89 @@
+{
+  "last_updated": "2026-10-09T09:39:47Z",
+  "ttl": 2,
+  "data": {
+    "stations": [
+      {
+        "station_id": "7000",
+        "num_vehicles_available": 42,
+        "num_vehicles_disabled": 2,
+        "num_docks_available": 3,
+        "num_docks_disabled": 0,
+        "last_reported": "2026-10-09T09:38:28.628Z",
+        "is_installed": true,
+        "is_renting": true,
+        "is_returning": true,
+        "vehicle_docks_available": [
+          {
+            "vehicle_type_ids": [
+              "ICONIC",
+              "BOOST",
+              "EFIT",
+              "ASTRO"
+            ],
+            "count": 3
+          }
+        ],
+        "vehicle_types_available": [
+          {
+            "vehicle_type_id": "BOOST",
+            "count": 0
+          },
+          {
+            "vehicle_type_id": "ICONIC",
+            "count": 42
+          },
+          {
+            "vehicle_type_id": "ASTRO",
+            "count": 0
+          },
+          {
+            "vehicle_type_id": "EFIT",
+            "count": 0
+          }
+        ]
+      },
+      {
+        "station_id": "7001",
+        "num_vehicles_available": 16,
+        "num_vehicles_disabled": 7,
+        "num_docks_available": 0,
+        "num_docks_disabled": 0,
+        "last_reported": "2026-10-09T09:38:07.295Z",
+        "is_installed": true,
+        "is_renting": true,
+        "is_returning": true,
+        "vehicle_docks_available": [
+          {
+            "vehicle_type_ids": [
+              "ICONIC",
+              "BOOST",
+              "EFIT",
+              "ASTRO"
+            ],
+            "count": 0
+          }
+        ],
+        "vehicle_types_available": [
+          {
+            "vehicle_type_id": "BOOST",
+            "count": 0
+          },
+          {
+            "vehicle_type_id": "ICONIC",
+            "count": 0
+          },
+          {
+            "vehicle_type_id": "ASTRO",
+            "count": 1
+          },
+          {
+            "vehicle_type_id": "EFIT",
+            "count": 15
+          }
+        ]
+      }
+    ]
+  },
+  "version": "3.0"
+}

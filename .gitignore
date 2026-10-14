@@ -1,0 +1,26 @@
+.env
+.env.*
+!.env.example
+.venv*/
+.airflow-venv/
+.local/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+.coverage
+htmlcov/
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+dbt/.user.yml
+airflow/logs/
+artifacts/
+*.log
+.DS_Store
+
+# Production database dumps (deploy/backup.sh)
+/backups/

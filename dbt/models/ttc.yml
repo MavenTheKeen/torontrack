@@ -1,0 +1,242 @@
+version: 2
+
+models:
+  - name: stg_ttc_platforms
+    description: Platforms of the newest static GTFS version with line, direction, order and terminal flag.
+    columns:
+      - name: stop_id
+        data_tests:
+          - unique
+          - not_null
+      - name: direction_id
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+      - name: station_key
+        data_tests:
+          - not_null
+      - name: is_terminal
+        data_tests:
+          - not_null
+
+  - name: stg_ttc_arrivals
+    description: Observed train arrivals (visits marked passed) with platform attributes and service hour.
+    columns:
+      - name: event_id
+        data_tests:
+          - unique
+          - not_null
+      - name: arrived_at
+        data_tests:
+          - not_null
+      - name: service_hour
+        data_tests:
+          - not_null
+
+  - name: stg_ttc_collection_gaps
+    description: Periods over 2 minutes without a new trip-update snapshot.
+    columns:
+      - name: gap_seconds
+        data_tests:
+          - not_null
+
+  - name: ttc_headways
+    description: >-
+      Time since the previous train at the same platform and service day. Incremental;
+      the last two service days are rebuilt each run.
+    columns:
+      - name: event_id
+        data_tests:
+          - unique
+          - not_null
+      - name: route_id
+        data_tests:
+          - not_null
+      - name: direction_id
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+      - name: headway_seconds
+        description: Null for the first train at a platform on a service day.
+      - name: implausible
+        data_tests:
+          - not_null
+      - name: spans_collection_gap
+        data_tests:
+          - not_null
+      - name: outside_service
+        description: A train passed more than 10 minutes before the platform's first scheduled train or 30 minutes after its last (a work or positioning train), so the gap spans the overnight closure.
+        data_tests:
+          - not_null
+
+  - name: ttc_scheduled_service
+    description: Scheduled trains per platform and service hour, using the GTFS version covering each date.
+    columns:
+      - name: scheduled_trains
+        data_tests:
+          - not_null
+      - name: feed_version
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: source('normalized', 'ttc_gtfs_versions')
+                field: feed_version
+
+  - name: ttc_headway_reliability_hourly
+    description: >-
+      Observed versus scheduled headways per line, direction and service hour, with day
+      type, weather (null until Environment Canada publishes the hour) and the sums for
+      excess wait time.
+    columns:
+      - name: observed_headways
+        data_tests:
+          - not_null
+      - name: day_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [weekday, saturday, sunday, holiday]
+
+  - name: ttc_collection_gaps
+    description: Every period over 2 minutes without a new trip snapshot, kept after poll runs expire.
+    columns:
+      - name: gap_start
+        data_tests:
+          - unique
+          - not_null
+
+  - name: ttc_service_days
+    description: >-
+      Day type of each observed service day from TTC's calendar; holiday when a calendar
+      exception removes the day's regular service.
+    columns:
+      - name: service_date
+        data_tests:
+          - unique
+          - not_null
+      - name: day_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [weekday, saturday, sunday, holiday]
+
+  - name: ttc_station_reliability
+    description: Measurable headways per platform and service day, with the sums for excess wait time.
+    columns:
+      - name: compared_headways
+        data_tests:
+          - not_null
+
+  - name: ttc_longest_gaps
+    description: Ten longest measurable gaps per line and service day, one row per pair of trains.
+    columns:
+      - name: event_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ttc_headways')
+                field: event_id
+
+  - name: ttc_elevator_outages
+    description: Elevator and escalator outages with durations from first sighting.
+    columns:
+      - name: alert_id
+        data_tests:
+          - unique
+          - not_null
+      - name: device_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['elevator', 'escalator', 'other']
+      - name: duration_minutes
+        data_tests:
+          - not_null
+
+  - name: stg_ttc_official_delays
+    description: TTC's logged subway incidents with service day, line and code description.
+    columns:
+      - name: source_id
+        data_tests:
+          - unique
+          - not_null
+
+  - name: stg_weather_hourly
+    description: >-
+      Hourly weather at Toronto City keyed by TTC service day and hour, from the
+      observations at both ends of the hour. conditions is dry when neither recorded
+      precipitation, snow when it fell at or below 0 °C, else rain.
+    columns:
+      - name: observed_at
+        data_tests:
+          - unique
+          - not_null
+      - name: service_hour
+        data_tests:
+          - not_null
+      - name: conditions
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [dry, rain, snow]
+
+  - name: ttc_delay_detection
+    description: >-
+      Each incident TTC logged with a gap between trains, at a matched station and line,
+      during this project's collection, with the longest gap this project observed at
+      that station and line around it. detected means the observed gap was at least 75%
+      of TTC's reported gap. Empty until TTC publishes a month this project collected.
+    columns:
+      - name: source_id
+        data_tests:
+          - unique
+          - not_null
+      - name: in_coverage
+        data_tests:
+          - not_null
+      - name: detected
+        data_tests:
+          - not_null
+  - name: stg_ttc_surface_passages
+    description: Bus and streetcar stop passages with service day and hour.
+    columns:
+      - name: service_date
+        data_tests:
+          - not_null
+  - name: stg_ttc_vehicle_gaps
+    description: Periods over 2 minutes with no new bus and streetcar position snapshot.
+  - name: ttc_surface_scheduled
+    description: Scheduled vehicles per route, direction, measurement stop and service hour.
+    columns:
+      - name: scheduled_trips
+        data_tests:
+          - not_null
+  - name: ttc_surface_headways
+    description: >-
+      Time between consecutive vehicles of a route and direction at a measurement stop,
+      with the scheduled headway for the hour; kept beyond passage retention.
+    columns:
+      - name: headway_seconds
+        data_tests:
+          - not_null
+  - name: ttc_surface_reliability_daily
+    description: >-
+      Bus and streetcar headways per route, direction and day on frequent service:
+      bunching, long gaps and the sums for excess wait time.
+  - name: ttc_surface_closure_days
+    description: Road restrictions in effect along each route direction on each measured service day.
+    columns:
+      - name: restrictions
+        data_tests:
+          - not_null
+  - name: ttc_surface_closure_effect
+    description: >-
+      Weekday bus and streetcar reliability sums per route direction, split by whether a
+      high-impact road restriction lay along the route that day.
+

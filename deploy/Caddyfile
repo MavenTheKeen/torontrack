@@ -1,0 +1,7 @@
+# HTTPS certificates are obtained and renewed automatically for SITE_ADDRESS.
+# No access log: the site promises no tracking, so visitor addresses are not recorded.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy web:8000
+}
