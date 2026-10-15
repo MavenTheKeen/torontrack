@@ -104,7 +104,7 @@ services:
     restart: unless-stopped
     stop_grace_period: 40s
 
-  # Brampton Transit and MiWay bus positions every 15 s (docs/agencies.md).
+  # Brampton Transit, MiWay and York Region Transit bus positions every 15 s (docs/agencies.md).
   agencies-collector:
     <<: *app
     command: ["agencies-collect"]

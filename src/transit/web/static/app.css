@@ -656,6 +656,7 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
 /* Neighbouring agencies' buses (transit.agencies). */
 .route-pill.br { background: #0f766e; }
 .route-pill.mi { background: #4f46e5; }
+.route-pill.yr { background: #a21caf; }
 /* A dock's trips by hour: 24 slim bars, values in each bar's title and the caption. */
 .hour-bars { display: flex; align-items: flex-end; gap: 2px; height: 56px; margin: 8px 0 2px; }
 .hour-bars span { flex: 1; background: #22c55e; min-height: 2px; }

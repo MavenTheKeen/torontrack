@@ -67,7 +67,7 @@ dc exec airflow airflow dags unpause road_restrictions
 dc exec airflow airflow dags unpause bikeshare_trips
 dc exec airflow airflow dags unpause city_events
 dc exec airflow airflow dags unpause ticketed_events   # needs secrets/ticketmaster_api_key
-dc exec airflow airflow dags unpause agency_schedules   # Brampton Transit and MiWay
+dc exec airflow airflow dags unpause agency_schedules   # Brampton Transit, MiWay and YRT
 dc exec airflow /opt/app-venv/bin/transit bikeshare-trips-refresh   # first load, a few minutes
 dc exec airflow /opt/app-venv/bin/transit regional-refresh   # first load, then daily
 dc exec airflow /opt/app-venv/bin/transit weather-refresh --since 2026-10-09   # one-time backfill

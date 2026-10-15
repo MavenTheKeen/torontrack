@@ -33,8 +33,9 @@ from transit.http import FetchError
 BUILDS_URL = "https://build-metadata.protomaps.dev/builds.json"
 BUILD_HOST = "build.protomaps.com"
 # West, south, east, north: every subway station and Bike Share dock with a margin, and
-# Brampton and Mississauga, whose buses the map shows (transit.agencies).
-BOUNDS = (-79.98, 43.47, -79.05, 43.92)
+# Brampton, Mississauga and York Region up to Keswick, whose buses the map shows
+# (transit.agencies).
+BOUNDS = (-79.98, 43.47, -79.05, 44.34)
 MAX_ZOOM = 15  # The map overzooms past this; z15 has every street and building.
 # Every regional rail station (Stratford to Bowmanville, Niagara Falls to Barrie).
 REGION = (-81.2, 42.95, -78.45, 44.55)

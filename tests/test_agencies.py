@@ -91,6 +91,17 @@ def test_headsigns_become_destinations():
     assert agencies.towards("Queen Eb-Fccc") == "Queen East"
     assert agencies.towards("Airport Road North - Nlsd") == "Airport Road North"
     assert agencies.towards("Bramalea Go") == "Bramalea"
+    assert agencies.towards("Newmarket Terminal - NB") == "Newmarket Terminal"
+    assert agencies.towards("Cornell Bus Terminal via Highway 7 - EB") == (
+        "Cornell Bus Terminal via Highway 7"
+    )
+
+
+def test_route_numbers_are_shown_as_riders_see_them():
+    assert agencies.route_number("001") == "1"
+    assert agencies.route_number("107B") == "107B"
+    assert agencies.route_number("blue") == "Blue"
+    assert agencies.route_number("A") == "A"
 
 
 @pytest.mark.integration
@@ -118,7 +129,7 @@ def test_a_network_and_live_buses_are_served_with_prefixed_ids(settings):
             for r in conn.execute("SELECT vehicle_id FROM normalized.agency_vehicles")
         ]
         assert ids == ["1051"]
-        assert agencies.healthy(conn, NOW + timedelta(seconds=30)) == ["mi"]
+        assert agencies.healthy(conn, NOW + timedelta(seconds=30)) == ["mi", "yr"]
 
         matched = web.matched_vehicles(conn, NOW)
         [bus] = matched

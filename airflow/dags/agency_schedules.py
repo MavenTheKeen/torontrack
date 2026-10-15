@@ -1,5 +1,5 @@
-"""Daily Brampton Transit and MiWay schedule refresh (transit.agencies). Each agency's
-network is replaced only when its zip changed."""
+"""Daily Brampton Transit, MiWay and York Region Transit schedule refresh
+(transit.agencies). Each agency's network is replaced only when its zip changed."""
 
 import subprocess
 from datetime import UTC, datetime, timedelta
@@ -10,7 +10,7 @@ APP = "/opt/app-venv/bin/transit"
 
 with DAG(
     dag_id="agency_schedules",
-    description="Download Brampton Transit and MiWay static GTFS and load their bus networks",
+    description="Download Brampton Transit, MiWay and YRT static GTFS and load their bus networks",
     start_date=datetime(2026, 10, 15, tzinfo=UTC),
     schedule="20 9 * * *",  # 05:20 Toronto time (EDT), after the regional refresh.
     catchup=False,
