@@ -105,13 +105,15 @@ def test_a_correction_is_made_up_evenly_until_the_next_refresh(page):
             const out = [glide(state, "a", [0, 0], 0)];
             // New data: the estimate is 0.001 degrees (about 80 m) east and keeps still.
             state.seq += 1;
-            for (const t of [0, 2500, 5000, 7500, 10000, 12000]) out.push(glide(state, "a", [0.001, 0], t));
+            for (const t of [0, 2500, 5000, 7500, 10000, 12000]) {
+                out.push(glide(state, "a", [0.001, 0], t));
+            }
             return out.map((c) => c[0]);
         }"""
     )
     # Even steps, no burst: a quarter of the way every 2.5 s, arriving at the next refresh.
     assert steps[:2] == [0, 0]
-    gaps = [b - a for a, b in zip(steps[1:6], steps[2:6])]
+    gaps = [b - a for a, b in zip(steps[1:5], steps[2:6], strict=True)]
     assert all(g == pytest.approx(0.00025) for g in gaps)
     assert steps[6] == pytest.approx(0.001)
 
@@ -126,7 +128,9 @@ def test_a_vehicle_ahead_of_its_estimate_waits_and_a_far_one_glides_quickly(page
             glide(state, "a", [0, 0.0001], 100);
             state.seq += 1;
             const held = [];
-            for (let t = 200; t <= 6200; t += 1000) held.push(glide(state, "a", [0, -0.0004 + t * 1e-7], t)[1]);
+            for (let t = 200; t <= 6200; t += 1000) {
+                held.push(glide(state, "a", [0, -0.0004 + t * 1e-7], t)[1]);
+            }
             // A correction of about 1 km is a quick glide, done well before the next refresh.
             const far = newGlide();
             glide(far, "b", [0, 0], 0);
@@ -135,7 +139,7 @@ def test_a_vehicle_ahead_of_its_estimate_waits_and_a_far_one_glides_quickly(page
             return [held, glide(far, "b", [0, 0.01], 1500)];
         }"""
     )
-    assert all(b >= a for a, b in zip(held, held[1:]))
+    assert all(b >= a for a, b in zip(held, held[1:], strict=False))
     assert far == [0, 0.01]
 
 
