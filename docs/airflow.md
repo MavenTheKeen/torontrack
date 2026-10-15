@@ -39,7 +39,7 @@ execution timeout. An HTTP Retry-After deadline is stored in PostgreSQL and also
 applies to later Airflow retries. Failed tasks remain failed visibly; no empty
 dataset is substituted.
 
-Four more DAGs run, each also paused until unpaused:
+Other DAGs, each also paused until unpaused, include:
 
 | DAG | Schedule (UTC) | Runs |
 | --- | --- | --- |
@@ -47,6 +47,7 @@ Four more DAGs run, each also paused until unpaused:
 | `ttc_official_delays` | 10:00 | `ttc-delays-refresh`: loads TTC's official delay log when a new month is published |
 | `weather_hourly` | hourly at :20 | `weather-refresh`: loads Environment Canada's hourly weather, re-reading two days so revisions and missed runs are caught up ([weather](weather.md)) |
 | `open_data_export` | 09:30 | `export`: writes completed days as [open-data files](datasets.md), catching up any missed days |
+| `ticketed_events` | every 6 h at :20 | `ticketed-events-refresh`: loads Ticketmaster concerts, games and shows for the next 14 days ([events](events.md#concerts-games-and-shows-ticketmaster)) |
 
 The collection ID hashes DAG ID + run ID. Clearing a task reuses stored raw data.
 The collected timestamp is the actual HTTP acquisition time, never the logical
