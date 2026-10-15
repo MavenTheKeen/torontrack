@@ -71,35 +71,42 @@ def pattern_index(conn, version: str) -> dict[str, list[dict]]:
                ORDER BY p.pattern_id, ps.stop_order""",
             (version, MATCH_SHARE),
         ).fetchall()
-        patterns: dict[int, dict] = {}
-        for r in rows:
-            pattern = patterns.setdefault(
-                r["pattern_id"],
-                {
-                    "pattern_id": r["pattern_id"],
-                    "route": r["route_id"],
-                    "direction_id": r["direction_id"],
-                    "towards": r["towards"],
-                    "trips": r["trips"],
-                    "stops": [],
-                    "offsets": [],
-                    "xy": [],
-                },
-            )
-            pattern["stops"].append(r["stop_id"])
-            pattern["offsets"].append(r["offset_seconds"])
-            pattern["xy"].append(_xy(r["lat"], r["lon"]))
-        routes: dict[str, list[dict]] = {}
-        for pattern in patterns.values():
-            pattern["order"] = {}
-            for i, stop_id in enumerate(pattern["stops"]):
-                pattern["order"].setdefault(stop_id, i)
-            pattern["measured"] = measured_stops(pattern["offsets"])
-            routes.setdefault(pattern["route"], []).append(pattern)
+        routes = index_rows(rows)
         if routes:
             _index.clear()
             _index.update(version=version, routes=routes)
         return routes
+
+
+def index_rows(rows) -> dict[str, list[dict]]:
+    """{route: [pattern]} from rows of one pattern stop each, in stop order: pattern_id,
+    route_id, direction_id, towards, trips, stop_id, offset_seconds, lat and lon."""
+    patterns: dict = {}
+    for r in rows:
+        pattern = patterns.setdefault(
+            r["pattern_id"],
+            {
+                "pattern_id": r["pattern_id"],
+                "route": r["route_id"],
+                "direction_id": r["direction_id"],
+                "towards": r["towards"],
+                "trips": r["trips"],
+                "stops": [],
+                "offsets": [],
+                "xy": [],
+            },
+        )
+        pattern["stops"].append(r["stop_id"])
+        pattern["offsets"].append(r["offset_seconds"])
+        pattern["xy"].append(_xy(r["lat"], r["lon"]))
+    routes: dict[str, list[dict]] = {}
+    for pattern in patterns.values():
+        pattern["order"] = {}
+        for i, stop_id in enumerate(pattern["stops"]):
+            pattern["order"].setdefault(stop_id, i)
+        pattern["measured"] = measured_stops(pattern["offsets"])
+        routes.setdefault(pattern["route"], []).append(pattern)
+    return routes
 
 
 def _angle(a: float, b: float) -> float:

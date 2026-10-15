@@ -216,6 +216,22 @@ def stop(conn, version: str, stop_id: str, matched: list[dict], now: datetime) -
         (version, stop_id),
     ).fetchall()
     short_names = {r["route_id"]: r["short_name"] for r in routes}
+    return {
+        "stop": {
+            "id": info["stop_id"],
+            "code": info["stop_code"],
+            "name": info["name"],
+            "lat": info["lat"],
+            "lon": info["lon"],
+        },
+        "routes": [dict(r) for r in routes],
+        "arrivals": estimate_arrivals(matched, stop_id, short_names, now),
+    }
+
+
+def estimate_arrivals(matched: list[dict], stop_id: str, short_names: dict, now: datetime):
+    """The next vehicles due at a stop: scheduled time along each matched vehicle's
+    pattern from its position to the stop, less the age of its report."""
     arrivals = []
     for v in matched:
         pattern = v["pattern"]
@@ -238,17 +254,19 @@ def stop(conn, version: str, stop_id: str, matched: list[dict], now: datetime) -
             }
         )
     arrivals.sort(key=lambda a: (a["seconds"], a["vehicle_id"]))
-    return {
-        "stop": {
-            "id": info["stop_id"],
-            "code": info["stop_code"],
-            "name": info["name"],
-            "lat": info["lat"],
-            "lon": info["lon"],
-        },
-        "routes": [dict(r) for r in routes],
-        "arrivals": arrivals[:ARRIVALS_SHOWN],
-    }
+    return arrivals[:ARRIVALS_SHOWN]
+
+
+def main_patterns(patterns: list[dict]) -> list[dict]:
+    """The patterns a route's drawn path uses: by trips, at least PATTERN_SHARE of their
+    direction's and at most PATTERNS_PER_DIRECTION per direction."""
+    shown, per_direction = [], {}
+    for p in patterns:
+        count = per_direction.get(p["direction_id"], 0)
+        if p["share"] >= PATTERN_SHARE and count < PATTERNS_PER_DIRECTION:
+            per_direction[p["direction_id"]] = count + 1
+            shown.append(p)
+    return shown
 
 
 def route(conn, version: str, route_id: str) -> dict | None:
@@ -267,12 +285,7 @@ def route(conn, version: str, route_id: str) -> dict | None:
            ORDER BY direction_id, trips DESC""",
         (version, route_id),
     ).fetchall()
-    shown, per_direction = [], {}
-    for p in patterns:
-        count = per_direction.get(p["direction_id"], 0)
-        if p["share"] >= PATTERN_SHARE and count < PATTERNS_PER_DIRECTION:
-            per_direction[p["direction_id"]] = count + 1
-            shown.append(p)
+    shown = main_patterns(patterns)
     paths = {}
     for r in conn.execute(
         """SELECT ps.pattern_id, round(s.lon::numeric, 5)::float AS lon,
