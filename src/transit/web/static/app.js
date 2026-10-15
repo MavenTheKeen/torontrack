@@ -2034,7 +2034,8 @@ function planFromMe(view) {
 // guidance.js decides what to show from each position; this part draws it. The position
 // comes from a location source, so real GPS and the simulated preview share everything.
 const GUIDE_ZOOM = 16.5;
-const LIVE_WAIT_MS = 30000;
+// Vehicle positions arrive every 10 s and the server caches stop estimates for 15 s.
+const LIVE_WAIT_MS = 15000;
 
 function addGuideLayers(view) {
   const map = view.map;

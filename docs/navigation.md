@@ -68,7 +68,7 @@ traveller 120 m along the line, and the stop count updates with each fix that ar
 - The map follows the traveller at street zoom and turns to the direction of travel.
   Panning stops following until **Recenter**.
 - While waiting for a TTC bus or streetcar, the card shows the live estimate for that stop
-  and route from `/api/stops/{id}`, refreshed every 30 seconds. Subway and regional legs
+  and route from `/api/stops/{id}`, refreshed every 15 seconds. Subway and regional legs
   show the scheduled time, and a subway leg names the entrance to use and, while riding,
   the exit to take ([trip planner](planner.md#entrances-and-exits)).
 - On a Bike Share ride, the card says which station to ride to and the minutes left at
