@@ -95,13 +95,13 @@ here / to here".
 
 ## Choosing how to travel
 
-"Travel by" switches each way of travelling on or off: subway, streetcar, TTC bus, GO
-train, GO bus and Bike Share. Walking is always allowed. Bike Share starts off; the rest
+"Travel by" switches each way of travelling on or off: subway, streetcar, TTC bus, regional
+train, regional bus and Bike Share. Walking is always allowed. Bike Share starts off; the rest
 start on. The choices, and the step-free option, are kept in the browser's local storage on
 that device only, and apply to every trip until changed. Changing one re-plans the trip.
 
 The planner has one mode per kind of vehicle, so subway, streetcar and train map directly.
-TTC and GO buses are both buses, so leaving out one of them excludes that network's bus
+TTC and regional buses are both buses, so leaving out one of them excludes that network's bus
 routes by ID; the route lists are read from the planner and cached for six hours. With
 every transit mode off, the planner returns walking (and Bike Share) trips only.
 

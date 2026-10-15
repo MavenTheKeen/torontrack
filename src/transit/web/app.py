@@ -337,6 +337,9 @@ def create_app(
             for s in network["stations"]:
                 station = {k: v for k, v in s.items() if k != "stop_ids"}
                 station["outages"] = outages.get(s["key"], [])
+                station["disrupted"] = queries.station_disrupted_lines(
+                    s["lines"], s.get("stop_ids", []), alerts
+                )
                 station["entrances"] = entrances.get(s["key"], [])
                 station["bike_parking"] = bike_parking.get(s["key"])
                 stations.append(station)
