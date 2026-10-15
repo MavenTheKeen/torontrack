@@ -833,8 +833,8 @@ const mapState = { view: null, mode: "bikes", layers: { trains: true, regional: 
 // brand is red-orange, so TTC buses take blue and streetcars crimson, and neighbouring
 // agencies' buses (mode = agency key, transit.agencies) teal and indigo. All are always
 // labelled, never told apart by colour alone.
-const SURFACE_COLOURS = { bus: "#2563eb", streetcar: "#e11d48", br: "#0f766e", mi: "#4f46e5" };
-const SURFACE_LABELS = { bus: "Bus", streetcar: "Streetcar", br: "Brampton Transit bus", mi: "MiWay bus" };
+const SURFACE_COLOURS = { bus: "#2563eb", streetcar: "#e11d48", br: "#0f766e", mi: "#4f46e5", yr: "#a21caf" };
+const SURFACE_LABELS = { bus: "Bus", streetcar: "Streetcar", br: "Brampton Transit bus", mi: "MiWay bus", yr: "York Region Transit bus" };
 const surfaceGlyph = (mode) => (mode === "streetcar" ? "streetcar" : "bus");
 // A route's number as shown: agencies' route IDs carry their prefix ("br:511").
 const routeName = (view, id) => (view.surfaceRoutes && view.surfaceRoutes.get(id)?.short_name) || String(id).replace(/^[a-z]{2}:/, "");
@@ -3045,7 +3045,7 @@ async function renderMap(focusKey) {
     });
     map.touchZoomRotate.disableRotation();
     map.addControl(new lib.NavigationControl({ showCompass: false }), "bottom-right");
-    map.addControl(new lib.AttributionControl({ compact: true, customAttribution: "Data: TTC, Bike Share Toronto, City of Toronto and Toronto Parking Authority (OGL – Toronto); regional rail data provided with the permission of Metrolinx; Brampton Transit data: City of Brampton (CC BY 4.0); MiWay data: City of Mississauga Terms of Use" }), "bottom-left");
+    map.addControl(new lib.AttributionControl({ compact: true, customAttribution: "Data: TTC, Bike Share Toronto, City of Toronto and Toronto Parking Authority (OGL – Toronto); regional rail data provided with the permission of Metrolinx; Brampton Transit data: City of Brampton (CC BY 4.0); MiWay data: City of Mississauga Terms of Use; contains public transit Information made available under YRT's Open Data Licence" }), "bottom-left");
     view.map = map;
     activeMap = view;
     renderChips();

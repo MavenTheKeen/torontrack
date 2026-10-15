@@ -90,10 +90,10 @@ def main():
     )
     commands.add_parser("regional-refresh", help="Load the regional train schedule if it changed")
     commands.add_parser(
-        "agencies-refresh", help="Load Brampton Transit and MiWay schedules if they changed"
+        "agencies-refresh", help="Load neighbouring agencies' schedules if they changed"
     )
     commands.add_parser(
-        "agencies-collect", help="Poll Brampton Transit and MiWay bus positions every 15 s"
+        "agencies-collect", help="Poll neighbouring agencies' bus positions every 15 s"
     )
     commands.add_parser(
         "agencies-health", help="Exit 1 unless every agency was polled in 2 minutes"

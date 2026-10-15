@@ -10,8 +10,9 @@ agency's key ("br:511") because route numbers repeat across agencies.
 
 Licences: Brampton Transit's data is CC BY 4.0 (credit required); MiWay's is under the
 City of Mississauga's Terms of Use, which require that redistributed data carry the terms'
-URL. Neither allows implying endorsement or using the agencies' logos, so the map uses its
-own colours and plain names.
+URL; York Region Transit's is under its Open Data Licence, whose credit wording is used.
+None allows implying endorsement or using the agencies' logos, so the map uses its own
+colours and plain names.
 """
 
 import hashlib
@@ -60,6 +61,13 @@ AGENCIES = {
             "(www5.mississauga.ca/research_catalogue/CityofMississauga_TermsofUse.pdf)."
         ),
     ),
+    "yr": Agency(
+        key="yr",
+        name="York Region Transit",
+        static_url="https://www.yrt.ca/google/google_transit.zip",
+        vehicles_url="https://rtu.york.ca/gtfsrealtime/VehiclePositions",
+        credit="Contains public transit Information made available under YRT's Open Data Licence.",
+    ),
 }
 STATIC_MAX_BYTES = 80 << 20
 POLL_SECONDS = 15
@@ -90,6 +98,14 @@ def towards(headsign: str) -> str:
     )
     text = re.sub(r"\s+GO(\s+Station)?$", "", text, flags=re.IGNORECASE).strip()
     return text or headsign.strip()
+
+
+def route_number(short_name: str) -> str:
+    """A route number as riders see it: '001' -> '1', '107B' -> '107B', 'blue' -> 'Blue'."""
+    name = short_name.strip()
+    if name[:1].isdigit():
+        return name.lstrip("0") or "0"
+    return name.title() if name.islower() else name
 
 
 # ---- Static network ----------------------------------------------------------------------
@@ -167,6 +183,8 @@ def refresh(database_url: str, client: FeedClient, agencies=None) -> dict:
             )
             sha = hashlib.sha256(body).hexdigest()
             feed = surface.parse(body, modes={"3": "bus"}, name_towards=towards)
+            for route in feed.routes:
+                route["short_name"] = route_number(route["short_name"])
             with connect(database_url) as conn:
                 result = load(conn, agency, feed, sha, started)
         except (FetchError, FeedValidationError, KeyError, ValueError) as exc:
