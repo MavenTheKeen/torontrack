@@ -508,12 +508,12 @@ def _normalize_vehicles(conn, raw, snapshot):
 
 
 def apply_retention(
-    conn, raw_days: int, event_days: int, poll_days: int = 30, vehicle_raw_hours: int = 6
+    conn, raw_days: int, event_days: int, poll_days: int = 30, vehicle_raw_hours: int = 1
 ) -> dict:
     """Raw protobuf is short-lived; derived history lives longer. Never deletes the
     snapshot a feed currently points at. Vehicle snapshots are ~130 KB every 30 seconds,
-    so they are kept for hours rather than days; surface trip updates (~700 KB) for one
-    hour."""
+    so they are kept for an hour rather than days; surface trip updates (~700 KB) for
+    15 minutes."""
     now = datetime.now(UTC)
     with conn.transaction():
         raw = conn.execute(
@@ -524,7 +524,7 @@ def apply_retention(
             (
                 now - timedelta(days=raw_days),
                 now - timedelta(hours=vehicle_raw_hours),
-                now - timedelta(hours=1),
+                now - timedelta(minutes=15),
             ),
         ).rowcount
         events = conn.execute(

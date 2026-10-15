@@ -15,6 +15,7 @@ from transit import (
     planner,
     regional,
     roads,
+    scheduler,
     ticketmaster,
     weather,
 )
@@ -98,6 +99,8 @@ def main():
     commands.add_parser(
         "agencies-health", help="Exit 1 unless every agency was polled in 2 minutes"
     )
+    commands.add_parser("schedule", help="Run the scheduled jobs (production, in place of Airflow)")
+    commands.add_parser("schedule-health", help="Exit 1 unless the scheduler is running")
     map_cmd = commands.add_parser(
         "map-tiles", help="Build the site's Toronto street map from OpenStreetMap"
     )
@@ -127,6 +130,11 @@ def main():
     export.add_argument("--force", action="store_true", help="Rewrite days already exported")
     args = parser.parse_args()
     try:
+        if args.command == "schedule":
+            scheduler.run_forever()
+            return 0
+        if args.command == "schedule-health":
+            return 0 if scheduler.healthy() else 1
         if args.command == "ttc-smoke":
             client = FeedClient()
             try:

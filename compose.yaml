@@ -88,7 +88,7 @@ services:
       # Subway predictions and vehicle positions (docs/ttc.md).
       TTC_FAST_POLL_SECONDS: ${TTC_FAST_POLL_SECONDS:-10}
       TTC_RAW_RETENTION_DAYS: ${TTC_RAW_RETENTION_DAYS:-3}
-      TTC_VEHICLE_RAW_RETENTION_HOURS: ${TTC_VEHICLE_RAW_RETENTION_HOURS:-6}
+      TTC_VEHICLE_RAW_RETENTION_HOURS: ${TTC_VEHICLE_RAW_RETENTION_HOURS:-1}
       TTC_EVENT_RETENTION_DAYS: ${TTC_EVENT_RETENTION_DAYS:-90}
     depends_on:
       postgres:
@@ -220,7 +220,7 @@ services:
     profiles: ["planner"]
     entrypoint: ["/bin/bash", "/planner.sh"]
     environment:
-      JAVA_OPTS: ${PLANNER_JAVA_OPTS:--Xmx2g}
+      JAVA_OPTS: ${PLANNER_JAVA_OPTS:--Xmx1536m}
       BUILD_JAVA_OPTS: ${PLANNER_BUILD_JAVA_OPTS:--Xmx4g}
     volumes:
       - planner-data:/var/opentripplanner
@@ -237,6 +237,39 @@ services:
       start_period: 15m
     restart: unless-stopped
     stop_grace_period: 30s
+
+  # Production's scheduled jobs (transit.scheduler): the Airflow DAGs' commands on their
+  # schedules in one small process, in place of Airflow (about 1.1 GB less memory).
+  # `docker compose --profile scheduler up -d`; use either this or the airflow profile.
+  scheduler:
+    image: toronto-transit-airflow:local
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
+    profiles: ["scheduler"]
+    entrypoint: ["/opt/app-venv/bin/transit"]
+    command: ["schedule"]
+    environment:
+      <<: *app-environment
+      EXPORT_DIR: /opt/airflow/open-data
+      TICKETMASTER_API_KEY_FILE: /run/secrets/ticketmaster_api_key
+    secrets: [postgres_password, ticketmaster_api_key]
+    volumes:
+      - open-data:/opt/airflow/open-data
+      - planner-data:/opt/airflow/planner
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init-db:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/opt/app-venv/bin/transit", "schedule-health"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+    stop_grace_period: 20s
 
   airflow-db-init:
     <<: *app

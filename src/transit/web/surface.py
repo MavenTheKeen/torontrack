@@ -143,68 +143,20 @@ def patterns(conn, version: str) -> dict:
     }
 
 
-def vehicle_predictions(conn, now: datetime) -> dict[str, list[tuple]]:
-    """{vehicle_id: [(stop_id, predicted arrival), ...]} in time order, from TTC's
-    current predictions (none when the feed is stale)."""
-    fresh = conn.execute(
-        "SELECT feed_timestamp FROM ops.ttc_feed_state WHERE feed = 'trips_surface'"
-    ).fetchone()
-    if not fresh or now - fresh["feed_timestamp"] > PREDICTIONS_STALE:
-        return {}
-    out: dict[str, list[tuple]] = {}
-    for r in conn.execute(
-        """SELECT vehicle_id, stop_id, predicted_arrival FROM normalized.ttc_surface_predictions
-           WHERE vehicle_id IS NOT NULL AND predicted_arrival BETWEEN %s AND %s
-           ORDER BY vehicle_id, predicted_arrival""",
-        (now - timedelta(minutes=2), now + timedelta(minutes=20)),
-    ):
-        out.setdefault(r["vehicle_id"], []).append((r["stop_id"], r["predicted_arrival"]))
-    return out
-
-
-# A predicted stop at least this far ahead on the timetable sets the pace; nearer ones
-# are too sensitive to a few seconds' error.
-PREDICTED_PACE_MIN_SECONDS = 60
-
-
-def predicted_pace(v: dict, stops: list[tuple]) -> float | None:
-    """The pace (timetable seconds per real second) that brings a vehicle from its report
-    to its first predicted stop at least PREDICTED_PACE_MIN_SECONDS ahead on its pattern,
-    at TTC's predicted time."""
-    pattern = v["pattern"]
-    here = _offset_at(pattern, v["position"])
-    for stop_id, at in stops:
-        i = pattern["order"].get(stop_id)
-        if i is None or i <= v["position"]:
-            continue
-        scheduled = pattern["offsets"][i] - here
-        actual = (at - v["reported_at"]).total_seconds()
-        if scheduled >= PREDICTED_PACE_MIN_SECONDS and actual > 0:
-            return scheduled / actual
-    return None
-
-
-def vehicles(
-    matched: list[dict], now: datetime, pace: dict | None = None, predicted: dict | None = None
-) -> dict:
+def vehicles(matched: list[dict], now: datetime, pace: dict | None = None) -> dict:
     """Every vehicle with, when matched to a pattern, what moving it needs (motion.js):
     the pattern, its fractional stop position, the report time (epoch seconds), whether it
-    reported standing still, and its pace (1.0 = timetable): the one that meets TTC's
-    prediction for a stop ahead, else its route's usual pace this hour. `pace_source`
-    says which (ttc, usual or timetable)."""
+    reported standing still, and its pace (1.0 = timetable): its route's usual pace this
+    hour where measured. `pace_source` says which (usual or timetable)."""
     newest = max((v["reported_at"] for v in matched), default=None)
     hour = now.astimezone(TORONTO).hour
     pace = pace or {}
-    predicted = predicted or {}
 
     def motion(v):
         if not v["pattern"]:
             return [None, None, None, None]
-        chosen = predicted_pace(v, predicted.get(v["vehicle_id"], []))
-        source = "ttc"
-        if chosen is None:
-            key = (v["route_id"], v["pattern"]["direction_id"], hour)
-            chosen, source = (pace[key], "usual") if key in pace else (1.0, "timetable")
+        key = (v["route_id"], v["pattern"]["direction_id"], hour)
+        chosen, source = (pace[key], "usual") if key in pace else (1.0, "timetable")
         return [
             v["pattern"]["pattern_id"],
             round(v["position"], 4),
