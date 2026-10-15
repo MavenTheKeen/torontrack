@@ -1,7 +1,9 @@
 # Events
 
-The map shows the City of Toronto's festivals and events for the coming week, and a subway
-station's panel lists events within a 10-minute walk (700 m) happening today.
+The **Events page** (`#/events`) lists what is on over the next 14 days: the City of
+Toronto's festivals and community events, and concerts, games and shows from Ticketmaster.
+The map also shows the city's events for the coming week, and a subway station's panel
+lists events within a 10-minute walk (700 m) happening today.
 
 Events: City of Toronto festivals and events calendar. Contains information licensed under
 the [Open Government Licence – Toronto](https://www.toronto.ca/city-government/data-research-maps/open-data/open-data-licence/).
@@ -15,10 +17,9 @@ in the next 60 days, the Toronto Waterfront Marathon, the Santa Claus parade, Nu
 and the Cavalcade of Lights among them.
 
 It does **not** list Blue Jays, Maple Leafs or Raptors games and lists only a couple of
-arena concerts, the events that move the most riders. So the site shows it as context and
-does not measure crowding from it. League schedule APIs are free to call but their terms
-restrict use (MLB's, for example, to individual, non-commercial, non-bulk use), so they are
-not used.
+arena concerts, the events that move the most riders. League schedule APIs are free to call
+but their terms restrict use (MLB's, for example, to individual, non-commercial, non-bulk
+use), so they are not used; Ticketmaster (below) covers those events instead.
 
 ## Loading
 
@@ -42,6 +43,57 @@ What the feed contains, and how the loader handles it:
 | `normalized.city_events` | Name, categories, featured, free, website, venue, address and coordinates |
 | `normalized.city_event_occurrences` | Each date of each event. Dates from now on are replaced on every load, so a cancelled date disappears; past dates are kept. |
 | `ops.city_event_refreshes` | Every load: feed hash, events, dates, and records skipped by reason |
+
+## Concerts, games and shows (Ticketmaster)
+
+Ticketmaster sells tickets for nearly every arena, stadium and concert hall in the city,
+including Maple Leafs, Raptors, Toronto FC and Argonauts games. Its Discovery API
+is free with a key from developer.ticketmaster.com, set as `TICKETMASTER_API_KEY` in
+`.env` (passed to Airflow only). Without a key the page shows city events alone, and each
+refresh is recorded as `skipped`.
+
+`transit ticketed-events-refresh` runs every 6 hours (`ticketed_events` Airflow DAG):
+
+- It requests each of the next 14 days separately (events within 30 km of City Hall,
+  from Toronto's midnight to the next), following pages; about 56 requests a day of the
+  5,000 allowed. The key travels only in the request URL, and errors never include it.
+- Ticketmaster lists parking passes, suites and add-ons as events; these are dropped by
+  name. A game or show listed several times at one venue and start time (packages,
+  presales) is kept once, under its shortest name. Cancelled events are dropped;
+  postponed and rescheduled ones are labelled.
+- The API terms allow caching event content only for reasonable periods to provide the
+  service and forbid deriving revenue from it. Each load replaces every upcoming event,
+  past events are deleted after a day, and tickets are bought on Ticketmaster: the page
+  links to each event's own page.
+
+| Table | Holds |
+| --- | --- |
+| `normalized.ticketed_events` | Upcoming events: name, segment and genre, start (or date with time to be announced), status, venue, address, coordinates and Ticketmaster link |
+| `ops.ticketed_event_refreshes` | Every refresh: status (`loaded`, `skipped`, `failed`), requests, events and skipped listings by reason |
+
+The tests use responses built from the Discovery API documentation, as no key was
+available when the loader was written; they are to be replaced with recorded responses.
+
+## The Events page
+
+`/api/agenda` returns the 14 days and every event occurrence in them, and the page shows a
+strip of the days (dots for how busy each is, an amber dot for a major-venue event), then
+the chosen day in time order. `#/events/2026-10-17` opens a given day.
+
+- **Categories:** concerts, sports, arts and theatre, and festivals and community, from
+  the city's categories or Ticketmaster's segment and genre; filters show one category or
+  only free events.
+- **Major venues:** Scotiabank Arena, Rogers Centre, BMO Field, Budweiser Stage and
+  Coca-Cola Coliseum. Their events are highlighted with a note that the nearest station
+  will be busy before the start and when the event ends.
+- **Ongoing events:** a city event on 5 or more days of the window (exhibits, markets,
+  museum programs) is folded into an "ongoing" list under each day, so the timeline shows
+  what happens at a time.
+- **All-day events:** the city lists them at midnight; they show as "All day", first.
+- **Getting there:** each event names the nearest subway station, or a regional station
+  if that is more than 3 minutes' walk closer, with the walk at 80 m a minute in a
+  straight line (none beyond 20 minutes). **Get there** opens the map's trip planner with
+  the venue as the destination.
 
 ## On the map
 

@@ -9,7 +9,7 @@ docker compose up -d web
 
 Open <http://localhost:8000>. Pages use hash routes: `#/` (service status), `#/line/1`
 (line view), `#/station/bloor-yonge` (station), `#/map` (live street map; `#/map/bloor-yonge`
-opens it on a station), `#/stop/15647` (bus or streetcar stop), `#/reliability` (reliability), `#/report` (reliability report), `#/pipeline` (pipeline status).
+opens it on a station), `#/events` (what's on, `#/events/2026-10-17` for one day), `#/stop/15647` (bus or streetcar stop), `#/reliability` (reliability), `#/report` (reliability report), `#/pipeline` (pipeline status).
 
 | Home | Line | Station | Map | Reliability |
 | --- | --- | --- | --- | --- |
@@ -34,6 +34,7 @@ about 2 h 30 min after collection started.
 | `/api/routes/{route_id}` | A surface route with the paths of its main patterns, for drawing it on the map. |
 | `/api/docks/{id}/trips` | A Bike Share dock's trips over the last 12 months of published ridership: totals, weekday hours and top destinations. |
 | `/api/events` | City of Toronto festivals and events from today to 7 days ahead; see [events](events.md). |
+| `/api/agenda` | The Events page: city events and Ticketmaster concerts, games and shows for the next 14 days, each with its category, major-venue flag and nearest station; see [events](events.md#the-events-page). |
 | `/api/roads` | Construction zones and road closures in effect today, with geometry, hours and impact; see [road restrictions](roads.md). |
 | `/api/regional`, `/api/regional/trains`, `/api/regional/stations/{id}` | Regional train lines, timetable positions and scheduled departures; see [regional trains](regional.md). |
 | `/api/trains` | Every line's estimated train positions for the map: each train's position is a fractional index into the line's station list, as on the line diagrams. |

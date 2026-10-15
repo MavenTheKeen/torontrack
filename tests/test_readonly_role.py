@@ -55,6 +55,7 @@ def test_site_runs_on_the_readonly_role(readonly_url):
         "/api/reliability",
         "/api/report",
         "/api/pipeline",
+        "/api/agenda",
         "/api/lines/1",
         "/api/stations/bloor-yonge",
     ):

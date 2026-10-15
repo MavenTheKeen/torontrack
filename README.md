@@ -58,11 +58,19 @@ months: departures by hour and its most common destinations, drawn on the map. T
 summaries cover 21.5 million trips since January 2024. The City of Toronto cycling
 network is available as a map layer.
 
-### Road restrictions and events
+### Events
+
+The Events page shows what is on over the next two weeks: the city's festivals and
+community events, and concerts, games and shows from Ticketmaster. A strip of days leads
+to each day's events in time order, with the nearest station and walking time, a heads-up
+when an arena or stadium event will crowd a station, and a button that plans the trip
+there. See [events](docs/events.md).
+
+### Road restrictions
 
 City of Toronto construction zones and road closures are shown with the bus and
-streetcar routes they affect. The city's festivals and events calendar is shown for the
-coming week, and station panels list events within walking distance.
+streetcar routes they affect. Station panels list the city's events within walking
+distance.
 
 ### Service status
 
@@ -233,7 +241,7 @@ docker compose --profile airflow build airflow
 docker compose --profile airflow up -d airflow
 foreach ($dag in "toronto_bikeshare_reliability", "ttc_static_gtfs", "open_data_export",
     "ttc_official_delays", "weather_hourly", "regional_schedule", "road_restrictions",
-    "bikeshare_trips", "city_events", "planner_data") {
+    "bikeshare_trips", "city_events", "ticketed_events", "planner_data") {
   docker compose exec airflow airflow dags unpause $dag
 }
 ```
