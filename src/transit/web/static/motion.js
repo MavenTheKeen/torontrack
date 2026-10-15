@@ -15,8 +15,9 @@
 //   halved the map's position error (docs/map.md).
 // - Regional trains follow their timetable track, sent ahead by the server.
 //
-// When fresh data moves a vehicle's estimate, the difference is made up over CORRECT_MS,
-// the time until the next refresh, along a curve that keeps both position and speed
+// When fresh data moves a vehicle's estimate, the difference is made up over at least
+// CORRECT_MS (the time until the next refresh), longer for a large one so the vehicle
+// never catches up more than about CATCHUP_MPS faster than it moves, along a curve that keeps both position and speed
 // continuous: a vehicle carries on at the speed it was drawn at and eases onto its new
 // estimate, so a refresh never shows as a jump or a sudden change of pace. One drawn ahead
 // waits instead of backing up. A correction over FAR_DEG (a detour, a report long missing)
@@ -27,6 +28,14 @@ const STOPPED_HOLD_S = 20;
 const MAX_MOVE_S = 120;
 const FADE_AFTER_S = 150;
 const CORRECT_MS = 10000; // The map refreshes trains and vehicles every 10 s.
+const MAX_CORRECT_MS = 30000;
+// Catching up at most this much faster (or slower) than the estimate, on average: measured
+// on the live map, a quarter of corrections at a refresh are over 85 m and a tenth over
+// 170 m, which made up within one 10 s refresh looked like a rush. A longer correction
+// carries over the next refresh, which continues it from where the vehicle is drawn.
+const CATCHUP_MPS = 6;
+const MAX_CARRY_MPS = 12; // Drawn speed carried into a correction, beyond the estimate's.
+const METRES_PER_DEG = 111000;
 const QUICK_MS = 3000;
 const FAR_DEG = 0.005; // About 500 m.
 const HOLD_DEG = 0.0015; // A vehicle up to ~150 m ahead of its estimate waits for it.
@@ -145,10 +154,13 @@ function glide(state, id, target, nowMs) {
     item.start = nowMs - back;
     item.seq = state.seq;
     item.quick = degrees(item.dx, item.dy) > FAR_DEG;
-    item.span = item.quick ? QUICK_MS : CORRECT_MS;
-    // Rate of change of the offset, per ms; dropped if it would carry the vehicle far.
+    const metres = degrees(item.dx, item.dy) * METRES_PER_DEG;
+    item.span = item.quick ? QUICK_MS : Math.min(MAX_CORRECT_MS, Math.max(CORRECT_MS, (1000 * metres) / CATCHUP_MPS));
+    // Rate of change of the offset, per ms, limited to MAX_CARRY_MPS.
     [item.vx, item.vy] = [item.vel[0] - item.tvel[0], item.vel[1] - item.tvel[1]];
-    if (item.quick || degrees(item.vx * item.span, item.vy * item.span) > FAR_DEG) item.vx = item.vy = 0;
+    const carry = degrees(item.vx, item.vy) * METRES_PER_DEG * 1000;
+    if (item.quick) item.vx = item.vy = 0;
+    else if (carry > MAX_CARRY_MPS) [item.vx, item.vy] = [(item.vx * MAX_CARRY_MPS) / carry, (item.vy * MAX_CARRY_MPS) / carry];
   } else if (dt > 0) {
     item.tvel = [(target[0] - item.target[0]) / dt, (target[1] - item.target[1]) / dt];
   }
