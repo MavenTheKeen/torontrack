@@ -1,9 +1,8 @@
 """Buses and streetcars from TTC static GTFS: routes, stops, and stop patterns with
 scheduled travel times, stored under the same feed version as the subway schedule.
 
-TTC publishes live positions for surface vehicles but no arrival predictions, so the
-site estimates arrivals from a vehicle's next stop and the scheduled time between stops
-on its pattern. stop_times.txt has millions of rows; it is streamed trip by trip and only
+The site estimates arrivals from a vehicle's position and the scheduled time between
+stops on its pattern, where TTC's own predictions (feed trips_surface) have none. stop_times.txt has millions of rows; it is streamed trip by trip and only
 running sums per pattern are kept, never the whole file.
 """
 

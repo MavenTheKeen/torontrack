@@ -216,6 +216,10 @@ def stop(conn, version: str, stop_id: str, matched: list[dict], now: datetime) -
         (version, stop_id),
     ).fetchall()
     short_names = {r["route_id"]: r["short_name"] for r in routes}
+    towards = {}
+    for r in routes:
+        towards.setdefault(r["route_id"], set()).add(r["towards"])
+    estimates = estimate_arrivals(matched, stop_id, short_names, now, limit=None)
     return {
         "stop": {
             "id": info["stop_id"],
@@ -225,11 +229,69 @@ def stop(conn, version: str, stop_id: str, matched: list[dict], now: datetime) -
             "lon": info["lon"],
         },
         "routes": [dict(r) for r in routes],
-        "arrivals": estimate_arrivals(matched, stop_id, short_names, now),
+        "arrivals": with_predictions(
+            estimates, predictions(conn, stop_id, now), matched, short_names, towards, now
+        ),
     }
 
 
-def estimate_arrivals(matched: list[dict], stop_id: str, short_names: dict, now: datetime):
+PREDICTIONS_STALE = timedelta(minutes=3)
+
+
+def predictions(conn, stop_id: str, now: datetime) -> list[dict]:
+    """TTC's current predictions at a stop, or none when its feed has gone stale."""
+    fresh = conn.execute(
+        "SELECT feed_timestamp FROM ops.ttc_feed_state WHERE feed = 'trips_surface'"
+    ).fetchone()
+    if not fresh or now - fresh["feed_timestamp"] > PREDICTIONS_STALE:
+        return []
+    return conn.execute(
+        """SELECT trip_id, route_id, vehicle_id, predicted_arrival
+           FROM normalized.ttc_surface_predictions
+           WHERE stop_id = %s AND predicted_arrival >= %s AND predicted_arrival <= %s
+           ORDER BY predicted_arrival""",
+        (stop_id, now - timedelta(seconds=30), now + MAX_ESTIMATE),
+    ).fetchall()
+
+
+def with_predictions(estimates, predicted, matched, short_names, towards, now):
+    """TTC's predictions where it has them, our estimates for other vehicles. A prediction
+    replaces the estimate for the same vehicle; `source` says which each time is."""
+    by_vehicle = {v["vehicle_id"]: v for v in matched}
+    arrivals, seen = [], set()
+    for p in predicted:
+        if p["route_id"] not in short_names or (p["vehicle_id"], p["route_id"]) in seen:
+            continue
+        seen.add((p["vehicle_id"], p["route_id"]))
+        v = by_vehicle.get(p["vehicle_id"])
+        pattern = v["pattern"] if v and v["route_id"] == p["route_id"] else None
+        names = towards.get(p["route_id"], set())
+        arrivals.append(
+            {
+                "vehicle_id": p["vehicle_id"],
+                "route_id": p["route_id"],
+                "short_name": short_names[p["route_id"]],
+                "mode": v["mode"] if v else None,
+                "towards": pattern["towards"]
+                if pattern
+                else (next(iter(names)) if len(names) == 1 else ""),
+                "occupancy": v["occupancy"] if v else None,
+                "seconds": max(0, round((p["predicted_arrival"] - now).total_seconds())),
+                "source": "ttc",
+            }
+        )
+    arrivals += [
+        {**e, "source": "estimate"}
+        for e in estimates
+        if (e["vehicle_id"], e["route_id"]) not in seen
+    ]
+    arrivals.sort(key=lambda a: (a["seconds"], a["vehicle_id"] or ""))
+    return arrivals[:ARRIVALS_SHOWN]
+
+
+def estimate_arrivals(
+    matched: list[dict], stop_id: str, short_names: dict, now: datetime, limit=ARRIVALS_SHOWN
+):
     """The next vehicles due at a stop: scheduled time along each matched vehicle's
     pattern from its position to the stop, less the age of its report."""
     arrivals = []
@@ -254,7 +316,7 @@ def estimate_arrivals(matched: list[dict], stop_id: str, short_names: dict, now:
             }
         )
     arrivals.sort(key=lambda a: (a["seconds"], a["vehicle_id"]))
-    return arrivals[:ARRIVALS_SHOWN]
+    return arrivals[:limit]
 
 
 def main_patterns(patterns: list[dict]) -> list[dict]:

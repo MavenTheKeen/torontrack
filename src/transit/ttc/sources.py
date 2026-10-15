@@ -5,8 +5,11 @@ REALTIME_FEEDS = {
     "trips_subway": f"https://{REALTIME_HOST}/trips/subway?format=binary",
     "alerts_subway": f"https://{REALTIME_HOST}/alerts/subway?format=binary",
     "alerts_accessibility": f"https://{REALTIME_HOST}/alerts/accessibility?format=binary",
-    # Every bus and streetcar in service (TTC publishes no surface arrival predictions).
+    # Every bus and streetcar in service.
     "vehicles": f"https://{REALTIME_HOST}/vehicles/position?format=binary",
+    # Bus and streetcar trip updates: TTC's own arrival predictions (not listed in the
+    # site's docs until 2026; about 2,400 trips and 31,000 stop predictions, ~700 KB).
+    "trips_surface": f"https://{REALTIME_HOST}/trips/update?format=binary",
 }
 
 # Toronto Open Data "TTC Routes and Schedules" (static GTFS, refreshed roughly monthly).

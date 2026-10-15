@@ -4,6 +4,7 @@ from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
+from google.transit import gtfs_realtime_pb2
 
 from tests.ttc_helpers import T0, static_zip, vehicle_feed
 from transit.db import connect
@@ -148,3 +149,48 @@ def test_surface_endpoints_place_vehicles_and_estimate_arrivals(client):
         ("Kennedy Station", 3),
     ]
     assert client.get("/api/stops/nope-1").status_code == 404
+
+
+def surface_trip_feed(timestamp, trips):
+    """trips: [{"trip_id", "route_id", "vehicle"?, "cancelled"?, "stops": [(stop_id, offset_s)]}]"""
+    message = gtfs_realtime_pb2.FeedMessage()
+    message.header.gtfs_realtime_version = "2.0"
+    message.header.timestamp = int(timestamp.timestamp())
+    for trip in trips:
+        update = message.entity.add(id=trip["trip_id"]).trip_update
+        update.trip.trip_id, update.trip.route_id = trip["trip_id"], trip["route_id"]
+        if trip.get("cancelled"):
+            update.trip.schedule_relationship = gtfs_realtime_pb2.TripDescriptor.CANCELED
+        if trip.get("vehicle"):
+            update.vehicle.id = trip["vehicle"]
+        for stop_id, offset in trip["stops"]:
+            stu = update.stop_time_update.add(stop_id=stop_id)
+            stu.arrival.time = int(timestamp.timestamp()) + offset
+    return message.SerializeToString()
+
+
+@pytest.mark.integration
+def test_ttc_predictions_replace_estimates_at_a_stop(client, settings):
+    payload = surface_trip_feed(
+        T0,
+        [
+            # The matched bus: TTC predicts Brimley in 200 s, which replaces the estimate.
+            {"trip_id": "a", "route_id": "10", "vehicle": "8001", "stops": [("664", 200)]},
+            # A bus not on the map yet, and a cancelled trip.
+            {"trip_id": "b", "route_id": "10", "vehicle": "8002", "stops": [("664", 600)]},
+            {"trip_id": "c", "route_id": "10", "cancelled": True, "stops": [("664", 300)]},
+            # A route that does not serve the stop, and a time past the 90 minute horizon.
+            {"trip_id": "d", "route_id": "99", "stops": [("664", 100)]},
+            {"trip_id": "e", "route_id": "10", "stops": [("664", 6000)]},
+        ],
+    )
+    with connect(settings.database_url) as conn:
+        snapshot_id, _ = store.store_snapshot(conn, "trips_surface", "test://", payload, T0)
+        assert (
+            store.normalize_snapshot(conn, snapshot_id)["accepted"] == 3
+        )  # a, b and d; c is cancelled, e too far ahead
+    arrivals = client.get("/api/stops/664").json()["arrivals"]
+    assert [(a["vehicle_id"], a["towards"], a["seconds"], a["source"]) for a in arrivals] == [
+        ("8001", "Brimley", 190, "ttc"),
+        ("8002", "Brimley", 590, "ttc"),
+    ]
