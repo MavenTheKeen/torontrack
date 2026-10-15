@@ -1,6 +1,7 @@
 """Public API: pure helpers offline, endpoints against a seeded *_test database."""
 
 import re
+from dataclasses import replace
 from datetime import timedelta
 
 import httpx
@@ -11,6 +12,7 @@ from tests.test_ingestion_integration import FixtureClient
 from tests.test_planner import itinerary, leg
 from tests.ttc_helpers import T0, alert_feed, static_zip, trip_feed
 from transit.bikeshare.ingestion import run
+from transit.config import Settings
 from transit.db import connect, migrations
 from transit.ttc import static_gtfs, store
 from transit.web import pipeline, queries
@@ -168,7 +170,7 @@ def client(settings):
             snapshot_id, _ = store.store_snapshot(conn, feed, "test://", payload, T0)
             store.normalize_snapshot(conn, snapshot_id)
     run(settings, "bikes", client=FixtureClient())
-    app = create_app(settings.database_url, clock=lambda: T0 + timedelta(seconds=10))
+    app = create_app(settings, clock=lambda: T0 + timedelta(seconds=10))
     return TestClient(app)
 
 
@@ -299,10 +301,8 @@ def test_trip_plans_carry_elevator_outages_at_their_stations(client, settings, t
         return httpx.Response(200, json={"data": {"planConnection": plan}})
 
     app = create_app(
-        settings.database_url,
+        replace(settings, map_dir=str(tmp_path), planner_url="http://otp:8080"),
         clock=lambda: T0 + timedelta(seconds=10),
-        map_dir=str(tmp_path),
-        planner_url="http://otp:8080",
         planner_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
     trip = {"from": "43.7764,-79.2575", "to": "43.6453,-79.3806", "step_free": "true"}
@@ -441,7 +441,7 @@ def test_report_endpoint_reports_analytics_not_built(client, settings):
 
 
 def test_installable_app_files_are_served_and_complete():
-    app_client = TestClient(create_app("postgresql://unused/db"))
+    app_client = TestClient(create_app(Settings("postgresql://unused/db")))
     worker = app_client.get("/sw.js")
     assert worker.status_code == 200 and "javascript" in worker.headers["content-type"]
     assert worker.headers["cache-control"] == "no-cache"  # New versions are picked up.

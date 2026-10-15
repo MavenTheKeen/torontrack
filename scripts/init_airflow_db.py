@@ -1,12 +1,12 @@
 """Create Airflow's separate local metadata database without touching collected data."""
 
-import os
 import sys
 
 import psycopg
 from psycopg import sql
 
 from transit import locks
+from transit.config import Settings
 
 DATABASE_NAME = "airflow_metadata"
 BOOTSTRAP_LOCK = locks.AIRFLOW_BOOTSTRAP
@@ -16,9 +16,8 @@ def main():
     try:
         # CREATE DATABASE cannot run inside a transaction. A session lock makes
         # the existence check and creation safe across overlapping bootstrap jobs.
-        with psycopg.connect(
-            os.environ["DATABASE_URL"], autocommit=True, connect_timeout=10
-        ) as conn:
+        url = Settings.from_env().database_url
+        with psycopg.connect(url, autocommit=True, connect_timeout=10) as conn:
             conn.execute("SELECT pg_advisory_lock(%s)", (BOOTSTRAP_LOCK,))
             try:
                 exists = conn.execute(

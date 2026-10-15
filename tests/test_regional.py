@@ -154,7 +154,7 @@ def test_departures_skip_trains_that_end_at_the_station(idx):
 
 @pytest.mark.integration
 def test_endpoints_credit_metrolinx_and_say_positions_are_scheduled(settings, idx):
-    client = TestClient(create_app(settings.database_url, clock=lambda: at("08:03:30")))
+    client = TestClient(create_app(settings, clock=lambda: at("08:03:30")))
     network = client.get("/api/regional").json()
     assert "permission of Metrolinx" in network["attribution"]
     [line] = network["lines"]

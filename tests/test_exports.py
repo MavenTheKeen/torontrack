@@ -3,6 +3,7 @@
 import gzip
 import hashlib
 import json
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 
 import pyarrow.parquet as pq
@@ -52,7 +53,7 @@ def test_export_writes_verifiable_files_once_and_the_site_serves_them(settings, 
     # A rerun leaves finished days alone.
     assert "bikeshare-availability" not in exports.export(settings.database_url, tmp_path, later)
 
-    client = TestClient(create_app(settings.database_url, export_dir=str(tmp_path)))
+    client = TestClient(create_app(replace(settings, export_dir=str(tmp_path))))
     listing = client.get("/api/datasets").json()
     assert listing["available"] is True
     bikes = next(d for d in listing["datasets"] if d["name"] == "bikeshare-availability")
@@ -64,5 +65,5 @@ def test_export_writes_verifiable_files_once_and_the_site_serves_them(settings, 
 
 @pytest.mark.integration
 def test_datasets_endpoint_without_exports(settings, tmp_path):
-    client = TestClient(create_app(settings.database_url, export_dir=str(tmp_path / "none")))
+    client = TestClient(create_app(replace(settings, export_dir=str(tmp_path / "none"))))
     assert client.get("/api/datasets").json() == {"available": False}

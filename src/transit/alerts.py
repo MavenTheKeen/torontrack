@@ -9,7 +9,6 @@ healthchecks.io can alert when this process, Docker or the whole machine stops.
 """
 
 import json
-import os
 import signal
 import threading
 from datetime import UTC, datetime, timedelta
@@ -156,9 +155,9 @@ def check(database_url: str, client: httpx.Client, ntfy_url: str | None, now: da
     return due
 
 
-def run(database_url: str, once: bool = False) -> None:
-    ntfy_url = os.environ.get("NTFY_URL") or None
-    heartbeat_url = os.environ.get("HEARTBEAT_URL") or None
+def run(
+    database_url: str, ntfy_url: str | None, heartbeat_url: str | None, once: bool = False
+) -> None:
     if not ntfy_url:
         _log({"warning": "NTFY_URL is not set: alerts are recorded in ops.alerts, not sent"})
     stop = threading.Event()

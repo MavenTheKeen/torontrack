@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from transit import events
+from transit.config import Settings
 from transit.db import connect
 from transit.web.app import create_app
 
@@ -99,7 +100,7 @@ def test_refresh_replaces_future_dates_and_serves_this_weeks_events(settings):
             )
         ]
     assert [d - NOW for d in dates] == [timedelta(hours=-12), timedelta(days=2)]
-    app = create_app(url, clock=lambda: NOW)
+    app = create_app(Settings(url), clock=lambda: NOW)
     body = TestClient(app).get("/api/events").json()
     [event] = body["events"]
     assert event["name"] == "Harvest Market" and len(event["dates"]) == 2

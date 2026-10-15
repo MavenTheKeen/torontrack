@@ -3,6 +3,7 @@
 from fastapi.testclient import TestClient
 
 from transit import place_index, places
+from transit.config import Settings
 from transit.web.app import create_app
 
 # Two streets crossing, a few addresses, a museum and a shop with a similar name, and two
@@ -91,12 +92,13 @@ def test_search_ranks_by_what_the_query_looks_like_and_by_distance(tmp_path):
 
 def test_places_endpoint(tmp_path):
     index(tmp_path)
-    web = TestClient(create_app("postgresql://unused/db", map_dir=str(tmp_path)))
+    web = TestClient(create_app(Settings("postgresql://unused/db", map_dir=str(tmp_path))))
     body = web.get("/api/places", params={"q": "royal ontario", "near": "43.66,-79.39"}).json()
     assert body["available"] and body["places"][0]["name"] == "Royal Ontario Museum"
     assert web.get("/api/places", params={"q": "x"}).status_code == 422
     assert web.get("/api/places", params={"q": "royal", "near": "here"}).status_code == 422
-    empty = TestClient(create_app("postgresql://unused/db", map_dir=str(tmp_path / "missing")))
+    missing = Settings("postgresql://unused/db", map_dir=str(tmp_path / "missing"))
+    empty = TestClient(create_app(missing))
     assert empty.get("/api/places", params={"q": "royal"}).json() == {
         "available": False,
         "places": [],

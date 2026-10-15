@@ -2,7 +2,6 @@
 
 import argparse
 import json
-import os
 import sys
 from datetime import UTC, date, datetime, time
 
@@ -33,6 +32,11 @@ from transit.ttc.sources import REALTIME_FEEDS, REALTIME_HOST
 
 
 def main():
+    try:
+        settings = Settings.from_env(require_database=False)
+    except ValueError as exc:
+        print(f"Failed: {exc}", file=sys.stderr)
+        return 1
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("init-db", help="Create schemas/tables (safe to repeat)")
@@ -87,26 +91,26 @@ def main():
     map_cmd = commands.add_parser(
         "map-tiles", help="Build the site's Toronto street map from OpenStreetMap"
     )
-    map_cmd.add_argument("--out", default=os.environ.get("MAP_DIR", "map-data"))
+    map_cmd.add_argument("--out", default=settings.map_dir or "map-data")
     map_cmd.add_argument("--build", help="Protomaps build file, e.g. 20261013.pmtiles")
     lanes_cmd = commands.add_parser(
         "bike-lanes", help="Build the map's bike lane layer from the city's cycling network"
     )
-    lanes_cmd.add_argument("--out", default=os.environ.get("MAP_DIR", "map-data"))
+    lanes_cmd.add_argument("--out", default=settings.map_dir or "map-data")
     osm_cmd = commands.add_parser(
         "osm-layers",
         help="Build the map's station entrance, parking and bike parking layers from OpenStreetMap",
     )
-    osm_cmd.add_argument("--out", default=os.environ.get("MAP_DIR", "map-data"))
+    osm_cmd.add_argument("--out", default=settings.map_dir or "map-data")
     osm_cmd.add_argument("--source", help="Local .osm.pbf to read instead of downloading one")
     planner_cmd = commands.add_parser(
         "planner-data", help="Download the trip planner's schedules and streets if they changed"
     )
-    planner_cmd.add_argument("--out", default=os.environ.get("PLANNER_DIR", "planner-data"))
+    planner_cmd.add_argument("--out", default=settings.planner_dir or "planner-data")
     alerts_cmd = commands.add_parser("alerts", help="Send phone alerts on pipeline health")
     alerts_cmd.add_argument("--once", action="store_true", help="Check once and exit")
     export = commands.add_parser("export", help="Write completed days as open-data files")
-    export.add_argument("--out", default=os.environ.get("EXPORT_DIR", "exports"))
+    export.add_argument("--out", default=settings.export_dir or "exports")
     export.add_argument(
         "--day", type=date.fromisoformat, action="append", help="YYYY-MM-DD; repeatable"
     )
@@ -162,9 +166,10 @@ def main():
             finally:
                 client.close()
         else:
-            settings = Settings.from_env()
+            if settings.database_url is None:
+                raise ValueError("Set DATABASE_URL before running database commands")
             if args.command.startswith("ttc-"):
-                result = run_ttc(args, settings.database_url)
+                result = run_ttc(args, settings)
             elif args.command == "weather-refresh":
                 client = FeedClient()
                 try:
@@ -199,7 +204,9 @@ def main():
             elif args.command == "ticketed-events-refresh":
                 client = FeedClient()
                 try:
-                    result = ticketmaster.refresh(settings.database_url, client)
+                    result = ticketmaster.refresh(
+                        settings.database_url, client, settings.ticketmaster_api_key
+                    )
                 finally:
                     client.close()
                 if result["status"] == "failed":
@@ -221,7 +228,9 @@ def main():
                 if result["status"] == "failed":
                     raise FetchError(f"Regional schedule refresh failed: {result['error']}")
             elif args.command == "alerts":
-                alerts.run(settings.database_url, once=args.once)
+                alerts.run(
+                    settings.database_url, settings.ntfy_url, settings.heartbeat_url, args.once
+                )
                 return 0
             elif args.command == "export":
                 result = exports.export(
@@ -230,9 +239,9 @@ def main():
             elif args.command == "init-db":
                 result = {"schema": "ready", "migrations_applied": init_db(settings.database_url)}
                 # Deployments give the public site its own read-only login.
-                if os.environ.get("WEB_DB_PASSWORD"):
+                if settings.web_db_password:
                     ensure_readonly_role(
-                        settings.database_url, WEB_DB_ROLE, os.environ["WEB_DB_PASSWORD"]
+                        settings.database_url, WEB_DB_ROLE, settings.web_db_password
                     )
                     result["readonly_role"] = WEB_DB_ROLE
             elif args.command == "transform":
@@ -260,9 +269,10 @@ def main():
     return 0
 
 
-def run_ttc(args, database_url):
-    raw_days = int(os.environ.get("TTC_RAW_RETENTION_DAYS", "3"))
-    event_days = int(os.environ.get("TTC_EVENT_RETENTION_DAYS", "90"))
+def run_ttc(args, settings):
+    database_url = settings.database_url
+    raw_days = settings.ttc_raw_retention_days
+    event_days = settings.ttc_event_retention_days
     if args.command == "ttc-gtfs-refresh":
         client = FeedClient()
         try:
@@ -285,11 +295,11 @@ def run_ttc(args, database_url):
         if not args.once:
             ttc_collector.run_forever(
                 database_url,
-                interval=float(os.environ.get("TTC_POLL_SECONDS", "30")),
-                fast_interval=float(os.environ.get("TTC_FAST_POLL_SECONDS", "10")),
+                interval=settings.ttc_poll_seconds,
+                fast_interval=settings.ttc_fast_poll_seconds,
                 raw_days=raw_days,
                 event_days=event_days,
-                vehicle_raw_hours=int(os.environ.get("TTC_VEHICLE_RAW_RETENTION_HOURS", "6")),
+                vehicle_raw_hours=settings.ttc_vehicle_raw_retention_hours,
             )
             return {"collector": "stopped"}
         client = FeedClient()

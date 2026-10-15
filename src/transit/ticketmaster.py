@@ -26,7 +26,6 @@ arena, stadium and concert hall in the city, so its Discovery API fills that gap
 """
 
 import json
-import os
 import re
 import time
 from datetime import UTC, date, datetime, timedelta
@@ -53,10 +52,6 @@ ADD_ON = re.compile(
     re.IGNORECASE,
 )
 PLACEHOLDER_TIME = "23:59:00"
-
-
-def api_key() -> str | None:
-    return os.environ.get("TICKETMASTER_API_KEY", "").strip() or None
 
 
 def request_url(key: str, day: date, page: int) -> str:
@@ -231,11 +226,15 @@ def load(conn, rows: list[dict], today: date, now: datetime) -> None:
 
 
 def refresh(
-    database_url: str, client: FeedClient, now: datetime | None = None, sleep=time.sleep
+    database_url: str,
+    client: FeedClient,
+    key: str | None,
+    now: datetime | None = None,
+    sleep=time.sleep,
 ) -> dict:
+    """Load the next DAYS days; without a key (TICKETMASTER_API_KEY), record a skip."""
     started = now or datetime.now(UTC)
     today = started.astimezone(TORONTO).date()
-    key = api_key()
     result = {"status": "failed", "requests": 0, "events": None}
     with connect(database_url) as conn:
         if key is None:

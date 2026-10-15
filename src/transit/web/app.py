@@ -7,7 +7,6 @@ service; it never calls the TTC.
 
 import json
 import logging
-import os
 import threading
 import time
 from collections import deque
@@ -23,6 +22,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from transit import events, places, roads
+from transit.config import Settings
 from transit.db import connect
 from transit.web import (
     access,
@@ -40,9 +40,6 @@ logger = logging.getLogger(__name__)
 CACHE_SECONDS = 15
 # Train and vehicle positions are refreshed this often, matching the 10 s collector.
 LIVE_SECONDS = 5
-RATE_LIMIT = int(os.environ.get("WEB_RATE_LIMIT_PER_MINUTE", "120"))
-# Each trip plan is a routing search, far costlier than a cached read.
-PLAN_RATE_LIMIT = int(os.environ.get("WEB_PLAN_RATE_LIMIT_PER_MINUTE", "20"))
 STATIC = files("transit.web").joinpath("static")
 ATTRIBUTION = "Data: Toronto Transit Commission. Predictions may be inaccurate."
 BIKES_ATTRIBUTION = (
@@ -113,28 +110,26 @@ class RateLimiter:
 
 
 def create_app(
-    database_url: str | None = None,
+    settings: Settings,
     clock=lambda: datetime.now(UTC),
-    export_dir: str | None = None,
-    map_dir: str | None = None,
-    planner_url: str | None = None,
     planner_client: httpx.Client | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Torontrack", docs_url=None, redoc_url=None, openapi_url=None)
     # Open-data files written by `transit export`; optional, served at /data/.
-    export_dir = export_dir or os.environ.get("EXPORT_DIR")
+    export_dir = settings.export_dir
     # The street map built by `transit map-tiles`; optional, served at /map-data/.
-    map_dir = map_dir or os.environ.get("MAP_DIR")
+    map_dir = settings.map_dir
     # Station entrances and bike parking from `transit osm-layers`, in the same folder.
     osm = access.Layers(map_dir)
     cache = TTLCache(CACHE_SECONDS)
     live = TTLCache(LIVE_SECONDS)
     # The routes' usual pace by hour changes slowly; recomputed hourly.
     slow = TTLCache(3600)
-    limiter = RateLimiter(RATE_LIMIT)
-    plan_limiter = RateLimiter(PLAN_RATE_LIMIT)
+    limiter = RateLimiter(settings.web_rate_limit_per_minute)
+    # Each trip plan is a routing search, far costlier than a cached read.
+    plan_limiter = RateLimiter(settings.web_plan_rate_limit_per_minute)
     # The trip planner (docs/planner.md) is optional; without it /api/plan answers 503.
-    planner_url = planner_url or os.environ.get("PLANNER_URL")
+    planner_url = settings.planner_url
     if planner_url and planner_client is None:
         planner_client = httpx.Client(timeout=12)
     planner_state = TTLCache(60)
@@ -145,10 +140,9 @@ def create_app(
     surface_cache = {}
 
     def db_url():
-        url = database_url or os.environ.get("DATABASE_URL")
-        if not url:
+        if not settings.database_url:
             raise RuntimeError("Set DATABASE_URL")
-        return url
+        return settings.database_url
 
     def schedule(conn):
         """Per-feed-version data that only changes when a new schedule is loaded."""
@@ -738,4 +732,4 @@ def create_app(
     return app
 
 
-app = create_app()
+app = create_app(Settings.from_env(require_database=False))
