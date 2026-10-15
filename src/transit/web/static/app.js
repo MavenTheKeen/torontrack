@@ -525,11 +525,21 @@ function downloadSection(sets) {
   ];
 }
 
+// One Reliability tab with two views: today's measurements and the long-term report.
+function reliabilityHeader(current) {
+  const views = [["today", "#/reliability", "Today"], ["report", "#/reliability/report", "Long-term report"]];
+  return [
+    el("h1", {}, "Reliability"),
+    el("nav", { class: "chip-group view-switch", "aria-label": "Reliability views" },
+      views.map(([key, href, label]) => el("a", { class: "chip small", href, "aria-current": key === current ? "page" : null }, label))),
+  ];
+}
+
 async function renderReliability() {
   const [data, sets] = await Promise.all([api("/api/reliability"), api("/api/datasets")]);
   if (!data.available) {
     return [
-      el("h1", {}, "Reliability"),
+      ...reliabilityHeader("today"),
       el("p", {}, "Reliability analytics have not been built yet. They appear after the first scheduled transformation."),
       downloadSection(sets),
     ];
@@ -541,7 +551,7 @@ async function renderReliability() {
       ? ""
       : ` (median ${durationText(outages.median_resolved_minutes)}, longest ${durationText(outages.longest_resolved_minutes)})`;
   return [
-    el("h1", {}, "Reliability"),
+    ...reliabilityHeader("today"),
     el(
       "p",
       { class: "muted" },
@@ -719,7 +729,7 @@ function closureComparison(c) {
 async function renderReport() {
   const data = await api("/api/report");
   if (!data.available || !data.lines.length) {
-    return [el("h1", {}, "Reliability report"), el("p", {}, "The report appears after the first scheduled transformation with measured gaps.")];
+    return [...reliabilityHeader("report"), el("p", {}, "The report appears after the first scheduled transformation with measured gaps.")];
   }
   const c = data.coverage;
   const pick = (rows, key) => (k, line) => rows.find((r) => r[key] === k && r.route_id === line);
@@ -728,7 +738,7 @@ async function renderReport() {
   const rainHours = maxHours(data.weather, "rain");
   const dates = [...new Set(data.daily.map((d) => d.service_date))];
   return [
-    el("h1", {}, "Reliability report"),
+    ...reliabilityHeader("report"),
     el(
       "p",
       {},
@@ -828,7 +838,7 @@ const TRAIN_REFRESH_MS = 10000; // The collector polls trains and vehicles every
 // Trains and vehicles move between refreshes (motion.js), redrawn every animation frame
 // when zoomed in. Zoomed out, a frame's movement is under a pixel, so they are redrawn
 // less often.
-const MOTION_FRAME_MS = [[14, 0], [12, 50], [0, 250]]; // [from zoom, minimum ms between redraws]
+const MOTION_FRAME_MS = [[13, 0], [11, 33], [0, 100]]; // [from zoom, minimum ms between redraws]
 const MOTION_STILL_MS = 5000; // With reduced motion.
 const BIKES_REFRESH_MS = 120000; // Bike Share data changes every 15 minutes.
 const WALK_METRES_PER_MIN = 80;
@@ -3547,7 +3557,8 @@ if ("serviceWorker" in navigator && window.isSecureContext) {
 }
 
 async function route({ refresh = false } = {}) {
-  const [, kind, id] = (location.hash || "#/").split("/");
+  let [, kind, id] = (location.hash || "#/").split("/");
+  if (kind === "report") [kind, id] = ["reliability", "report"]; // Old links.
   const seq = ++renderSeq;
   if (!refresh && kind !== "map") mapCleanup();
   const waiting = refresh ? null : setTimeout(() => seq === renderSeq && kind !== "map" && main.replaceChildren(skeleton()), 160);
@@ -3561,8 +3572,7 @@ async function route({ refresh = false } = {}) {
     let content;
     if (kind === "line" && id) content = await renderLine(id);
     else if (kind === "station" && id) content = await renderStation(id);
-    else if (kind === "reliability") content = await renderReliability();
-    else if (kind === "report") content = await renderReport();
+    else if (kind === "reliability") content = id === "report" ? await renderReport() : await renderReliability();
     else if (kind === "map") content = await renderMap(id);
     else if (kind === "stop" && id) content = await renderStop(decodeURIComponent(id));
     else if (kind === "pipeline") content = await renderPipeline();

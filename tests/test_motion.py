@@ -98,24 +98,29 @@ def test_a_regional_train_follows_its_timetable_track(page):
     assert points[2] == pytest.approx([-79.4, 43.75])
 
 
-def test_a_correction_is_made_up_evenly_until_the_next_refresh(page):
-    steps = page.evaluate(
+def test_a_correction_keeps_position_and_speed_continuous(page):
+    ys = page.evaluate(
         """() => {
+            // Drawn moving north at 1e-7 degrees/ms (about 11 m/s), frames every 100 ms.
             const state = newGlide();
-            const out = [glide(state, "a", [0, 0], 0)];
-            // New data: the estimate is 0.001 degrees (about 80 m) east and keeps still.
+            const out = [];
+            for (let t = 0; t <= 1000; t += 100) out.push(glide(state, "a", [0, t * 1e-7], t)[1]);
+            // New data: the estimate jumps 0.001 degrees (about 110 m) ahead, same speed.
             state.seq += 1;
-            for (const t of [0, 2500, 5000, 7500, 10000, 12000]) {
-                out.push(glide(state, "a", [0.001, 0], t));
+            for (let t = 1100; t <= 12000; t += 100) {
+                out.push(glide(state, "a", [0, 0.001 + t * 1e-7], t)[1]);
             }
-            return out.map((c) => c[0]);
+            return out;
         }"""
     )
-    # Even steps, no burst: a quarter of the way every 2.5 s, arriving at the next refresh.
-    assert steps[:2] == [0, 0]
-    gaps = [b - a for a, b in zip(steps[1:5], steps[2:6], strict=True)]
-    assert all(g == pytest.approx(0.00025) for g in gaps)
-    assert steps[6] == pytest.approx(0.001)
+    steps = [b - a for a, b in zip(ys, ys[1:], strict=False)]
+    # No jump: the frame after new data moves about as far as the frame before it.
+    assert steps[10] == pytest.approx(steps[9], rel=0.05)
+    # Speed changes gradually: no frame differs much from the one before.
+    assert max(abs(b - a) for a, b in zip(steps, steps[1:], strict=False)) < 0.2e-5
+    # And it is on the new estimate by the next refresh, moving at its speed.
+    assert ys[-1] == pytest.approx(0.001 + 12000 * 1e-7, abs=1e-9)
+    assert steps[-1] == pytest.approx(1e-5, rel=0.01)
 
 
 def test_a_vehicle_ahead_of_its_estimate_waits_and_a_far_one_glides_quickly(page):
@@ -131,12 +136,12 @@ def test_a_vehicle_ahead_of_its_estimate_waits_and_a_far_one_glides_quickly(page
             for (let t = 200; t <= 6200; t += 1000) {
                 held.push(glide(state, "a", [0, -0.0004 + t * 1e-7], t)[1]);
             }
-            // A correction of about 1 km is a quick glide, done well before the next refresh.
+            // A correction of about 1 km is eased over QUICK_MS, well before the next refresh.
             const far = newGlide();
             glide(far, "b", [0, 0], 0);
             far.seq += 1;
             glide(far, "b", [0, 0.01], 0);
-            return [held, glide(far, "b", [0, 0.01], 1500)];
+            return [held, glide(far, "b", [0, 0.01], 3500)];
         }"""
     )
     assert all(b >= a for a, b in zip(held, held[1:], strict=False))

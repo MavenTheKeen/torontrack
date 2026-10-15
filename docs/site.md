@@ -9,7 +9,7 @@ docker compose up -d web
 
 Open <http://localhost:8000>. Pages use hash routes: `#/` (service status), `#/line/1`
 (line view), `#/station/bloor-yonge` (station), `#/map` (live street map; `#/map/bloor-yonge`
-opens it on a station), `#/events` (what's on, `#/events/2026-10-17` for one day), `#/stop/15647` (bus or streetcar stop), `#/reliability` (reliability), `#/report` (reliability report), `#/pipeline` (pipeline status).
+opens it on a station), `#/events` (what's on, `#/events/2026-10-17` for one day), `#/stop/15647` (bus or streetcar stop), `#/reliability` (reliability today), `#/reliability/report` (long-term report; `#/report` still opens it), `#/pipeline` (pipeline status).
 
 | Home | Line | Station | Map | Reliability |
 | --- | --- | --- | --- | --- |
