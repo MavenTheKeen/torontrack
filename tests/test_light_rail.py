@@ -139,7 +139,10 @@ def test_light_rail_alerts_come_from_the_combined_feed(client, settings):
         T0,
         [
             {"id": "60", "effect": "NO_SERVICE", "routes": ["6"], "text": "Line 6: No service"},
-            {"id": "61", "stops": ["16291"], "text": "Westmore: platform closed"},
+            {"id": "61", "routes": ["6"], "stops": ["16291"], "text": "Westmore: closed"},
+            # A Line 1 alert naming a station shared with light rail, and an elevator.
+            {"id": "10", "routes": ["1"], "stops": ["16289"], "text": "Line 1: no service"},
+            {"id": "20", "effect": "ACCESSIBILITY_ISSUE", "routes": ["6"], "text": "Elevator"},
             {"id": "50", "effect": "DETOUR", "routes": ["501"], "text": "501 Queen detour"},
         ],
     )

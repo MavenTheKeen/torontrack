@@ -290,10 +290,13 @@ def _normalize_alerts(conn, raw, snapshot, stops):
         # Accessibility alerts name only platforms; derive their lines from static GTFS.
         route_ids |= {stops[s]["route_id"] for s in stop_ids if s in stops}
         if feed == "alerts_light_rail":
-            # The combined feed: only alerts naming a light rail line or its platforms.
-            if not route_ids & LIGHT_RAIL_LINES:
+            # The combined feed repeats subway and elevator alerts, which may name a
+            # station shared with a light rail line; only alerts naming Line 5 or 6
+            # themselves are kept. Elevator alerts come from alerts_accessibility.
+            named = {e["route_id"] for e in a["informed_entities"] if e["route_id"]}
+            if not named & LIGHT_RAIL_LINES or a["effect"] == "ACCESSIBILITY_ISSUE":
                 continue
-            route_ids &= LIGHT_RAIL_LINES
+            route_ids = named & LIGHT_RAIL_LINES
             stop_ids = [s for s in stop_ids if stops.get(s, {}).get("route_id") in route_ids]
         kept += 1
         conn.execute(
