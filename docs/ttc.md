@@ -26,9 +26,19 @@ Data: Toronto Transit Commission. Predictions may be inaccurate.
 | Static GTFS | Toronto Open Data, "TTC Routes and Schedules" (ZIP) | Platforms, line order, scheduled trips |
 
 The realtime feeds need no API key and publish no rate limits or terms of use. One
-backend process polls them; browsers never call TTC directly. Only subway routes
-(GTFS `route_type` 1: Lines 1, 2 and 4) are loaded. Lines 5 and 6 are light rail and
-are not in the subway realtime feed.
+backend process polls them; browsers never call TTC directly. The rapid transit lines
+are loaded as lines with stations: the subway (GTFS `route_type` 1: Lines 1, 2 and 4)
+and the light rail Lines 5 Eglinton and 6 Finch West (`transit.ttc.sources.LIGHT_RAIL_LINES`),
+which GTFS types as streetcars (`route_type` 0). TTC publishes no realtime data for
+Lines 5 and 6: they are in neither the subway trip updates, the general trip updates nor
+the vehicle positions (checked 2026-10-15). Their trains are therefore placed by
+timetable (`queries.scheduled_predictions`, in the shape of the subway's predictions, so
+the same positioning applies), their stations list scheduled times, and they have no
+reliability or delay detection, which need observed arrivals. Their platforms are named
+"Cedarvale Station Eastbound Platform" rather than "... Station - Eastbound Platform";
+both forms reduce to the same station, so Cedarvale, Eglinton, Kennedy and Finch West
+are single interchange stations. A schedule version loaded before light rail was
+included gains it on the next refresh (`static_gtfs.add_lines`).
 
 ## Data flow
 
@@ -153,8 +163,8 @@ the vehicles currently shown is treated as a feed dropout and skipped. Position 
 not kept: at this rate it would add about 400 MB a day.
 
 The surface network comes from the same static GTFS version as the subway (`ttc-gtfs-refresh`
-loads it, also for a version loaded before buses were added): 233 routes (213 bus,
-20 streetcar and light rail), 9,261 stops and 1,356 stop patterns in the October 2026
+loads it, also for a version loaded before buses were added): 231 routes (213 bus,
+18 streetcar; Lines 5 and 6 are left out, as they are loaded with the subway), 9,175 stops and 1,349 stop patterns in the October 2026
 schedule. A pattern is one exact stop sequence on a route and direction, with the mean
 scheduled time from its first stop to each stop across every trip using it. The 5-million-row
 `stop_times.txt` is streamed trip by trip; only running sums per pattern are kept.
@@ -190,7 +200,7 @@ all 131,793 trips in the October 2026 schedule).
 
 | Table | Holds |
 | --- | --- |
-| `normalized.ttc_surface_routes` | Route number, name and mode (`bus`, or `streetcar` for GTFS route type 0, which includes Lines 5 and 6) per feed version |
+| `normalized.ttc_surface_routes` | Route number, name and mode (`bus`, or `streetcar` for GTFS route type 0, except Lines 5 and 6) per feed version |
 | `normalized.ttc_surface_stops` | Stop ID, public stop code, name and coordinates |
 | `normalized.ttc_surface_patterns` | Route, direction, destination and trip count of each stop pattern |
 | `normalized.ttc_surface_pattern_stops` | Each pattern's stops in order with mean scheduled offset |

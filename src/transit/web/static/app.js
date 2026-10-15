@@ -277,6 +277,8 @@ function lineDiagram(data) {
   return strip;
 }
 
+const TIMETABLE_NOTE = "TTC publishes no live data for this line, so trains are placed by timetable.";
+
 function directionSummary(data, dir) {
   const trains = data.trains.filter((t) => t.direction_id === dir.direction_id);
   const longGaps = data.gaps.filter((g) => g.long && g.direction_id === dir.direction_id);
@@ -285,7 +287,7 @@ function directionSummary(data, dir) {
     "section",
     { class: "card" },
     el("h2", {}, `Towards ${dir.towards}`),
-    el("p", { class: "muted" }, `${trains.length} trains in the feed`, headway ? ` · scheduled about every ${minutesText(headway)}` : ""),
+    el("p", { class: "muted" }, `${trains.length} trains ${data.line.timetable ? "scheduled now" : "in the feed"}`, headway ? ` · scheduled about every ${minutesText(headway)}` : ""),
     longGaps.length
       ? el("p", {}, statusPill("detected", `${longGaps.length} unusually long gap${longGaps.length > 1 ? "s" : ""}`), ` Longest ${Math.round(Math.max(...longGaps.map((g) => g.seconds)) / 60)} min between trains.`)
       : el("p", { class: "muted" }, "No unusually long gaps between trains."),
@@ -304,7 +306,7 @@ async function renderLine(id) {
   return [
     el("h1", { class: "with-badge" }, badge(data.line.id, { link: false }), data.line.name),
     el("div", { class: "card" }, statusDetails(data.status)),
-    staleNotice(data.predictions_as_of, "Train predictions"),
+    data.line.timetable ? el("p", { class: "notice", role: "status" }, TIMETABLE_NOTE) : staleNotice(data.predictions_as_of, "Train predictions"),
     el(
       "div",
       { class: "diagram" },
@@ -317,10 +319,14 @@ async function renderLine(id) {
         el("li", {}, el("span", { class: "train at sample" }), "Train at a station"),
         el("li", {}, el("span", { class: "gap sample" }), "Gap well above the schedule"),
       ),
-      el("p", { class: "muted small" }, "Positions are estimated from predicted arrival times. Train lists below give the same information as text."),
+      el("p", { class: "muted small" }, data.line.timetable ? "Positions follow the timetable. Train lists below give the same information as text." : "Positions are estimated from predicted arrival times. Train lists below give the same information as text."),
     ),
     [dir0, dir1].filter(Boolean).map((dir) => directionSummary(data, dir)),
   ];
+}
+
+function scheduledLine(id) {
+  return Boolean((lines.find((l) => l.id === id) || {}).timetable);
 }
 
 function arrivalsCard(d) {
@@ -332,9 +338,10 @@ function arrivalsCard(d) {
       ? el(
           "ul",
           { class: "arrivals" },
-          d.arrivals.map((a) => el("li", {}, el("span", { class: "mins" }, a.minutes === 0 ? "Due" : `${a.minutes} min`), el("span", { class: "muted" }, timeFmt.format(new Date(a.arrival))))),
+          d.arrivals.map((a) => el("li", {}, el("span", { class: "mins" }, a.minutes === 0 ? "Due" : `${a.minutes} min`), el("span", { class: "muted" }, timeFmt.format(new Date(a.arrival)), a.scheduled ? " scheduled" : ""))),
         )
-      : el("p", { class: "muted" }, "No predictions right now."),
+      : el("p", { class: "muted" }, scheduledLine(d.line) ? "No scheduled trains right now." : "No predictions right now."),
+    scheduledLine(d.line) ? el("p", { class: "muted small" }, "Timetable times: TTC publishes no live data for this line.") : null,
   );
 }
 
@@ -2368,10 +2375,10 @@ function trainSheet(view, id) {
   if (!t) return null;
   const towards = (line.directions.find((d) => d.direction_id === t.direction_id) || {}).towards;
   return [
-    el("p", { class: "sheet-kicker" }, "Subway train"),
+    el("p", { class: "sheet-kicker" }, t.scheduled ? "Light rail train" : "Subway train"),
     el("h2", { class: "with-badge" }, badge(lineId, { small: true }), towards ? `Towards ${towards}` : `Line ${lineId}`),
     el("p", {}, t.at_station ? `At ${t.station}` : `Approaching ${t.station}`, t.at_station ? "" : el("span", { class: "muted" }, ` · ${minutesText(t.eta_seconds)}`)),
-    el("p", { class: "muted small" }, "Position estimated from TTC's predicted arrival times; the subway feed has no GPS positions."),
+    el("p", { class: "muted small" }, t.scheduled ? "Placed by timetable: TTC publishes no live data for this line." : "Position estimated from TTC's predicted arrival times; the subway feed has no GPS positions."),
   ];
 }
 
@@ -2656,7 +2663,7 @@ function mapLegend() {
     { class: "map-legend" },
     el("p", { class: "panel-heading" }, "Legend"),
     el("ul", { class: "legend-list" },
-      lines.map((l) => legendRow(badgeEl("subway", l.color || "#777", textOn(l.color || "#777777"), { size: 22 }), `Line ${l.id} train (estimated position)`)),
+      lines.map((l) => legendRow(badgeEl("subway", l.color || "#777", textOn(l.color || "#777777"), { size: 22 }), `Line ${l.id} train (${l.timetable ? "placed by timetable" : "estimated position"})`)),
       surface.map(([mode, label]) => legendRow(badgeEl(surfaceGlyph(mode), SURFACE_COLOURS[mode], "#ffffff", { size: 22 }), `${label}, with the pointer showing its heading`)),
       legendRow(el("span", { class: "swatch-pill" }, "LW"), "Regional train, placed by timetable"),
       legendRow(el("span", { class: "swatch-station", "aria-hidden": "true" }), "Station"),

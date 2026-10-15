@@ -24,6 +24,12 @@ from transit.ttc.static_gtfs import parse, seconds, station_key, station_parts
         ("York University - Northbound Platform", ("York University", "Northbound")),
         ("Bloor Station - Southbound Platform", ("Bloor-Yonge", "Southbound")),
         ("Yonge Station - Eastbound Platform", ("Bloor-Yonge", "Eastbound")),
+        ("Cedarvale Station Eastbound Platform", ("Cedarvale", "Eastbound")),
+        ("Kennedy Station LRT Platform", ("Kennedy", "LRT")),
+        (
+            "Aga Khan Park & Museum Station Westbound Platform",
+            ("Aga Khan Park & Museum", "Westbound"),
+        ),
     ],
 )
 def test_station_parts_from_real_ttc_platform_names(stop_name, expected):

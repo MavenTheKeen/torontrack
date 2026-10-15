@@ -44,13 +44,26 @@ STREETCAR = [
     ("702", "Queen St at Bay St", 43.6522, -79.3818),
 ]
 SURFACE_STOPS = {s: (n, lat, lon) for s, n, lat, lon in BUS_EAST + BUS_WEST + STREETCAR}
+# Line 6 Finch West, light rail (route_type 0 like streetcars), at its western end. Each
+# trip takes 3 minutes between stops: eastbound trips leave Humber College at 08:56, 09:06
+# and 09:16 Toronto time (T0 is 09:00), westbound ones leave Martin Grove at 08:58.
+LINE_6_EAST = [
+    ("16289", "Humber College Station LRT Platform", 43.7286, -79.6067),
+    ("16291", "Westmore Station Eastbound Platform", 43.7372, -79.6000),
+    ("16293", "Martin Grove Station Eastbound Platform", 43.7428, -79.5878),
+]
+LINE_6_WEST = [
+    ("16294", "Martin Grove Station Westbound Platform", 43.7429, -79.5879),
+    ("16292", "Westmore Station Westbound Platform", 43.7373, -79.6001),
+    ("16290", "Humber College Station LRT Platform", 43.7287, -79.6068),
+]
 
 
 def _csv(header, rows):
     return "\n".join([",".join(header), *(",".join(map(str, r)) for r in rows)]) + "\n"
 
 
-def static_zip(extra_stop_times=()) -> bytes:
+def static_zip(extra_stop_times=(), light_rail=False) -> bytes:
     trips, stop_times = [], []
     patterns = [
         ("1", 0, "Line 1 (Yonge-University) towards Vaughan Metropolitan Centre", LINE_1_SOUTH),
@@ -76,24 +89,39 @@ def static_zip(extra_stop_times=()) -> bytes:
             for seq, (stop_id, *_rest) in enumerate(stops, start=1):
                 t = f"{7 + n}:{(seq - 1) * 3:02d}:00"
                 stop_times.append((trip_id, t, t, stop_id, seq))
+    routes = [
+        ("1", "1", "1", "Line 1 (Yonge-University)", 1),
+        ("2", "1", "2", "Line 2 (Bloor - Danforth)", 1),
+        ("10", "1", "10", "Van Horne", 3),
+        ("501", "1", "501", "Queen", 0),
+    ]
+    stops = [(s, n, 43.66, -79.38, 1) for s, n in STOP_NAMES.items() if s not in SURFACE_STOPS]
+    stops += [(s, n, lat, lon, 1) for s, (n, lat, lon) in SURFACE_STOPS.items()]
+    if light_rail:
+        routes.append(("6", "1", "6", "Line 6 Finch West", 0))
+        for direction, pattern, first, count in ((0, LINE_6_EAST, 56, 3), (1, LINE_6_WEST, 58, 1)):
+            headsign = "Martin Grove" if direction == 0 else "Humber College"
+            for n in range(count):
+                trip_id = f"6{direction}{n}"
+                trips.append(
+                    ("6", "1", trip_id, f"Line 6 Finch West towards {headsign}", direction)
+                )
+                for seq, (stop_id, *_rest) in enumerate(pattern, start=1):
+                    minute = first + n * 10 + (seq - 1) * 3
+                    t = f"{8 + minute // 60:02d}:{minute % 60:02d}:00"
+                    stop_times.append((trip_id, t, t, stop_id, seq))
+            stops += [(s, n, lat, lon, 1) for s, n, lat, lon in pattern]
     stop_times.extend(extra_stop_times)
     files = {
         "routes.txt": _csv(
             ["route_id", "agency_id", "route_short_name", "route_long_name", "route_type"],
-            [
-                ("1", "1", "1", "Line 1 (Yonge-University)", 1),
-                ("2", "1", "2", "Line 2 (Bloor - Danforth)", 1),
-                ("10", "1", "10", "Van Horne", 3),
-                ("501", "1", "501", "Queen", 0),
-            ],
+            routes,
         ),
         "trips.txt": _csv(
             ["route_id", "service_id", "trip_id", "trip_headsign", "direction_id"], trips
         ),
         "stops.txt": _csv(
-            ["stop_id", "stop_name", "stop_lat", "stop_lon", "wheelchair_boarding"],
-            [(s, n, 43.66, -79.38, 1) for s, n in STOP_NAMES.items() if s not in SURFACE_STOPS]
-            + [(s, n, lat, lon, 1) for s, (n, lat, lon) in SURFACE_STOPS.items()],
+            ["stop_id", "stop_name", "stop_lat", "stop_lon", "wheelchair_boarding"], stops
         ),
         "stop_times.txt": _csv(
             ["trip_id", "arrival_time", "departure_time", "stop_id", "stop_sequence"],

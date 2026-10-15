@@ -19,7 +19,13 @@ from transit.bikeshare.parsing import FeedValidationError
 from transit.db import connect
 from transit.http import FeedClient, FetchError
 from transit.ttc import passages, static_gtfs, store, surface
-from transit.ttc.sources import REALTIME_FEEDS, REALTIME_HOST, STATIC_GTFS_URL, STATIC_HOST
+from transit.ttc.sources import (
+    LIGHT_RAIL_LINES,
+    REALTIME_FEEDS,
+    REALTIME_HOST,
+    STATIC_GTFS_URL,
+    STATIC_HOST,
+)
 
 COLLECTOR_LOCK_ID = locks.TTC_COLLECTOR  # One TTC collector per database.
 FAST_FEEDS = ("trips_subway", "vehicles")
@@ -49,14 +55,19 @@ def refresh_static(database_url: str, client: FeedClient, url: str = STATIC_GTFS
                 "status": "loaded" if loaded else "unchanged",
                 "feed_version": feed.feed_version,
             }
+            # Light rail lines, also for a version loaded before they were included.
+            if not loaded and (added := static_gtfs.add_lines(conn, feed)):
+                result["lines_added"] = added
             # Buses and streetcars, also for a version loaded before they (or their
-            # scheduled trip starts) were added.
+            # scheduled trip starts) were added, and without the light rail lines.
             if not surface.loaded(conn, feed.feed_version):
-                result["surface"] = surface.load(conn, surface.parse(payload), feed.feed_version)
+                network = surface.without_routes(surface.parse(payload), LIGHT_RAIL_LINES)
+                result["surface"] = surface.load(conn, network, feed.feed_version)
             elif not surface.starts_loaded(conn, feed.feed_version):
-                result["surface_starts"] = surface.load_starts(
-                    conn, surface.parse(payload), feed.feed_version
-                )
+                network = surface.without_routes(surface.parse(payload), LIGHT_RAIL_LINES)
+                result["surface_starts"] = surface.load_starts(conn, network, feed.feed_version)
+            if removed := surface.remove_routes(conn, feed.feed_version, LIGHT_RAIL_LINES):
+                result["surface_removed"] = removed
         except Exception as exc:
             result = {"status": "failed", "feed_version": None, "error": _safe_error(exc)}
         conn.execute(

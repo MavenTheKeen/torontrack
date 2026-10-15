@@ -17,7 +17,9 @@ since 2026-10-09. The whole stack runs on one server behind an existing reverse 
 
 ### Map
 
-The map shows subway lines with estimated train positions, all TTC buses and streetcars
+The map shows subway lines with estimated train positions, the Line 5 Eglinton and
+Line 6 Finch West light rail lines with trains placed by timetable (TTC publishes no live
+data for them), all TTC buses and streetcars
 with their routes and headings, and more than 9,000 surface stops with estimated
 arrivals. Brampton Transit, MiWay and York Region Transit buses and stops are shown the same way
 ([neighbouring agencies](docs/agencies.md)). Regional trains between Kitchener and Oshawa are positioned from the published

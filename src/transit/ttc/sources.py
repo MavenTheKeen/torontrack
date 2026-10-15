@@ -16,6 +16,9 @@ STATIC_GTFS_URL = (
     "cfb6b2b8-6191-41e3-bda1-b175c51148cb/download/opendata_ttc_schedules.zip"
 )
 
-# GTFS route_type 1 = subway/metro. Lines 5 and 6 are light rail (type 0) and are not in
-# the realtime subway feed.
+# GTFS route_type 1 = subway/metro. Lines 5 and 6 are light rail (type 0, as streetcars
+# are) but run as rapid transit lines with stations, so they are loaded with the subway.
+# TTC publishes no realtime data for them (no predictions, no vehicle positions), so their
+# trains are placed by timetable.
 SUBWAY_ROUTE_TYPE = "1"
+LIGHT_RAIL_LINES = frozenset({"5", "6"})
