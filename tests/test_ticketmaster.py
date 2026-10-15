@@ -1,7 +1,10 @@
 """Ticketmaster events for the Events page (transit.ticketmaster).
 
-The responses here are built from the Discovery API v2 documentation, not recorded: the
-project has no API key yet. Replace them with recorded responses once one is configured.
+The responses here are built by hand rather than recorded: Ticketmaster's terms allow
+storing event content only for reasonable periods to provide the service, which rules out
+keeping real responses in a public repository. Their structure (fields, nesting, string
+coordinates, paging) was checked against a real response on 2026-10-15, and the cases
+below are the ones that response and the first full load showed.
 """
 
 import json
@@ -16,7 +19,7 @@ from transit.db import connect
 
 def tm_event(event_id, name, *, when="2026-10-17T23:00:00Z", local_date="2026-10-17",
              venue="Scotiabank Arena", venue_id="KovZpZAEkn6A", lat="43.6435", lon="-79.3791",
-             segment="Sports", genre="Hockey", status="onsale", **start):  # fmt: skip
+             segment="Sports", genre="Basketball", status="onsale", **start):  # fmt: skip
     return {
         "name": name,
         "type": "event",
@@ -57,20 +60,20 @@ def page(events, number=0, total_pages=1):
     ).encode()
 
 
-GAME = tm_event("G1", "Toronto Maple Leafs vs. Boston Bruins")
+GAME = tm_event("G1", "Toronto Raptors vs. Chicago Bulls")
 
 
 def test_events_are_parsed_and_add_ons_and_cancellations_skipped():
     row, why = ticketmaster.parse_event(GAME)
     assert why is None
-    assert row["name"] == "Toronto Maple Leafs vs. Boston Bruins"
+    assert row["name"] == "Toronto Raptors vs. Chicago Bulls"
     assert row["starts_at"] == datetime(2026, 10, 17, 23, tzinfo=UTC)
     assert row["local_date"] == date(2026, 10, 17) and row["time_tbd"] is False
     assert (row["segment"], row["venue"], row["lat"]) == ("Sports", "Scotiabank Arena", 43.6435)
     assert row["url"] == "https://www.ticketmaster.ca/event/G1"
     skipped = [
-        tm_event("P1", "Maple Leafs vs. Bruins - Parking"),
-        tm_event("S1", "Suite Rental: Leafs vs Bruins"),
+        tm_event("P1", "Raptors vs. Bulls - Parking"),
+        tm_event("S1", "Suite Rental: Raptors vs Bulls"),
         tm_event("C1", "Cancelled Show", status="cancelled"),
         tm_event("F1", "Faraway Show", lat="45.42", lon="-75.69"),  # Ottawa.
     ]
@@ -81,14 +84,49 @@ def test_events_are_parsed_and_add_ons_and_cancellations_skipped():
     assert tba["time_tbd"] is True and tba["starts_at"] is None
 
 
+def test_listings_that_are_not_events_on_the_day_are_skipped():
+    day = date(2026, 10, 17)
+    not_events = [
+        tm_event("A1", "Leafs Fan Access Plus Ups: Fanboni", segment="Miscellaneous"),
+        tm_event("A2", "Guided Tours of Scotiabank Arena", segment="Miscellaneous"),
+        tm_event("A3", "TMU Bold Women's Hockey - 2026-27 Season Pass"),
+        {**tm_event("A4", "Test Event"), "test": True},
+        # Still running from August: a day's query returns it too.
+        tm_event("A5", "Koto Fall Introductory Class", local_date="2026-08-23"),
+    ]
+    assert [ticketmaster.parse_event(e, day)[1] for e in not_events] == [
+        "add_on", "add_on", "add_on", "test_listing", "started_earlier",
+    ]  # fmt: skip
+    # 23:59 is a placeholder time, not a start.
+    late, _ = ticketmaster.parse_event(tm_event("L1", "Tour", localTime="23:59:00"), day)
+    assert late["time_tbd"] is True and late["starts_at"] is None
+
+
 def test_one_game_listed_several_times_is_kept_once():
     rows = [
         ticketmaster.parse_event(e)[0]
-        for e in (GAME, tm_event("G2", "Toronto Maple Leafs vs. Boston Bruins - Premium Seating"))
+        for e in (GAME, tm_event("G2", "Toronto Raptors vs. Chicago Bulls - Premium Seating"))
     ]
     skipped = {}
     merged = ticketmaster.merge(rows, skipped)
     assert [r["event_id"] for r in merged] == ["G1"] and skipped == {"duplicate_listing": 1}
+
+
+def test_a_timed_entry_attraction_is_one_row_per_day_with_its_sessions():
+    slots = [
+        tm_event(
+            f"H{i}",
+            "Legends of Horror",
+            when=f"2026-10-17T23:{i * 5:02d}:00Z",
+            venue="Casa Loma",
+            venue_id="casa",
+        )  # fmt: skip
+        for i in range(8)
+    ]
+    skipped = {}
+    merged = ticketmaster.merge([ticketmaster.parse_event(e)[0] for e in reversed(slots)], skipped)
+    assert len(merged) == 1 and merged[0]["event_id"] == "H0" and merged[0]["sessions"] == 8
+    assert skipped == {"extra_session": 7}
 
 
 def test_each_day_is_requested_from_toronto_midnight_and_pages_followed():

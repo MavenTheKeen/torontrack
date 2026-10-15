@@ -46,8 +46,11 @@ What the feed contains, and how the loader handles it:
 
 ## Concerts, games and shows (Ticketmaster)
 
-Ticketmaster sells tickets for nearly every arena, stadium and concert hall in the city,
-including Maple Leafs, Raptors, Toronto FC and Argonauts games. Its Discovery API
+Ticketmaster sells tickets for most arenas, stadiums and concert halls in the city. The
+first load (2026-10-15) had 326 events over 14 days: 122 concerts, 150 arts and theatre,
+17 sports, among them Raptors, Toronto FC, Argonauts and Marlies games. **Maple Leafs
+games are not in the Discovery API**: only an add-on sold on game nights appears, and it
+is dropped. Its Discovery API
 is free with a key from developer.ticketmaster.com, set as `TICKETMASTER_API_KEY` in
 `.env` (passed to Airflow only). Without a key the page shows city events alone, and each
 refresh is recorded as `skipped`.
@@ -57,10 +60,17 @@ refresh is recorded as `skipped`.
 - It requests each of the next 14 days separately (events within 30 km of City Hall,
   from Toronto's midnight to the next), following pages; about 56 requests a day of the
   5,000 allowed. The key travels only in the request URL, and errors never include it.
-- Ticketmaster lists parking passes, suites and add-ons as events; these are dropped by
-  name. A game or show listed several times at one venue and start time (packages,
-  presales) is kept once, under its shortest name. Cancelled events are dropped;
-  postponed and rescheduled ones are labelled.
+- Ticketmaster lists parking passes, suites, season passes, venue tours and add-ons as
+  events; these are dropped by name, as are listings flagged as tests. A game or show
+  listed several times at one venue and start time (packages, presales) is kept once,
+  under its shortest name. Cancelled events are dropped; postponed and rescheduled ones
+  are labelled.
+- Timed-entry attractions list every slot (Casa Loma's "Legends of Horror": 104 slots
+  over 14 nights), so one name at one venue on one day is kept once, at its first time,
+  with the number of sessions.
+- A day's query also returns events that started earlier and are still running (a class
+  series from August to November); only events starting that day are kept. A start of
+  23:59 is a placeholder and is shown as time to be announced.
 - The API terms allow caching event content only for reasonable periods to provide the
   service and forbid deriving revenue from it. Each load replaces every upcoming event,
   past events are deleted after a day, and tickets are bought on Ticketmaster: the page
@@ -71,8 +81,9 @@ refresh is recorded as `skipped`.
 | `normalized.ticketed_events` | Upcoming events: name, segment and genre, start (or date with time to be announced), status, venue, address, coordinates and Ticketmaster link |
 | `ops.ticketed_event_refreshes` | Every refresh: status (`loaded`, `skipped`, `failed`), requests, events and skipped listings by reason |
 
-The tests use responses built from the Discovery API documentation, as no key was
-available when the loader was written; they are to be replaced with recorded responses.
+Unlike the other sources, the tests do not use recorded responses: the terms' limit on
+storing event content rules out keeping them in a public repository. The hand-built
+responses were checked against a real one, and cover the cases the first load showed.
 
 ## The Events page
 
@@ -86,9 +97,9 @@ the chosen day in time order. `#/events/2026-10-17` opens a given day.
 - **Major venues:** Scotiabank Arena, Rogers Centre, BMO Field, Budweiser Stage and
   Coca-Cola Coliseum. Their events are highlighted with a note that the nearest station
   will be busy before the start and when the event ends.
-- **Ongoing events:** a city event on 5 or more days of the window (exhibits, markets,
-  museum programs) is folded into an "ongoing" list under each day, so the timeline shows
-  what happens at a time.
+- **Ongoing events:** an event on 5 or more days of the window (exhibits, markets,
+  museum programs, nightly attractions; for Ticketmaster, one name at one venue) is folded
+  into an "ongoing" list under each day, so the timeline shows what happens at a time.
 - **All-day events:** the city lists them at midnight; they show as "All day", first.
 - **Getting there:** each event names the nearest subway station, or a regional station
   if that is more than 3 minutes' walk closer, with the walk at 80 m a minute in a

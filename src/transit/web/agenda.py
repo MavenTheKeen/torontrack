@@ -6,8 +6,9 @@ concerts, games and shows, day by day, each with the nearest station to get ther
   Ticketmaster's segment and genre.
 - An event at a major venue (arenas and stadiums) is flagged, since it fills the nearest
   station before it starts and when it ends.
-- City exhibits and markets that run on most days would crowd every day, so an event on
-  ONGOING_DAYS or more days of the window is marked ongoing; the page folds those away.
+- Exhibits, markets and attractions that run on most days would crowd every day, so an
+  event on ONGOING_DAYS or more days of the window is marked ongoing; the page folds those
+  away. For Ticketmaster, which has no series ID, that is one name at one venue.
 - The city lists all-day events (installations, exhibits) at midnight; those are marked
   all_day and listed first.
 - The nearest subway or regional station is found by straight-line distance and walking
@@ -125,7 +126,7 @@ def ticketed_rows(conn, first: date, last: date) -> list[dict]:
         dict(r)
         for r in conn.execute(
             """SELECT event_id, name, segment, genre, starts_at, local_date, time_tbd,
-                      status, venue, address, lat, lon, url
+                      status, venue, address, lat, lon, url, sessions
                FROM normalized.ticketed_events
                WHERE local_date BETWEEN %s AND %s AND status <> 'cancelled'
                ORDER BY local_date, starts_at NULLS LAST, name""",
@@ -139,6 +140,10 @@ def build(city: list[dict], ticketed: list[dict], stations: list[dict], days: li
     city_days: dict[str, set] = {}
     for r in city:
         city_days.setdefault(r["event_id"], set()).add(r["starts_at"].astimezone(TORONTO).date())
+    # Ticketmaster has no series ID: one name at one venue on many days is one attraction.
+    ticketed_days: dict[tuple, set] = {}
+    for r in ticketed:
+        ticketed_days.setdefault((r["name"].casefold(), r["venue"]), set()).add(r["local_date"])
     events = []
     near: dict[tuple, dict | None] = {}
 
@@ -170,6 +175,7 @@ def build(city: list[dict], ticketed: list[dict], stations: list[dict], days: li
                 "major": is_major(r["venue"]),
                 "status": None,
                 "ongoing": len(city_days[r["event_id"]]) >= ONGOING_DAYS,
+                "sessions": 1,
                 "station": station(r["lat"], r["lon"]),
             }
         )
@@ -193,7 +199,8 @@ def build(city: list[dict], ticketed: list[dict], stations: list[dict], days: li
                 "featured": False,
                 "major": is_major(r["venue"]),
                 "status": r["status"] if r["status"] in ("postponed", "rescheduled") else None,
-                "ongoing": False,
+                "ongoing": len(ticketed_days[(r["name"].casefold(), r["venue"])]) >= ONGOING_DAYS,
+                "sessions": r.get("sessions", 1),
                 "station": station(r["lat"], r["lon"]),
             }
         )
