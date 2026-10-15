@@ -5,6 +5,8 @@
 # 3 days, for replay) and the issues logged against them are left out, which halves the
 # dump again; their tables are restored empty and refill from the next poll.
 set -u
+PGPASSWORD=$(cat /run/secrets/postgres_password)
+export PGPASSWORD
 while true; do
   stamp=$(date -u +%Y%m%dT%H%MZ)
   partial="/backups/transit-$stamp.dump.partial"

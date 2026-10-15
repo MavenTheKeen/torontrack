@@ -30,13 +30,14 @@ use `docker compose` with a space.
 
 ## Start the project
 
-Run these commands from the repository root. Copy `.env` only once so that an
-existing local password is preserved. Edit it and replace the example password
-with a local password containing letters, digits, hyphens, or underscores.
+Run these commands from the repository root. Copy `.env` only once so that existing
+settings are preserved. `deploy/make_secrets.sh` (run with Git for Windows' `sh`)
+generates the local database password in `secrets/postgres_password` and never
+overwrites an existing one.
 
 ```powershell
 Copy-Item .env.example .env
-notepad .env
+sh deploy/make_secrets.sh
 docker compose config --quiet
 docker compose build
 docker compose up -d postgres
@@ -88,7 +89,7 @@ docker compose ps -a
 - **Host port already allocated:** edit `POSTGRES_PORT` or `DASHBOARD_PORT` in
   `.env`, then repeat `docker compose up -d dashboard`. Container-to-container
   connections keep using port 5432; the dashboard URL uses `DASHBOARD_PORT`.
-- **Database authentication fails after changing `.env`:** PostgreSQL applies
+- **Database authentication fails after changing `secrets/postgres_password`:** PostgreSQL applies
   its initial password only when creating a new data directory. Restore the
   previous password or change it inside PostgreSQL; restarting the container
   does not update an existing database password.

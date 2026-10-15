@@ -6,11 +6,15 @@ services:
   init-db:
     environment:
       # init-db creates the site's read-only login when this is set.
-      WEB_DB_PASSWORD: ${WEB_DB_PASSWORD:?Set WEB_DB_PASSWORD in .env for production}
+      WEB_DB_PASSWORD_FILE: /run/secrets/web_db_password
+    secrets: [postgres_password, web_db_password]
 
   web:
     environment:
-      DATABASE_URL: postgresql://transit_web:${WEB_DB_PASSWORD:?Set WEB_DB_PASSWORD in .env for production}@postgres:5432/transit
+      DATABASE_URL: postgresql://transit_web@postgres:5432/transit
+      DATABASE_PASSWORD_FILE: /run/secrets/web_db_password
+    # Only the read-only login's password, not the owner's.
+    secrets: !override [web_db_password]
     command:
       - transit.web.app:app
       - --host=0.0.0.0
@@ -45,8 +49,8 @@ services:
       PGHOST: postgres
       PGUSER: transit
       PGDATABASE: transit
-      PGPASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}
       BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
+    secrets: [postgres_password]
     volumes:
       - ./deploy/backup.sh:/backup.sh:ro
       - ./backups:/backups
@@ -54,6 +58,10 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+
+secrets:
+  web_db_password:
+    file: ./secrets/web_db_password
 
 volumes:
   caddy-data:

@@ -22,5 +22,8 @@ artifacts/
 *.log
 .DS_Store
 
+# Compose secret files (deploy/make_secrets.sh)
+/secrets/
+
 # Production database dumps (deploy/backup.sh)
 /backups/

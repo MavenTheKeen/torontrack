@@ -1,6 +1,7 @@
 .git
 .aws
 .env
+secrets
 .env.*
 !.env.example
 .local

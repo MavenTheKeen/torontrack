@@ -19,7 +19,8 @@ Internet ──443──> Caddy ──> web (FastAPI, read-only DB login)
 | --- | --- |
 | HTTPS | Caddy obtains and renews a certificate for `SITE_ADDRESS` automatically. A free `<ip-with-dashes>.sslip.io` name works until a domain is bought. |
 | Exposure | Only Caddy publishes ports (80, 443). PostgreSQL, Airflow and the dashboard keep the base file's `127.0.0.1` bindings. |
-| Least privilege | `init-db` creates a `transit_web` login when `WEB_DB_PASSWORD` is set: `SELECT` on `normalized`, `staging`, `analytics` and `ops` (including tables dbt creates later), no access to `raw`, read-only transactions. The site connects with it. |
+| Secrets | Passwords, the Ticketmaster key and the alert URLs are files in `./secrets`, mounted into only the containers that use them ([Secrets](#secrets)). They are not in any container's environment, so `docker inspect` and child processes do not see them. |
+| Least privilege | `init-db` creates a `transit_web` login with the password in `secrets/web_db_password`: `SELECT` on `normalized`, `staging`, `analytics` and `ops` (including tables dbt creates later), no access to `raw`, read-only transactions. The site connects with it. |
 | Rate limiting | Behind a proxy every request comes from Caddy. Caddy sets `X-Forwarded-For` to the connecting client (it ignores the header from untrusted clients), and uvicorn runs with `--proxy-headers`, so the per-client limit applies to real visitors. |
 | Privacy | Caddy has no access log, so visitor addresses are not recorded. |
 | Backups | The `backup` service writes a zstd-compressed `pg_dump` custom-format file to `./backups` daily and keeps `BACKUP_KEEP_DAYS` (7). Raw TTC snapshots (a 3-day replay buffer) and their issue rows are left out, so a dump is 21 MB where a default one is 70 MB (2026-10-13); a restore loses only the ability to replay those 3 days. These sit on the same disk; copy them elsewhere for disaster recovery. |
@@ -37,20 +38,17 @@ bash deploy/server-setup.sh        # Docker, log rotation, OS firewall, auto upd
 exit                               # log in again so the docker group applies
 ```
 
-Create `.env` from `.env.example` with generated secrets and the public hostname:
+Create the secret files (the two database passwords are generated) and `.env` with the
+public hostname:
 
 ```bash
 cd torontrack
-cp .env.example .env
-sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 24)/" .env
-ip=$(curl -s https://checkip.amazonaws.com)
-cat >> .env <<EOF
-SITE_ADDRESS=${ip//./-}.sslip.io
-WEB_DB_PASSWORD=$(openssl rand -hex 24)
+sh deploy/make_secrets.sh
 # Phone alerts: subscribe to this topic in the ntfy app (docs/alerts.md).
-NTFY_URL=https://ntfy.sh/transit-alerts-$(openssl rand -hex 12)
-EOF
-chmod 600 .env
+printf 'https://ntfy.sh/transit-alerts-%s' "$(openssl rand -hex 12)" > secrets/ntfy_url
+cp .env.example .env
+ip=$(curl -s https://checkip.amazonaws.com)
+echo "SITE_ADDRESS=${ip//./-}.sslip.io" >> .env
 ```
 
 Build and start everything, then turn on the schedules:
@@ -68,7 +66,7 @@ dc exec airflow airflow dags unpause regional_schedule
 dc exec airflow airflow dags unpause road_restrictions
 dc exec airflow airflow dags unpause bikeshare_trips
 dc exec airflow airflow dags unpause city_events
-dc exec airflow airflow dags unpause ticketed_events   # needs TICKETMASTER_API_KEY
+dc exec airflow airflow dags unpause ticketed_events   # needs secrets/ticketmaster_api_key
 dc exec airflow /opt/app-venv/bin/transit bikeshare-trips-refresh   # first load, a few minutes
 dc exec airflow /opt/app-venv/bin/transit regional-refresh   # first load, then daily
 dc exec airflow /opt/app-venv/bin/transit weather-refresh --since 2026-10-09   # one-time backfill
@@ -99,6 +97,31 @@ The second step matters when the dump comes from a development machine that rece
 collected tables by logical replication ([collector server](collector.md)). Replication
 copies rows but not sequence positions, so without it the first new rows reuse existing
 IDs and the collectors fail with unique violations. It is harmless otherwise.
+
+## Secrets
+
+Each secret is a file in `./secrets`, which Git and Docker builds ignore. Compose mounts
+a file at `/run/secrets/<name>` in the containers that declare it, and the application
+reads it through a `NAME_FILE` variable holding that path (`transit.config`):
+
+| File | Used by | Contents |
+| --- | --- | --- |
+| `postgres_password` | PostgreSQL, the collectors, Airflow, the dashboard, backups | Owner login `transit` |
+| `web_db_password` | `init-db`, the site (production) | Read-only login `transit_web`; the site has no other |
+| `ticketmaster_api_key` | Airflow | Optional ([events](events.md)) |
+| `ntfy_url`, `heartbeat_url` | `alerts` | Optional ([alerts](alerts.md)) |
+
+`deploy/make_secrets.sh` creates the missing files: a value still in `.env` (an
+install from before 2026-10-15) is moved into its file, missing passwords are
+generated, and optional ones are left empty. It never overwrites a file. After it runs,
+delete those lines from `.env`. The directory is readable by its owner only; the files
+inside are world-readable because the containers' users (postgres, app, airflow) are not
+the owner.
+
+To set an optional secret later, write the file and recreate what uses it, for example
+`printf '%s' "$KEY" > secrets/ticketmaster_api_key` and `dc --profile airflow up -d airflow`.
+PostgreSQL applies `postgres_password` only when it creates a new data directory;
+changing the file afterwards requires `ALTER ROLE` as well.
 
 ## Behind an existing proxy
 

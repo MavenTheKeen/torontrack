@@ -51,8 +51,8 @@ first load (2026-10-15) had 326 events over 14 days: 122 concerts, 150 arts and 
 17 sports, among them Raptors, Toronto FC, Argonauts and Marlies games. **Maple Leafs
 games are not in the Discovery API**: only an add-on sold on game nights appears, and it
 is dropped. Its Discovery API
-is free with a key from developer.ticketmaster.com, set as `TICKETMASTER_API_KEY` in
-`.env` (passed to Airflow only). Without a key the page shows city events alone, and each
+is free with a key from developer.ticketmaster.com (the Consumer Key), stored in
+`secrets/ticketmaster_api_key` and mounted into Airflow only. Without a key the page shows city events alone, and each
 refresh is recorded as `skipped`.
 
 `transit ticketed-events-refresh` runs every 6 hours (`ticketed_events` Airflow DAG):
