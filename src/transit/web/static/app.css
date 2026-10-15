@@ -1,5 +1,6 @@
-/* Torontrack. Styled like transit signage: black, white and greys, with colour reserved
-   for the lines and for service problems. Every colour has a dark-mode value. */
+/* Torontrack. Styled like transit signage: white (light) or black (dark) with red-orange
+   for the brand and for what can be pressed or is selected; other colour belongs to the
+   lines and to service problems. Every colour has a dark-mode value. */
 @font-face {
   font-family: "Atkinson Hyperlegible Next";
   font-weight: 200 800;
@@ -23,22 +24,27 @@
   --faint: #767676;
   --border: #d9d9d9;
   --rule: #111111;
-  --accent: #111111;
-  --accent-soft: rgba(17, 17, 17, 0.07);
+  /* Brand red-orange: --brand for the logo, --accent for text and controls (4.9:1 on
+     white, and white text on it). */
+  --brand: #f2471a;
+  --accent: #cc3d0e;
+  --accent-soft: rgba(204, 61, 14, 0.1);
+  --on-accent: #ffffff;
   --link: #111111;
   --ok: #1d6b3a;
   --ok-bg: #e6f2ea;
   --warn: #8a4f00;
   --warn-bg: #fdf0d5;
-  --bad: #b3261e;
-  --bad-bg: #fbe9e7;
-  --gap: rgba(179, 38, 30, 0.12);
+  /* Crimson, so a problem never reads as the brand orange. */
+  --bad: #a3123a;
+  --bad-bg: #fbe8ed;
+  --gap: rgba(163, 18, 58, 0.12);
   --bar: #545454;
   --grey: #9a9a9a;
   --map-bg: #eeeeec;
-  --sign: #111111;
-  --sign-text: #ffffff;
-  --sign-muted: #b5b5b5;
+  --sign: #ffffff;
+  --sign-text: #111111;
+  --sign-muted: #545454;
   /* Shadows only where something floats over the map. */
   --shadow-sm: none;
   --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.12);
@@ -51,30 +57,65 @@
   --tabs-h: 0px;
   color-scheme: light dark;
 }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0a0a0a;
+  --surface: #151515;
+  --surface-2: #202020;
+  --text: #f0f0f0;
+  --muted: #b0b0b0;
+  --faint: #8c8c8c;
+  --border: #2e2e2e;
+  --rule: #f0f0f0;
+  --accent: #ff5a1f;
+  --accent-soft: rgba(255, 90, 31, 0.14);
+  --on-accent: #000000;
+  --link: #f0f0f0;
+  --ok: #6fcf8f;
+  --ok-bg: rgba(111, 207, 143, 0.12);
+  --warn: #f2b84b;
+  --warn-bg: rgba(242, 184, 75, 0.12);
+  --bad: #ff6b8e;
+  --bad-bg: rgba(255, 107, 142, 0.12);
+  --gap: rgba(255, 107, 142, 0.14);
+  --bar: #b0b0b0;
+  --grey: #6b6b6b;
+  --map-bg: #151515;
+  --sign: #000000;
+  --sign-text: #ffffff;
+  --sign-muted: #a8a8a8;
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+/* Before theme.js runs (or without it), follow the device. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #121212;
-    --surface: #1b1b1b;
-    --surface-2: #242424;
+  :root:not([data-theme]) {
+    --bg: #0a0a0a;
+    --surface: #151515;
+    --surface-2: #202020;
     --text: #f0f0f0;
     --muted: #b0b0b0;
     --faint: #8c8c8c;
-    --border: #333333;
+    --border: #2e2e2e;
     --rule: #f0f0f0;
-    --accent: #f0f0f0;
-    --accent-soft: rgba(240, 240, 240, 0.1);
+    --accent: #ff5a1f;
+    --accent-soft: rgba(255, 90, 31, 0.14);
+    --on-accent: #000000;
     --link: #f0f0f0;
     --ok: #6fcf8f;
     --ok-bg: rgba(111, 207, 143, 0.12);
     --warn: #f2b84b;
     --warn-bg: rgba(242, 184, 75, 0.12);
-    --bad: #ff8a80;
-    --bad-bg: rgba(255, 138, 128, 0.12);
-    --gap: rgba(255, 138, 128, 0.14);
+    --bad: #ff6b8e;
+    --bad-bg: rgba(255, 107, 142, 0.12);
+    --gap: rgba(255, 107, 142, 0.14);
     --bar: #b0b0b0;
     --grey: #6b6b6b;
-    --map-bg: #1b1b1b;
+    --map-bg: #151515;
     --sign: #000000;
+    --sign-text: #ffffff;
+    --sign-muted: #a8a8a8;
     --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.5);
   }
@@ -89,7 +130,7 @@ body {
   -webkit-font-smoothing: antialiased;
   padding-bottom: var(--tabs-h);
 }
-a { color: var(--link); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a { color: var(--link); text-decoration-color: var(--accent); text-underline-offset: 3px; text-decoration-thickness: 1px; }
 a:hover { text-decoration-thickness: 2px; }
 .skip { position: absolute; left: -9999px; }
 main:focus { outline: none; }
@@ -99,19 +140,28 @@ a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visibl
 }
 header.site, main, footer.site, .updated { max-width: 820px; margin: 0 auto; padding: 0 16px; }
 
-/* Header: a black band, like a station sign. Main navigation sits here on wide screens,
-   in tabs on phones. */
-.site-bar { position: sticky; top: 0; z-index: 20; background: var(--sign); color: var(--sign-text); }
+/* Header: like a station sign, white or black with an orange rule. Main navigation sits
+   here on wide screens, in tabs on phones. */
+.site-bar { position: sticky; top: 0; z-index: 20; background: var(--sign); color: var(--sign-text); border-bottom: 3px solid var(--brand); }
 header.site { display: flex; align-items: center; gap: 12px; padding-top: 10px; padding-bottom: 10px; }
-.brand { flex: none; font-weight: 700; font-size: 1.1rem; color: var(--sign-text); text-decoration: none; }
+.brand { flex: none; display: inline-flex; align-items: center; gap: 9px; font-weight: 700; font-size: 1.15rem; color: var(--sign-text); text-decoration: none; }
+.brand-mark { width: 28px; height: 28px; flex: none; }
 nav.primary { display: none; gap: 18px; margin-left: 20px; align-self: stretch; }
 nav.primary a {
   display: flex; align-items: center; color: var(--sign-muted); text-decoration: none; font-weight: 600; font-size: 0.95rem;
-  border-bottom: 3px solid transparent; margin-bottom: -10px; padding-bottom: 7px; padding-top: 10px; margin-top: -10px;
+  border-bottom: 3px solid transparent; margin-bottom: -13px; padding-bottom: 7px; padding-top: 10px; margin-top: -10px;
 }
 nav.primary a:hover { color: var(--sign-text); }
-nav.primary a[aria-current="page"] { color: var(--sign-text); border-bottom-color: var(--sign-text); }
+nav.primary a[aria-current="page"] { color: var(--sign-text); border-bottom-color: var(--accent); }
 #line-nav { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+/* Light or dark: shows the theme it switches to. */
+.theme-switch {
+  flex: none; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: var(--radius); background: transparent; color: var(--sign-text); cursor: pointer;
+}
+.theme-switch:hover { border-color: var(--accent); color: var(--accent); }
+.theme-switch svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+:root[data-theme="dark"] .theme-switch .to-dark, :root:not([data-theme="dark"]) .theme-switch .to-light { display: none; }
 #line-nav .badge { box-shadow: none; }
 #line-nav .badge[aria-current="page"] { box-shadow: 0 0 0 2px var(--sign), 0 0 0 4px var(--sign-text); }
 
@@ -119,7 +169,7 @@ nav.primary a[aria-current="page"] { color: var(--sign-text); border-bottom-colo
 .tabs {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 25;
   display: grid; grid-template-columns: repeat(5, 1fr);
-  background: var(--sign);
+  background: var(--sign); border-top: 1px solid var(--border);
   padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
 }
 .tabs a {
@@ -127,7 +177,7 @@ nav.primary a[aria-current="page"] { color: var(--sign-text); border-bottom-colo
   font-size: 0.72rem; font-weight: 600; color: var(--sign-muted); text-decoration: none; padding: 4px 0;
 }
 .tabs svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.tabs a[aria-current="page"] { color: var(--sign-text); }
+.tabs a[aria-current="page"] { color: var(--accent); }
 @media (max-width: 719px) { :root { --tabs-h: calc(64px + env(safe-area-inset-bottom)); } .brand-name { font-size: 0.98rem; } }
 @media (min-width: 720px) { nav.primary { display: flex; } .tabs { display: none; } }
 @media (max-width: 380px) { .brand-name { display: none; } }
@@ -145,7 +195,7 @@ nav.primary a[aria-current="page"] { color: var(--sign-text); border-bottom-colo
   background: var(--surface); color: var(--text); text-decoration: none;
 }
 .day:hover { border-color: var(--text); }
-.day[aria-current="date"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.day[aria-current="date"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .day-name { font-size: 0.78rem; font-weight: 600; opacity: 0.8; }
 .day-num { font-size: 1.25rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .day-dots { display: flex; gap: 3px; height: 6px; }
@@ -210,7 +260,7 @@ h3.with-badge .badge { margin-top: 1px; }
 .button {
   display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.92rem;
   padding: 8px 14px; border-radius: var(--radius); text-decoration: none;
-  background: var(--text); color: var(--bg);
+  background: var(--accent); color: var(--on-accent);
 }
 button.button { border: 0; cursor: pointer; font-family: inherit; }
 .button:hover { opacity: 0.85; }
@@ -224,7 +274,7 @@ button.button { border: 0; cursor: pointer; font-family: inherit; }
 }
 .summary.ok .state-icon { background: var(--ok); }
 .summary.issues .state-icon { background: var(--warn); }
-@media (prefers-color-scheme: dark) { .summary .state-icon { color: #121212; } }
+:root[data-theme="dark"] .summary .state-icon { color: #0a0a0a; }
 
 /* Status */
 .status-list { list-style: none; padding: 0; margin: 0; }
@@ -272,7 +322,7 @@ input[type="search"] {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a93a0' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
   color: var(--text);
 }
-input[type="search"]:focus { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); outline: none; }
+input[type="search"]:focus { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); outline: none; }
 .results { list-style: none; padding: 0; margin: 6px 0 0; }
 .results:not(:empty) {
   background: var(--surface); border: 1px solid var(--muted); border-radius: var(--radius); overflow: hidden;
@@ -407,9 +457,9 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
   flex: none; width: 46px; height: 46px; border-radius: var(--radius); border: 0; cursor: pointer; display: flex; align-items: center; justify-content: center;
   background: var(--surface); color: var(--muted); box-shadow: var(--shadow-md); transition: background 0.2s, color 0.2s;
 }
-.map-tool.on { background: var(--text); color: var(--bg); }
+.map-tool.on { background: var(--accent); color: var(--on-accent); }
 /* On a dark map the surface colour alone barely separates the controls from it. */
-@media (prefers-color-scheme: dark) { .map-tool, .map-fab, .map-page input.map-search { border: 1px solid var(--border); } }
+:root[data-theme="dark"] :is(.map-tool, .map-fab, .map-page input.map-search) { border: 1px solid var(--border); }
 .map-page input.map-search { box-shadow: var(--shadow-md); border-color: transparent; }
 .map-results { list-style: none; margin: 6px 0 0; padding: 0; }
 .map-results:not(:empty) { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-lg); overflow: hidden; }
@@ -434,7 +484,7 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
   background: var(--surface); border: 0; border-radius: var(--radius-sm); padding: 8px 12px; min-height: 36px;
   box-shadow: var(--shadow-md);
 }
-.chip[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 .chip.small { box-shadow: none; padding: 5px 11px; min-height: 30px; }
 .map-status {
   align-self: flex-start; margin: -2px 0 0; font-size: 0.76rem; font-weight: 650; color: var(--muted);
@@ -476,7 +526,7 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
   flex: none; position: relative; width: 44px; height: 26px; border-radius: var(--radius); border: 0; padding: 0; cursor: pointer;
   background: var(--border); transition: background 0.2s;
 }
-.switch[aria-checked="true"] { background: var(--ok); }
+.switch[aria-checked="true"] { background: var(--accent); }
 .switch-knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 2px; background: #fff; transition: transform 0.15s var(--ease); }
 .switch[aria-checked="true"] .switch-knob { transform: translateX(18px); }
 .map-legend { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
@@ -503,7 +553,7 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
   width: 100%; text-align: left; font: inherit; color: var(--text); cursor: pointer; display: grid; gap: 6px;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px;
 }
-.plan-trip[aria-pressed="true"] { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
+.plan-trip[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .plan-trip-top { display: flex; justify-content: space-between; gap: 8px; }
 .plan-pills { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .plan-pill { display: inline-block; min-width: 22px; padding: 2px 7px; border-radius: var(--radius-sm); font-size: 0.78rem; font-weight: 700; text-align: center; line-height: 1.35; }
@@ -579,6 +629,11 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
 .maplibregl-ctrl-group button { width: 40px !important; height: 40px !important; }
 .maplibregl-ctrl-bottom-right { bottom: 8px; }
 .maplibregl-ctrl-attrib { font-size: 11px; }
+/* MapLibre's own controls are white; in dark they match the other map controls. */
+:root[data-theme="dark"] .maplibregl-ctrl-group, :root[data-theme="dark"] .maplibregl-ctrl-attrib { background: var(--surface); color: var(--text); }
+:root[data-theme="dark"] .maplibregl-ctrl-group button + button { border-top-color: var(--border); }
+:root[data-theme="dark"] .maplibregl-ctrl-icon, :root[data-theme="dark"] .maplibregl-ctrl-attrib-button { filter: invert(1); }
+:root[data-theme="dark"] .maplibregl-ctrl-attrib a { color: var(--muted); }
 
 /* Bus and streetcar route numbers: blue for buses, crimson for streetcars, always with
    the number as text. */

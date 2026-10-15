@@ -3,12 +3,13 @@
 // The app shell (page, scripts, styles, icons, map library) is served network-first and
 // falls back to the last copy; live data under /api/ is never cached, so nothing stale is
 // shown as live. Map tiles are left to the browser's own HTTP cache (range requests).
-const SHELL_CACHE = "torontrack-shell-v3";
+const SHELL_CACHE = "torontrack-shell-v4";
 const SHELL = [
   "/",
   "/static/app.css",
   "/static/fonts/atkinson-hyperlegible-next-latin.woff2",
   "/static/fonts/atkinson-hyperlegible-next-latin-ext.woff2",
+  "/static/theme.js",
   "/static/icons.js",
   "/static/guidance.js",
   "/static/motion.js",
