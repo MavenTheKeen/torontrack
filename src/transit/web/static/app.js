@@ -868,14 +868,15 @@ async function loadMapLibrary() {
   return lib;
 }
 
-const prefersDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
+// The theme chosen on the site, or the device's (theme.js keeps <html data-theme> current).
+const prefersDark = () => document.documentElement.dataset.theme === "dark";
 const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // Muted streets so the transit layers carry the colour. Layer names follow the Protomaps
 // basemap schema (v4) that the extract uses.
 function basemapColours(dark) {
   return dark
-    ? { water: "#0f1c28", land: "#14171c", park: "#16231b", building: "#1d2128", road: "#262b33", major: "#2e343e", highway: "#394150", casing: "#0f1216", label: "#8c96a4", halo: "#0b0d10", rail: "#3a404a" }
+    ? { water: "#0f1c28", land: "#151515", park: "#16231b", building: "#1d1d1d", road: "#262626", major: "#2f2f2f", highway: "#3a3a3a", casing: "#0f0f0f", label: "#8c8c8c", halo: "#0a0a0a", rail: "#3a3a3a" }
     : { water: "#cbdcea", land: "#f3f4f1", park: "#dbe9d3", building: "#e7e7e3", road: "#ffffff", major: "#ffffff", highway: "#fdfdfb", casing: "#d9dad3", label: "#6b7280", halo: "#ffffff", rail: "#c9cbc4" };
 }
 
@@ -1073,7 +1074,7 @@ const PARKING_COLOUR = "#4338ca";
 const BIKE_PARKING_COLOUR = "#0f766e";
 
 function mapCasing() {
-  return prefersDark() ? "#0b0d10" : "#ffffff";
+  return prefersDark() ? "#0a0a0a" : "#ffffff";
 }
 
 // Every icon the map draws, from icons.js. Subway trains take their line's colour.
@@ -1098,7 +1099,7 @@ function addMapIcons(map) {
 }
 
 function addSurfaceLayers(map) {
-  const c = prefersDark() ? { stop: "#14171c", stopStroke: "#8c96a4", halo: "#0b0d10", casing: "#0b0d10" } : { stop: "#ffffff", stopStroke: "#64748b", halo: "#ffffff", casing: "#ffffff" };
+  const c = prefersDark() ? { stop: "#151515", stopStroke: "#8c8c8c", halo: "#0a0a0a", casing: "#0a0a0a" } : { stop: "#ffffff", stopStroke: "#64748b", halo: "#ffffff", casing: "#ffffff" };
   const modeColour = ["match", ["get", "mode"], "streetcar", SURFACE_COLOURS.streetcar, SURFACE_COLOURS.bus];
   map.addSource("route-path", { type: "geojson", data: featureCollection([]) });
   map.addSource("bus-stops", { type: "geojson", data: featureCollection([]) });
@@ -1260,7 +1261,7 @@ function addRegionalPill(map) {
 }
 
 function addRegionalLayers(map) {
-  const c = prefersDark() ? { casing: "#0b0d10", fill: "#14171c", label: "#eef1f5", halo: "#0b0d10" } : { casing: "#ffffff", fill: "#ffffff", label: "#111418", halo: "#ffffff" };
+  const c = prefersDark() ? { casing: "#0a0a0a", fill: "#151515", label: "#f0f0f0", halo: "#0a0a0a" } : { casing: "#ffffff", fill: "#ffffff", label: "#111418", halo: "#ffffff" };
   map.addSource("regional-lines", { type: "geojson", data: featureCollection([]) });
   map.addSource("regional-stations", { type: "geojson", data: featureCollection([]) });
   map.addSource("regional-trains", { type: "geojson", data: featureCollection([]) });
@@ -1423,7 +1424,7 @@ const OSM_SOURCES = { parking: ["parking", "parking.geojson", "Parking"], bikePa
 
 function addOsmLayers(view) {
   const map = view.map;
-  const c = prefersDark() ? { label: "#eef1f5", halo: "#0b0d10" } : { label: "#111418", halo: "#ffffff" };
+  const c = prefersDark() ? { label: "#f0f0f0", halo: "#0a0a0a" } : { label: "#111418", halo: "#ffffff" };
   map.addSource("parking", { type: "geojson", data: featureCollection([]) });
   map.addSource("bike-parking", { type: "geojson", data: featureCollection([]) });
   map.addLayer({ id: "bike-parking", type: "symbol", source: "bike-parking", minzoom: 14.5, layout: {
@@ -1808,7 +1809,7 @@ function planPlace(view, coord) {
 
 function addPlanLayers(view) {
   const map = view.map;
-  const c = prefersDark() ? { fill: "#14171c", ink: "#eef1f5" } : { fill: "#ffffff", ink: "#111418" };
+  const c = prefersDark() ? { fill: "#151515", ink: "#f0f0f0" } : { fill: "#ffffff", ink: "#111418" };
   const transit = ["all", ["==", ["geometry-type"], "LineString"], ["!", ["get", "walk"]]];
   map.addSource("plan", { type: "geojson", data: featureCollection([]) });
   // An ink outline sets the trip apart from the network lines it runs along.
@@ -2205,7 +2206,7 @@ function lineColour(id) {
 
 function addOverlayLayers(map, data) {
   const { lines: lineFc, stations, entrances } = networkFeatures(data);
-  const c = prefersDark() ? { casing: "#0b0d10", stationFill: "#14171c", stationStroke: "#eef1f5", label: "#eef1f5", halo: "#0b0d10", trainStroke: "#ffffff" } : { casing: "#ffffff", stationFill: "#ffffff", stationStroke: "#111418", label: "#111418", halo: "#ffffff", trainStroke: "#111418" };
+  const c = prefersDark() ? { casing: "#0a0a0a", stationFill: "#151515", stationStroke: "#f0f0f0", label: "#f0f0f0", halo: "#0a0a0a", trainStroke: "#ffffff" } : { casing: "#ffffff", stationFill: "#ffffff", stationStroke: "#111418", label: "#111418", halo: "#ffffff", trainStroke: "#111418" };
   map.addSource("lines", { type: "geojson", data: lineFc });
   map.addSource("stations", { type: "geojson", data: stations });
   map.addSource("docks", { type: "geojson", data: dockFeatures(data, mapState.mode) });
@@ -2665,7 +2666,7 @@ function mapLegend() {
       legendRow(badgeEl("event", EVENT_COLOUR, "#ffffff", { size: 20 }), "Event today"),
       legendRow(badgeEl("event", prefersDark() ? "#94a3b8" : EVENT_COLOUR, "#ffffff", { size: 20, hollow: true }), "Event later this week"),
       legendRow(el("span", { class: "swatch-me", "aria-hidden": "true" }), "Your location"),
-      legendRow(lineSwatch(prefersDark() ? "#eef1f5" : "#111418"), "Planned trip")),
+      legendRow(lineSwatch(prefersDark() ? "#f0f0f0" : "#111418"), "Planned trip")),
   );
 }
 
@@ -3573,5 +3574,11 @@ setInterval(() => {
   route({ refresh: true });
 }, REFRESH_MS);
 window.addEventListener("resize", setHeaderHeight);
+document.getElementById("theme-switch").addEventListener("click", () => window.toggleTheme());
+// The page restyles itself; the map draws its colours when built, so it is rebuilt, unless
+// guidance is running, which a rebuild would end.
+window.addEventListener("themechange", () => {
+  if (location.hash.startsWith("#/map") && !activeMap?.guide) route();
+});
 setHeaderHeight();
 route();
