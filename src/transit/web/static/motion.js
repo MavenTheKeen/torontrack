@@ -15,19 +15,20 @@
 //   halved the map's position error (docs/map.md).
 // - Regional trains follow their timetable track, sent ahead by the server.
 //
-// When fresh data moves a vehicle's estimate, the difference is made up evenly over
-// CORRECT_MS, the time until the next refresh: a vehicle drawn behind runs a little faster
-// for the whole interval rather than lurching forward in a burst, and one drawn ahead
+// When fresh data moves a vehicle's estimate, the difference is made up over CORRECT_MS,
+// the time until the next refresh, along a curve that keeps both position and speed
+// continuous: a vehicle carries on at the speed it was drawn at and eases onto its new
+// estimate, so a refresh never shows as a jump or a sudden change of pace. One drawn ahead
 // waits instead of backing up. A correction over FAR_DEG (a detour, a report long missing)
-// glides over QUICK_MS instead. Heading arrows turn at up to TURN_DEG_PER_S instead of
+// is eased over QUICK_MS instead. Heading arrows turn at up to TURN_DEG_PER_S instead of
 // snapping at each corner of the route.
 
 const STOPPED_HOLD_S = 20;
 const MAX_MOVE_S = 120;
 const FADE_AFTER_S = 150;
 const CORRECT_MS = 10000; // The map refreshes trains and vehicles every 10 s.
-const QUICK_MS = 1200;
-const FAR_DEG = 0.0025; // About 250 m.
+const QUICK_MS = 3000;
+const FAR_DEG = 0.005; // About 500 m.
 const HOLD_DEG = 0.0015; // A vehicle up to ~150 m ahead of its estimate waits for it.
 const TURN_DEG_PER_S = 180;
 
@@ -113,9 +114,11 @@ function trackPoint(track, nowMs) {
 
 // ---- Gliding to corrected positions -------------------------------------------------------
 
-// Tracks what each vehicle was last drawn at. After new data (a new `seq`), the difference
-// between where a vehicle is drawn and its new estimate shrinks to nothing: evenly over
-// CORRECT_MS, or eased over QUICK_MS when far.
+// Tracks what each vehicle was last drawn at and how fast it was moving. After new data (a
+// new `seq`), the offset between where a vehicle is drawn and its new estimate shrinks to
+// nothing over the span: a cubic Hermite curve starting at the offset and its rate of
+// change (drawn velocity minus estimate velocity) and ending at zero with zero rate, so the
+// drawn path has no corner. Far corrections ease in and out over QUICK_MS.
 function newGlide() {
   return { seq: 0, items: new Map() };
 }
@@ -128,19 +131,38 @@ function degrees(dx, dy) {
 function glide(state, id, target, nowMs) {
   let item = state.items.get(id);
   if (!item) {
-    item = { seq: state.seq, start: nowMs, dx: 0, dy: 0, span: CORRECT_MS, quick: false, coord: target, dir: null };
+    item = { seq: state.seq, start: nowMs, dx: 0, dy: 0, vx: 0, vy: 0, span: CORRECT_MS, quick: false, coord: target, target, at: nowMs, vel: [0, 0], tvel: [0, 0], dir: null };
     state.items.set(id, item);
-  } else if (item.seq !== state.seq) {
-    item.dx = item.coord[0] - target[0];
-    item.dy = item.coord[1] - target[1];
-    item.start = nowMs;
+  }
+  const dt = nowMs - item.at;
+  const fresh = item.seq !== state.seq;
+  if (fresh) {
+    // The curve starts at the last frame, against where the new estimate was then, so the
+    // vehicle keeps moving on this frame too.
+    const back = Math.max(0, dt);
+    item.dx = item.coord[0] - (target[0] - item.tvel[0] * back);
+    item.dy = item.coord[1] - (target[1] - item.tvel[1] * back);
+    item.start = nowMs - back;
     item.seq = state.seq;
     item.quick = degrees(item.dx, item.dy) > FAR_DEG;
     item.span = item.quick ? QUICK_MS : CORRECT_MS;
+    // Rate of change of the offset, per ms; dropped if it would carry the vehicle far.
+    [item.vx, item.vy] = [item.vel[0] - item.tvel[0], item.vel[1] - item.tvel[1]];
+    if (item.quick || degrees(item.vx * item.span, item.vy * item.span) > FAR_DEG) item.vx = item.vy = 0;
+  } else if (dt > 0) {
+    item.tvel = [(target[0] - item.target[0]) / dt, (target[1] - item.target[1]) / dt];
   }
-  const p = Math.min(1, Math.max(0, (nowMs - item.start) / item.span));
-  const left = item.quick ? 1 - p * p * (3 - 2 * p) : 1 - p;
-  let coord = [target[0] + item.dx * left, target[1] + item.dy * left];
+  const s = Math.min(1, Math.max(0, (nowMs - item.start) / item.span));
+  let ox, oy;
+  if (item.quick) {
+    const left = 1 - s * s * (3 - 2 * s);
+    [ox, oy] = [item.dx * left, item.dy * left];
+  } else {
+    const h00 = 2 * s ** 3 - 3 * s ** 2 + 1;
+    const h10 = (s ** 3 - 2 * s ** 2 + s) * item.span;
+    [ox, oy] = [item.dx * h00 + item.vx * h10, item.dy * h00 + item.vy * h10];
+  }
+  let coord = [target[0] + ox, target[1] + oy];
   const step = [coord[0] - item.coord[0], coord[1] - item.coord[1]];
   if (!item.quick && item.dir && step[0] * item.dir[0] + step[1] * item.dir[1] < 0 && degrees(item.coord[0] - target[0], item.coord[1] - target[1]) < HOLD_DEG) {
     // The correction would move it backwards: it waits where it is, and what remains is
@@ -148,11 +170,15 @@ function glide(state, id, target, nowMs) {
     coord = item.coord;
     item.dx = coord[0] - target[0];
     item.dy = coord[1] - target[1];
+    item.vx = item.vy = 0;
     item.start = nowMs;
   } else if (step[0] || step[1]) {
     item.dir = step;
   }
+  if (dt > 0) item.vel = [(coord[0] - item.coord[0]) / dt, (coord[1] - item.coord[1]) / dt];
   item.coord = coord;
+  item.target = target;
+  item.at = nowMs;
   item.seen = nowMs;
   return item.coord;
 }

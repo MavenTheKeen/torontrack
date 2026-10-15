@@ -494,7 +494,9 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
   background: var(--surface); border: 0; border-radius: var(--radius-sm); padding: 8px 12px; min-height: 36px;
   box-shadow: var(--shadow-md);
 }
-.chip[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.chip[aria-pressed="true"], .chip[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
+.view-switch { margin: 0 0 16px; }
+.view-switch .chip { text-decoration: none; display: inline-flex; align-items: center; }
 .chip.small { box-shadow: none; padding: 5px 11px; min-height: 30px; }
 .map-status {
   align-self: flex-start; margin: -2px 0 0; font-size: 0.76rem; font-weight: 650; color: var(--muted);
