@@ -9,9 +9,17 @@ arena, stadium and concert hall in the city, so its Discovery API fills that gap
   errors never include the URL, so it is not stored or logged.
 - Events are requested one day at a time for DAYS days within RADIUS_KM of downtown. The
   API serves at most 1,000 results per query (size x page), and one day stays well under.
-- Ticketmaster lists parking passes, suites and add-ons as separate events, and often lists
-  one game or show several times (packages, presales). Add-ons are dropped by name and
-  listings of one venue at one start time are merged, keeping the shortest name.
+- Ticketmaster lists parking passes, suites, season passes, venue tours and add-ons (such
+  as the Maple Leafs' "Fan Access Plus Ups") as separate events; these are dropped by name,
+  as are listings flagged as tests. Measured on 2026-10-15, Maple Leafs games themselves
+  are not in the Discovery API, while Raptors, Toronto FC, Argonauts and Marlies games are.
+- One game or show is often listed several times (packages, presales): listings of one
+  venue at one start time are merged, keeping the shortest name. Timed-entry attractions
+  list every slot (Casa Loma's "Legends of Horror": 104 slots over 14 nights), so one name
+  at one venue on one day is kept once, at its first time, with the number of sessions.
+- A query for a day also returns events that started earlier and are still running (a
+  class series running August to November); only events starting on the day are kept.
+- A start of 23:59 is a placeholder (daily tours), so it is treated as time to be announced.
 - The terms allow caching event content only for reasonable periods to provide the
   service: each load replaces every upcoming event, and past events are deleted after a day.
 - Tickets are bought on Ticketmaster; the site links to each event's page.
@@ -40,9 +48,11 @@ REQUEST_GAP_S = 0.25  # The API allows 5 requests a second.
 BOUNDS = (43.4, 44.0, -79.9, -78.9)
 ADD_ON = re.compile(
     r"\b(parking|suite|suites|upsell|add[- ]?on|vip package|hospitality package|"
-    r"gift card|voucher|fast lane|early entry|tailgate)\b",
+    r"gift card|voucher|fast lane|early entry|tailgate|season pass|flex pass|day pass|"
+    r"plus ups?|fan access|guided tours?)\b",
     re.IGNORECASE,
 )
+PLACEHOLDER_TIME = "23:59:00"
 
 
 def api_key() -> str | None:
@@ -70,11 +80,14 @@ def request_url(key: str, day: date, page: int) -> str:
     return f"{URL}?{urlencode(params)}"
 
 
-def parse_event(event: dict) -> tuple[dict | None, str | None]:
-    """(event row, or None and why it was skipped)."""
+def parse_event(event: dict, day: date | None = None) -> tuple[dict | None, str | None]:
+    """(event row, or None and why it was skipped). With `day`, the day requested, an event
+    starting on another day (one still running from earlier) is skipped."""
     name = " ".join((event.get("name") or "").split())
     if not event.get("id") or not name:
         return None, "no_id_or_name"
+    if event.get("test"):
+        return None, "test_listing"
     if ADD_ON.search(name):
         return None, "add_on"
     dates = event.get("dates") or {}
@@ -86,9 +99,11 @@ def parse_event(event: dict) -> tuple[dict | None, str | None]:
         local_date = date.fromisoformat(start["localDate"])
     except (KeyError, TypeError, ValueError):
         return None, "no_date"
+    if day is not None and local_date != day:
+        return None, "started_earlier" if local_date < day else "other_day"
     time_tbd = bool(
         start.get("timeTBA") or start.get("noSpecificTime") or start.get("dateTBD")
-        or not start.get("dateTime")
+        or not start.get("dateTime") or start.get("localTime") == PLACEHOLDER_TIME
     )  # fmt: skip
     starts_at = None
     if not time_tbd:
@@ -126,12 +141,14 @@ def parse_event(event: dict) -> tuple[dict | None, str | None]:
         "lat": round(lat, 6),
         "lon": round(lon, 6),
         "url": url if isinstance(url, str) and url.startswith("https://") else None,
+        "sessions": 1,
     }, None
 
 
 def merge(rows: list[dict], skipped: dict) -> list[dict]:
     """One row per venue and start: the same game or show listed several times (packages,
-    presales) keeps the listing with the shortest name."""
+    presales) keeps the listing with the shortest name. Then one row per name, venue and
+    day: a timed-entry attraction keeps its first session and counts the rest."""
     best: dict[tuple, dict] = {}
     for row in rows:
         when = row["starts_at"] or row["local_date"]
@@ -144,8 +161,18 @@ def merge(rows: list[dict], skipped: dict) -> list[dict]:
                 best[key] = row
         else:
             best[key] = row
+    days: dict[tuple, dict] = {}
+    for row in sorted(
+        best.values(), key=lambda r: r["starts_at"] or datetime.max.replace(tzinfo=UTC)
+    ):
+        key = (row["name"].casefold(), row["venue_id"] or row["venue"], row["local_date"])
+        if key in days:
+            skipped["extra_session"] = skipped.get("extra_session", 0) + 1
+            days[key]["sessions"] += 1
+        else:
+            days[key] = {**row, "sessions": 1}
     return sorted(
-        best.values(),
+        days.values(),
         key=lambda r: (
             r["local_date"],
             r["starts_at"] or datetime.max.replace(tzinfo=UTC),
@@ -171,7 +198,7 @@ def read(
             except ValueError as exc:
                 raise FetchError("Ticketmaster returned invalid JSON") from exc
             for event in (payload.get("_embedded") or {}).get("events") or []:
-                row, why = parse_event(event)
+                row, why = parse_event(event, day)
                 if row is None:
                     skipped[why] = skipped.get(why, 0) + 1
                 else:
@@ -184,7 +211,7 @@ def read(
 
 COLUMNS = (
     "event_id", "name", "segment", "genre", "starts_at", "local_date", "time_tbd", "status",
-    "venue_id", "venue", "address", "lat", "lon", "url",
+    "venue_id", "venue", "address", "lat", "lon", "url", "sessions",
 )  # fmt: skip
 
 

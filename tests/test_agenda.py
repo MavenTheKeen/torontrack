@@ -93,3 +93,23 @@ def test_build_marks_ongoing_city_events_and_merges_both_sources():
                 "starts_at": datetime(2026, 10, 16, 4, tzinfo=UTC)}  # fmt: skip
     first_row = agenda.build([midnight, *city], [], STATIONS, days)["events"]
     assert [e["all_day"] for e in first_row if e["date"] == "2026-10-16"][:2] == [True, False]
+
+
+def test_a_ticketed_attraction_on_most_days_is_ongoing():
+    days = agenda.window(datetime(2026, 10, 15, 16, tzinfo=UTC))
+    nightly = {
+        "name": "Legends of Horror", "segment": "Miscellaneous", "genre": None, "time_tbd": False,
+        "status": "onsale", "venue": "Casa Loma", "address": None, "lat": 43.678, "lon": -79.4094,
+        "url": None, "sessions": 9,
+    }  # fmt: skip
+    rows = [
+        {
+            **nightly,
+            "event_id": f"h{i}",
+            "local_date": days[i],
+            "starts_at": datetime(2026, 10, 15 + i, 23, tzinfo=UTC),
+        }  # fmt: skip
+        for i in range(5)
+    ]
+    events = agenda.build([], rows, STATIONS, days)["events"]
+    assert all(e["ongoing"] for e in events) and events[0]["sessions"] == 9

@@ -3381,7 +3381,7 @@ function agendaItem(e, categories) {
   return el(
     "li",
     { class: `agenda-item${e.major ? " major" : ""}` },
-    el("p", { class: "agenda-time" }, eventTime(e)),
+    el("p", { class: "agenda-time" }, eventTime(e), e.sessions > 1 ? el("span", { class: "muted small agenda-sessions" }, `${e.sessions} times`) : null),
     el(
       "div",
       { class: "agenda-body" },
