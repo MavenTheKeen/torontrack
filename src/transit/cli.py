@@ -6,6 +6,7 @@ import sys
 from datetime import UTC, date, datetime, time
 
 from transit import (
+    agencies,
     alerts,
     bike_lanes,
     events,
@@ -88,6 +89,15 @@ def main():
         "--year", type=int, action="append", help="Reload this year regardless; repeatable"
     )
     commands.add_parser("regional-refresh", help="Load the regional train schedule if it changed")
+    commands.add_parser(
+        "agencies-refresh", help="Load Brampton Transit and MiWay schedules if they changed"
+    )
+    commands.add_parser(
+        "agencies-collect", help="Poll Brampton Transit and MiWay bus positions every 15 s"
+    )
+    commands.add_parser(
+        "agencies-health", help="Exit 1 unless every agency was polled in 2 minutes"
+    )
     map_cmd = commands.add_parser(
         "map-tiles", help="Build the site's Toronto street map from OpenStreetMap"
     )
@@ -227,6 +237,25 @@ def main():
                     client.close()
                 if result["status"] == "failed":
                     raise FetchError(f"Regional schedule refresh failed: {result['error']}")
+            elif args.command == "agencies-refresh":
+                client = FeedClient()
+                try:
+                    result = agencies.refresh(settings.database_url, client)
+                finally:
+                    client.close()
+                failed = [k for k, r in result.items() if r["status"] == "failed"]
+                if failed:
+                    print(json.dumps(result, default=str))
+                    raise FetchError(f"Agency schedule refresh failed for {', '.join(failed)}")
+            elif args.command == "agencies-collect":
+                agencies.run_forever(settings.database_url)
+                result = {"collector": "stopped"}
+            elif args.command == "agencies-health":
+                with connect(settings.database_url) as conn:
+                    late = agencies.healthy(conn, datetime.now(UTC))
+                if late:
+                    raise ValueError(f"No successful recent poll for {', '.join(late)}")
+                result = {"agencies_collector": "healthy"}
             elif args.command == "alerts":
                 alerts.run(
                     settings.database_url, settings.ntfy_url, settings.heartbeat_url, args.once
@@ -257,6 +286,7 @@ def main():
         FeedValidationError,
         CollectionBusy,
         ttc_collector.CollectorBusy,
+        agencies.CollectorBusy,
     ) as exc:
         print(f"Failed: {exc}", file=sys.stderr)
         return 1

@@ -104,6 +104,24 @@ services:
     restart: unless-stopped
     stop_grace_period: 40s
 
+  # Brampton Transit and MiWay bus positions every 15 s (docs/agencies.md).
+  agencies-collector:
+    <<: *app
+    command: ["agencies-collect"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init-db:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "transit", "agencies-health"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 180s
+    restart: unless-stopped
+    stop_grace_period: 20s
+
   alerts:
     <<: *app
     command: ["alerts"]

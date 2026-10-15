@@ -8,6 +8,7 @@ service; it never calls the TTC.
 import json
 import logging
 import mimetypes
+import re
 import threading
 import time
 from collections import deque
@@ -23,10 +24,12 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from transit import events, places, roads
+from transit.agencies import AGENCIES
 from transit.config import Settings
 from transit.db import connect
 from transit.web import (
     access,
+    agencies,
     agenda,
     bikes,
     pipeline,
@@ -54,6 +57,9 @@ EVENTS_ATTRIBUTION = (
     "under the Open Government Licence – Toronto."
 )
 AGENDA_ATTRIBUTION = EVENTS_ATTRIBUTION + " Concerts, games and shows: Ticketmaster."
+SURFACE_ATTRIBUTION = " ".join([ATTRIBUTION, *(a.credit for a in AGENCIES.values())])
+# A neighbouring agency's stop or route: its key, a colon and its own ID (transit.agencies).
+AGENCY_ID = re.compile(r"[a-z]{2}:[A-Za-z0-9_-]{1,24}")
 ROADS_ATTRIBUTION = (
     "Road restrictions: City of Toronto. Contains information licensed under the "
     "Open Government Licence – Toronto."
@@ -405,64 +411,98 @@ def create_app(
                 surface_cache.update(version=version, network=network)
             return surface_cache["network"]
 
+    def ttc_part(read, empty):
+        """The TTC's share of a combined bus endpoint, or `empty` before its schedule is
+        loaded, so neighbouring agencies still show."""
+        try:
+            return read()
+        except queries.NotFound:
+            return empty
+
     @app.get("/api/surface")
     def surface_stops():
-        """Every bus and streetcar route and stop; changes only with a new schedule."""
-        return cached("surface", lambda conn, now: surface_network(conn))
+        """Every bus and streetcar route and stop, the TTC's and neighbouring agencies';
+        changes only with a new schedule."""
+
+        def build(conn, now):
+            ttc = ttc_part(lambda: surface_network(conn), {"routes": [], "stops": []})
+            others = agencies.network(conn)
+            return {
+                **ttc,
+                "routes": ttc["routes"] + others["routes"],
+                "stops": ttc["stops"] + others["stops"],
+            }
+
+        return cached("surface", build, attribution=SURFACE_ATTRIBUTION)
 
     def matched(conn, now):
-        """Vehicles matched to their route patterns, shared by the vehicle and stop
-        endpoints for one cache period."""
+        """Vehicles matched to their route patterns, the TTC's then other agencies',
+        shared by the vehicle and stop endpoints for one cache period."""
         return live.get(
-            "matched", lambda: surface.matched_vehicles(conn, queries.feed_version(conn), now)
+            "matched",
+            lambda: ttc_part(
+                lambda: surface.matched_vehicles(conn, queries.feed_version(conn), now), []
+            )
+            + agencies.matched_vehicles(conn, now),
         )
 
     @app.get("/api/vehicles")
     def vehicles():
         def build(conn, now):
-            version = queries.feed_version(conn)
             try:
+                version = queries.feed_version(conn)
                 pace = slow.get(f"pace:{version}", lambda: surface.typical_pace(conn, version, now))
-            except psycopg.Error:
+            except (psycopg.Error, queries.NotFound):
                 pace = {}  # Without a usual pace, vehicles move at the timetable's.
             return surface.vehicles(matched(conn, now), now, pace)
 
-        return cached("vehicles", build, store=live)
+        return cached("vehicles", build, attribution=SURFACE_ATTRIBUTION, store=live)
 
     @app.get("/api/patterns")
     def surface_patterns():
         """Every bus and streetcar pattern's stops with timetable times, for moving vehicles
         between reports; changes only with a new schedule."""
-        return cached(
-            "patterns", lambda conn, now: surface.patterns(conn, queries.feed_version(conn))
-        )
+
+        def build(conn, now):
+            ttc = ttc_part(lambda: surface.patterns(conn, queries.feed_version(conn)), {})
+            return {"patterns": {**ttc.get("patterns", {}), **agencies.patterns(conn)}}
+
+        return cached("patterns", build)
 
     @app.get("/api/stops/{stop_id}")
     def bus_stop(stop_id: str):
-        if not stop_id.isalnum() or len(stop_id) > 12:
+        other = AGENCY_ID.fullmatch(stop_id) is not None
+        if not other and (not stop_id.isalnum() or len(stop_id) > 12):
             raise HTTPException(status_code=404, detail="Unknown stop")
 
         def build(conn, now):
-            version = queries.feed_version(conn)
-            data = surface.stop(conn, version, stop_id, matched(conn, now), now)
+            if other:
+                data = agencies.stop(conn, stop_id, matched(conn, now), now)
+            else:
+                version = queries.feed_version(conn)
+                data = surface.stop(conn, version, stop_id, matched(conn, now), now)
             if data is None:
                 raise queries.NotFound(f"Unknown stop {stop_id}")
             return data
 
-        return cached(f"stop:{stop_id}", build)
+        return cached(f"stop:{stop_id}", build, attribution=SURFACE_ATTRIBUTION)
 
     @app.get("/api/routes/{route_id}")
     def surface_route(route_id: str):
-        if not route_id.isalnum() or len(route_id) > 6:
+        other = AGENCY_ID.fullmatch(route_id) is not None
+        if not other and (not route_id.isalnum() or len(route_id) > 6):
             raise HTTPException(status_code=404, detail="Unknown route")
 
         def build(conn, now):
-            data = surface.route(conn, queries.feed_version(conn), route_id)
+            if other:
+                data = agencies.route(conn, route_id)
+            else:
+                data = surface.route(conn, queries.feed_version(conn), route_id)
             if data is None:
                 raise queries.NotFound(f"Unknown route {route_id}")
             return data
 
-        return cached(f"route:{route_id}", build)
+        return cached(f"route:{route_id}", build, attribution=SURFACE_ATTRIBUTION)
 
     @app.get("/api/docks/{station_id}/trips")
     def dock_trips(station_id: str):

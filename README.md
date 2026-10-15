@@ -19,7 +19,8 @@ since 2026-10-09. The whole stack runs on one server behind an existing reverse 
 
 The map shows subway lines with estimated train positions, all TTC buses and streetcars
 with their routes and headings, and more than 9,000 surface stops with estimated
-arrivals. Regional trains between Kitchener and Oshawa are positioned from the published
+arrivals. Brampton Transit and MiWay buses and stops are shown the same way
+([neighbouring agencies](docs/agencies.md)). Regional trains between Kitchener and Oshawa are positioned from the published
 timetable. Bike Share docks show current bike and dock counts. Close up, every subway
 station's entrances are shown with the side of the street each is on and whether it is
 step-free; optional layers add public car parks with their entrances, and bike parking.
@@ -313,6 +314,7 @@ uv run --locked uvicorn transit.web.app:app --host 127.0.0.1 --port 8000
   [trip planner](docs/planner.md), [trip guidance](docs/navigation.md)
 - **Analysis:** [reliability analytics](docs/reliability.md),
   [metric definitions](docs/metrics.md), [open data](docs/datasets.md)
+- **Neighbouring agencies:** [Brampton Transit and MiWay](docs/agencies.md)
 - **Operations:** [deployment](docs/deploy.md), [Airflow](docs/airflow.md),
   [phone alerts](docs/alerts.md), [Windows setup](docs/setup-windows.md)
 - **Background:** [engineering decisions](docs/decisions.md),
