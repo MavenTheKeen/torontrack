@@ -258,6 +258,8 @@ services:
       AIRFLOW__API__WORKERS: "1"
       AIRFLOW__DAG_PROCESSOR__PARSING_PROCESSES: "1"
       EXPORT_DIR: /opt/airflow/open-data
+      # Concerts and games for the Events page (docs/events.md); optional.
+      TICKETMASTER_API_KEY: ${TICKETMASTER_API_KEY:-}
     command: ["standalone"]
     ports:
       - "127.0.0.1:${AIRFLOW_PORT:-8080}:8080"

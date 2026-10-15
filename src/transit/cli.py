@@ -15,6 +15,7 @@ from transit import (
     planner,
     regional,
     roads,
+    ticketmaster,
     weather,
 )
 from transit.bikeshare import trips as bikeshare_trips
@@ -72,6 +73,10 @@ def main():
     )
     commands.add_parser("roads-refresh", help="Load City of Toronto road restrictions")
     commands.add_parser("events-refresh", help="Load the City of Toronto events calendar")
+    commands.add_parser(
+        "ticketed-events-refresh",
+        help="Load concerts, games and shows from Ticketmaster (needs TICKETMASTER_API_KEY)",
+    )
     trips_cmd = commands.add_parser(
         "bikeshare-trips-refresh", help="Load Bike Share ridership files that changed"
     )
@@ -191,6 +196,14 @@ def main():
                     client.close()
                 if result["status"] == "failed":
                     raise FetchError(f"Events refresh failed: {result['error']}")
+            elif args.command == "ticketed-events-refresh":
+                client = FeedClient()
+                try:
+                    result = ticketmaster.refresh(settings.database_url, client)
+                finally:
+                    client.close()
+                if result["status"] == "failed":
+                    raise FetchError(f"Ticketmaster refresh failed: {result['error']}")
             elif args.command == "roads-refresh":
                 client = FeedClient()
                 try:

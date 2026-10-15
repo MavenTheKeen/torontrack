@@ -31,6 +31,7 @@ def settings():
         )
         conn.execute("TRUNCATE normalized.regional_versions, ops.regional_refreshes CASCADE")
         conn.execute("TRUNCATE normalized.city_events, ops.city_event_refreshes CASCADE")
+        conn.execute("TRUNCATE normalized.ticketed_events, ops.ticketed_event_refreshes")
         conn.execute(
             """TRUNCATE normalized.bikeshare_trip_files, normalized.bikeshare_trip_station_days,
                normalized.bikeshare_trip_station_hours, normalized.bikeshare_trip_pairs,
