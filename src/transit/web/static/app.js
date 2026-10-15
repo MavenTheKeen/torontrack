@@ -1192,7 +1192,7 @@ function vehicleSheet(view, id) {
     el("h2", { class: "with-badge" }, routePill(view, v.route, { button: false }), route ? route.long_name : `Route ${v.route}`),
     el("p", {}, v.towards ? `Towards ${v.towards}` : el("span", { class: "muted" }, "Not matched to its route right now (detour or not yet in service)")),
     v.occupancy ? el("p", { class: "muted" }, OCCUPANCY[v.occupancy] || v.occupancy) : null,
-    el("p", { class: "muted small" }, `Vehicle ${id}. Position from TTC's live feed, updated every 30 seconds.`),
+    el("p", { class: "muted small" }, `Vehicle ${id}. Position from TTC's live feed, which updates every 10 to 30 seconds; in between, the map estimates its movement along the route.`),
     el("p", { class: "sheet-actions" }, el("button", { type: "button", class: "button", "data-route": v.route }, `Show route ${route ? route.short_name : v.route}`)),
   ];
 }
