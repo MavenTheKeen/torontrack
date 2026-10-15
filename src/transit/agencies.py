@@ -37,6 +37,7 @@ class Agency:
     name: str
     static_url: str
     vehicles_url: str
+    trips_url: str
     credit: str
 
     def host(self, url: str) -> str:
@@ -49,6 +50,7 @@ AGENCIES = {
         name="Brampton Transit",
         static_url="https://www.arcgis.com/sharing/rest/content/items/a355aabd5a8c490186bdce559c9c75fb/data",
         vehicles_url="https://gtfs-rt-merge.prod.bt-cadavl.com/BramptonTransit/GTFS/merged_VehiclePosition.pb",
+        trips_url="https://gtfs-rt-merge.prod.bt-cadavl.com/BramptonTransit/GTFS/merged_TripUpdate.pb",
         credit="Brampton Transit data: City of Brampton, licensed under CC BY 4.0.",
     ),
     "mi": Agency(
@@ -56,6 +58,7 @@ AGENCIES = {
         name="MiWay",
         static_url="https://www.miapp.ca/GTFS/google_transit.zip",
         vehicles_url="https://www.miapp.ca/GTFS_RT/Vehicle/VehiclePositions.pb",
+        trips_url="https://www.miapp.ca/GTFS_RT/TripUpdate/TripUpdates.pb",
         credit=(
             "MiWay data: City of Mississauga, under its Terms of Use "
             "(www5.mississauga.ca/research_catalogue/CityofMississauga_TermsofUse.pdf)."
@@ -66,11 +69,15 @@ AGENCIES = {
         name="York Region Transit",
         static_url="https://www.yrt.ca/google/google_transit.zip",
         vehicles_url="https://rtu.york.ca/gtfsrealtime/VehiclePositions",
+        trips_url="https://rtu.york.ca/gtfsrealtime/TripUpdates",
         credit="Contains public transit Information made available under YRT's Open Data Licence.",
     ),
 }
 STATIC_MAX_BYTES = 80 << 20
 POLL_SECONDS = 15
+# Trip updates (each agency's own arrival predictions) are polled every other round.
+PREDICTION_ROUNDS = 2
+PREDICTION_HORIZON = timedelta(minutes=90)
 # A bus's last report is kept this long after it stops reporting.
 KEEP_REPORTS = timedelta(hours=1)
 LOG_EVERY_SECONDS = 3600
@@ -311,6 +318,63 @@ def poll(conn, client: FeedClient, agency: Agency, now: datetime) -> dict:
     return {"agency": agency.key, "status": "ok", "vehicles": len(vehicles)}
 
 
+def parse_predictions(snapshot: realtime.Snapshot) -> list[tuple]:
+    """(stop_id, trip_id, route_id, vehicle_id, predicted arrival) for every stop still
+    ahead within PREDICTION_HORIZON; cancelled trips and skipped stops are left out."""
+    trip_type = realtime.gtfs_realtime_pb2.TripDescriptor
+    skipped = realtime.gtfs_realtime_pb2.TripUpdate.StopTimeUpdate.SKIPPED
+    since = snapshot.feed_timestamp - timedelta(minutes=1)
+    until = snapshot.feed_timestamp + PREDICTION_HORIZON
+    rows = []
+    for entity in snapshot.message.entity:
+        update = entity.trip_update
+        if not entity.HasField("trip_update") or not update.trip.route_id:
+            continue
+        if update.trip.schedule_relationship in (trip_type.CANCELED, 7):  # 7: DELETED.
+            continue
+        for stu in update.stop_time_update:
+            epoch = stu.arrival.time or stu.departure.time
+            if stu.schedule_relationship == skipped or not stu.stop_id or not epoch:
+                continue
+            at = datetime.fromtimestamp(epoch, UTC)
+            if since <= at <= until:
+                rows.append(
+                    (stu.stop_id, update.trip.trip_id, update.trip.route_id,
+                     update.vehicle.id or None, at)
+                )  # fmt: skip
+    return rows
+
+
+def poll_predictions(conn, client: FeedClient, agency: Agency, now: datetime) -> dict:
+    """Replace an agency's predictions with its latest trip updates. A failed fetch keeps
+    the previous ones; the site ignores them once they are stale."""
+    try:
+        snapshot = realtime.decode(
+            client.fetch_bytes(agency.trips_url, host=agency.host(agency.trips_url))
+        )
+        rows = parse_predictions(snapshot)
+    except (FetchError, FeedValidationError) as exc:
+        conn.execute(
+            "UPDATE ops.agency_polls SET predictions_error = %s WHERE agency = %s",
+            (str(exc)[:1000], agency.key),
+        )
+        return {"agency": agency.key, "status": "failed", "error": str(exc)[:200]}
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute("DELETE FROM normalized.agency_predictions WHERE agency = %s", (agency.key,))
+        with cur.copy(
+            """COPY normalized.agency_predictions
+               (agency, stop_id, trip_id, route_id, vehicle_id, predicted_arrival) FROM STDIN"""
+        ) as copy:
+            for row in rows:
+                copy.write_row((agency.key, *row))
+        cur.execute(
+            """UPDATE ops.agency_polls SET predictions_at = %s, predictions = %s,
+                   predictions_error = NULL WHERE agency = %s""",
+            (snapshot.feed_timestamp, len(rows), agency.key),
+        )
+    return {"agency": agency.key, "status": "ok", "predictions": len(rows)}
+
+
 class CollectorBusy(RuntimeError):
     pass
 
@@ -340,6 +404,7 @@ def run_forever(database_url: str, client: FeedClient | None = None, stop=None) 
             _log({"event": "static_gtfs", **refresh(database_url, client, missing)})
         summary: dict = {}
         last_log = time.monotonic()
+        rounds = 0
         while not stop.is_set():
             started = time.monotonic()
             with connect(database_url) as conn:
@@ -349,6 +414,11 @@ def run_forever(database_url: str, client: FeedClient | None = None, stop=None) 
                     counts[result["status"]] += 1
                     if result["status"] == "failed":
                         _log({"event": "poll_failed", **result})
+                    if rounds % PREDICTION_ROUNDS == 0:
+                        result = poll_predictions(conn, client, agency, datetime.now(UTC))
+                        if result["status"] == "failed":
+                            _log({"event": "predictions_failed", **result})
+            rounds += 1
             if started - last_log >= LOG_EVERY_SECONDS:
                 _log({"event": "hourly", "polls": summary})
                 summary, last_log = {}, started

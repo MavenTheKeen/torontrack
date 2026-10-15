@@ -4,9 +4,8 @@ from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from google.transit import gtfs_realtime_pb2
 
-from tests.ttc_helpers import T0, static_zip, vehicle_feed
+from tests.ttc_helpers import T0, static_zip, surface_trip_feed, vehicle_feed
 from transit.db import connect
 from transit.ttc import matching, static_gtfs, store, surface
 from transit.web.app import create_app
@@ -151,24 +150,6 @@ def test_surface_endpoints_place_vehicles_and_estimate_arrivals(client):
     assert client.get("/api/stops/nope-1").status_code == 404
 
 
-def surface_trip_feed(timestamp, trips):
-    """trips: [{"trip_id", "route_id", "vehicle"?, "cancelled"?, "stops": [(stop_id, offset_s)]}]"""
-    message = gtfs_realtime_pb2.FeedMessage()
-    message.header.gtfs_realtime_version = "2.0"
-    message.header.timestamp = int(timestamp.timestamp())
-    for trip in trips:
-        update = message.entity.add(id=trip["trip_id"]).trip_update
-        update.trip.trip_id, update.trip.route_id = trip["trip_id"], trip["route_id"]
-        if trip.get("cancelled"):
-            update.trip.schedule_relationship = gtfs_realtime_pb2.TripDescriptor.CANCELED
-        if trip.get("vehicle"):
-            update.vehicle.id = trip["vehicle"]
-        for stop_id, offset in trip["stops"]:
-            stu = update.stop_time_update.add(stop_id=stop_id)
-            stu.arrival.time = int(timestamp.timestamp()) + offset
-    return message.SerializeToString()
-
-
 @pytest.mark.integration
 def test_ttc_predictions_replace_estimates_at_a_stop(client, settings):
     payload = surface_trip_feed(
@@ -191,6 +172,20 @@ def test_ttc_predictions_replace_estimates_at_a_stop(client, settings):
         )  # a, b and d; c is cancelled, e too far ahead
     arrivals = client.get("/api/stops/664").json()["arrivals"]
     assert [(a["vehicle_id"], a["towards"], a["seconds"], a["source"]) for a in arrivals] == [
-        ("8001", "Brimley", 190, "ttc"),
-        ("8002", "Brimley", 590, "ttc"),
+        ("8001", "Brimley", 190, "prediction"),
+        ("8002", "Brimley", 590, "prediction"),
     ]
+
+
+def test_pace_meets_ttc_prediction_for_a_stop_far_enough_ahead():
+    from transit.web.surface import predicted_pace
+
+    pattern = {"order": {"a": 0, "b": 1, "c": 2, "d": 3}, "offsets": [0, 30, 120, 240]}
+    v = {"pattern": pattern, "position": 0.5, "reported_at": T0}  # 15 timetable s along.
+    # b is behind 60 s of timetable from here; c is 105 s ahead, predicted 70 s after the
+    # report: the vehicle is running 1.5x the timetable.
+    stops = [("b", T0 + timedelta(seconds=10)), ("c", T0 + timedelta(seconds=70))]
+    assert predicted_pace(v, stops) == pytest.approx(105 / 70)
+    # Stops behind it, not on its pattern, or nothing far enough ahead: no prediction.
+    assert predicted_pace(v, [("a", T0), ("x", T0 + timedelta(seconds=90))]) is None
+    assert predicted_pace(v, [("b", T0 + timedelta(seconds=10))]) is None

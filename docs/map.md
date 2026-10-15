@@ -121,6 +121,16 @@ combinations). The 504 King streetcar, for example, runs at 0.75 to 0.8 of its t
 pace in the rush hours and faster than it overnight. Without passages, the timetable's pace
 is used.
 
+Where TTC predicts a vehicle's arrival at a stop at least a minute of timetable ahead
+(its surface trip updates, [TTC data](ttc.md)), the vehicle instead moves at the pace that
+reaches that stop at the predicted time (`surface.predicted_pace`). `/api/vehicles` says
+which pace each vehicle has in `pace_source`: `ttc`, `usual` or `timetable`.
+
+`scripts/motion_check.py` measures both sides of this against the live site: `accuracy`
+compares where the map would place each vehicle when its next report arrives with that
+report, by pace source; `smoothness` samples the drawn vehicles in a headless browser and
+reports how uneven their speed is.
+
 ### How the bus and streetcar estimate was chosen
 
 On 2026-10-14, TTC's vehicle feed was recorded every 10 seconds for 45 minutes in the
