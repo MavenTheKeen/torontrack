@@ -67,8 +67,9 @@ function statusPill(status, label) {
 
 function staleNotice(freshness, what) {
   if (!freshness || !freshness.stale) return null;
-  const when = freshness.as_of ? ` Last update ${timeFmt.format(new Date(freshness.as_of))}.` : "";
-  return el("p", { class: "notice", role: "status" }, `${what} may be out of date.${when}`);
+  // "(last update 12:00 p.m.)": the time format ends in a full stop of its own.
+  const when = freshness.as_of ? ` (last update ${timeFmt.format(new Date(freshness.as_of))})` : "";
+  return el("p", { class: "notice", role: "status" }, `${what} may be out of date${when}.`);
 }
 
 function minutesText(seconds) {
@@ -133,7 +134,7 @@ function statusDetails(status) {
 function statusRow(status) {
   return el(
     "li",
-    { class: "card status-row link-card" },
+    { class: "status-row board-row" },
     badge(status.line, { link: false }),
     el("div", {}, el("a", { class: "name", href: `#/line/${status.line}` }, status.name), statusDetails(status)),
     el("span", { class: "chevron", "aria-hidden": "true" }, "›"),
@@ -176,25 +177,17 @@ function networkSummary(lineData, alertData) {
   const ok = !affected.length;
   return el(
     "section",
-    { class: `hero ${ok ? "ok" : "issues"}` },
-    el("p", { class: "eyebrow" }, "Toronto subway now"),
+    { class: `summary ${ok ? "ok" : "issues"}` },
     el(
-      "div",
-      { class: "hero-state" },
+      "h1",
+      {},
       el("span", { class: "state-icon", "aria-hidden": "true" }, ok ? "✓" : "!"),
-      el("h1", {}, ok ? "All lines running normally" : `${affected.length} of ${statuses.length} lines affected`),
+      ok ? "Subway: all lines running normally" : `Subway: ${affected.length} of ${statuses.length} lines affected`,
     ),
     el(
       "p",
       { class: "muted" },
       `${plural(alertData.active.length, "active alert", "active alerts")} · ${plural(alertData.accessibility.length, "elevator or escalator", "elevators or escalators")} out of service`,
-    ),
-    el(
-      "nav",
-      { class: "quick", "aria-label": "Shortcuts" },
-      el("a", { href: "#/map" }, el("b", {}, "Live map"), el("span", {}, "Trains, bikes, near me")),
-      el("a", { href: "#/report" }, el("b", {}, "Report"), el("span", {}, "How reliable it is")),
-      el("a", { href: "#/pipeline" }, el("b", {}, "Pipeline"), el("span", {}, "Data health")),
     ),
   );
 }
