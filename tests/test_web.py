@@ -453,3 +453,5 @@ def test_installable_app_files_are_served_and_complete():
     assert len(shell) > 5
     for path in icons + shell:
         assert app_client.get(path).status_code == 200, path
+    font = app_client.get("/static/fonts/atkinson-hyperlegible-next-latin.woff2")
+    assert font.headers["content-type"] == "font/woff2"

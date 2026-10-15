@@ -7,6 +7,7 @@ service; it never calls the TTC.
 
 import json
 import logging
+import mimetypes
 import threading
 import time
 from collections import deque
@@ -41,6 +42,8 @@ CACHE_SECONDS = 15
 # Train and vehicle positions are refreshed this often, matching the 10 s collector.
 LIVE_SECONDS = 5
 STATIC = files("transit.web").joinpath("static")
+# The site's font; slim Python images have no system type table that lists it.
+mimetypes.add_type("font/woff2", ".woff2")
 ATTRIBUTION = "Data: Toronto Transit Commission. Predictions may be inaccurate."
 BIKES_ATTRIBUTION = (
     "Bike Share Toronto ridership: Toronto Parking Authority. Contains information licensed "
