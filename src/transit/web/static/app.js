@@ -3196,7 +3196,7 @@ async function renderPipeline() {
       "Healthy means the last success is recent; delayed or failing means data on this site may be out of date.",
     ),
     el("h2", {}, "TTC realtime feeds"),
-    el("p", { class: "muted small" }, "Polled every 30 seconds."),
+    el("p", { class: "muted small" }, "Subway predictions and vehicle positions are polled every 10 seconds, alerts every 30."),
     ttc.feeds.map((f) =>
       healthCard(
         f.label,
