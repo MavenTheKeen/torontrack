@@ -20,6 +20,15 @@ def test_dbt_configuration_stays_in_environment_and_decodes_url_password():
     assert env["DBT_SSLMODE"] == "require"
 
 
+def test_dbt_inherits_what_it_needs_but_not_other_secrets():
+    env = dbt_environment(
+        "postgresql://tester@db.example/transit",
+        {"PATH": "/bin", "DBT_PROFILES_DIR": "/p", "TICKETMASTER_API_KEY": "k", "NTFY_URL": "u"},
+    )
+    assert env["PATH"] == "/bin" and env["DBT_PROFILES_DIR"] == "/p"
+    assert "TICKETMASTER_API_KEY" not in env and "NTFY_URL" not in env
+
+
 @pytest.mark.integration
 def test_a_timed_out_build_ends_its_queries_left_on_the_server(settings, tmp_path, monkeypatch):
     (tmp_path / "dbt_project.yml").write_text("name: test\n")
