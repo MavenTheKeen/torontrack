@@ -829,10 +829,15 @@ const TRAIN_OFFSET_M = 28; // Each direction sits a little to its own side of th
 const MAP_MODES = { bikes: "Bikes", docks: "Docks" };
 const DIRECTION_SIDE = { 0: 1, 1: -1 };
 const mapState = { view: null, mode: "bikes", layers: { trains: true, regional: true, buses: true, bikes: true, access: true, entrances: true, roads: false, lanes: false, events: false, parking: false, bikeParking: false } };
-// Buses and streetcars. TTC's subway lines own yellow, green and purple, so surface modes
-// take blue and crimson; both are always labelled, never told apart by colour alone.
-const SURFACE_COLOURS = { bus: "#2563eb", streetcar: "#e11d48" };
-const SURFACE_LABELS = { bus: "Bus", streetcar: "Streetcar" };
+// Buses and streetcars. TTC's subway lines own yellow, green and purple and the site's
+// brand is red-orange, so TTC buses take blue and streetcars crimson, and neighbouring
+// agencies' buses (mode = agency key, transit.agencies) teal and indigo. All are always
+// labelled, never told apart by colour alone.
+const SURFACE_COLOURS = { bus: "#2563eb", streetcar: "#e11d48", br: "#0f766e", mi: "#4f46e5" };
+const SURFACE_LABELS = { bus: "Bus", streetcar: "Streetcar", br: "Brampton Transit bus", mi: "MiWay bus" };
+const surfaceGlyph = (mode) => (mode === "streetcar" ? "streetcar" : "bus");
+// A route's number as shown: agencies' route IDs carry their prefix ("br:511").
+const routeName = (view, id) => (view.surfaceRoutes && view.surfaceRoutes.get(id)?.short_name) || String(id).replace(/^[a-z]{2}:/, "");
 const OCCUPANCY = {
   EMPTY: "Empty", MANY_SEATS_AVAILABLE: "Many seats free", FEW_SEATS_AVAILABLE: "Few seats free",
   STANDING_ROOM_ONLY: "Standing room only", CRUSHED_STANDING_ROOM_ONLY: "Very crowded", FULL: "Full",
@@ -1043,7 +1048,7 @@ function moveVehicles(view) {
       const heading = at.bearing !== null && at.bearing !== undefined;
       const coord = place(`v:${v.id}`, at.coord);
       const bearing = heading && !still ? turn(view.glide, `v:${v.id}`, at.bearing, now) : at.bearing;
-      return point(coord, { id: v.id, route: v.route, mode: v.mode, bearing: heading ? bearing : 0, heading, towards: v.towards, occupancy: v.occupancy, fade: at.fade });
+      return point(coord, { id: v.id, route: v.route, label: routeName(view, v.route), mode: v.mode, bearing: heading ? bearing : 0, heading, towards: v.towards, occupancy: v.occupancy, fade: at.fade });
     });
     map.getSource("vehicles").setData(featureCollection(view.vehicleFeatures.filter(inView)));
   }
@@ -1080,8 +1085,7 @@ function mapCasing() {
 // Every icon the map draws, from icons.js. Subway trains take their line's colour.
 function addMapIcons(map) {
   const ring = mapCasing();
-  addBadge(map, "badge-bus", "bus", SURFACE_COLOURS.bus, "#ffffff", ring);
-  addBadge(map, "badge-streetcar", "streetcar", SURFACE_COLOURS.streetcar, "#ffffff", ring);
+  for (const [mode, colour] of Object.entries(SURFACE_COLOURS)) addBadge(map, `badge-${mode}`, surfaceGlyph(mode), colour, "#ffffff", ring);
   for (const l of lines) addBadge(map, `badge-train-${l.id}`, "subway", l.color || "#777", textOn(l.color || "#777777"), ring);
   addBadge(map, "badge-train", "subway", "#777777", "#ffffff", ring);
   for (const [level, colour] of Object.entries(DOCK_COLOURS)) addBadge(map, `badge-dock-${level}`, "bike", colour, "#ffffff", ring, { css: 24, glyph: 15 });
@@ -1100,7 +1104,7 @@ function addMapIcons(map) {
 
 function addSurfaceLayers(map) {
   const c = prefersDark() ? { stop: "#151515", stopStroke: "#8c8c8c", halo: "#0a0a0a", casing: "#0a0a0a" } : { stop: "#ffffff", stopStroke: "#64748b", halo: "#ffffff", casing: "#ffffff" };
-  const modeColour = ["match", ["get", "mode"], "streetcar", SURFACE_COLOURS.streetcar, SURFACE_COLOURS.bus];
+  const modeColour = ["match", ["get", "mode"], ...Object.entries(SURFACE_COLOURS).filter(([m]) => m !== "bus").flat(), SURFACE_COLOURS.bus];
   map.addSource("route-path", { type: "geojson", data: featureCollection([]) });
   map.addSource("bus-stops", { type: "geojson", data: featureCollection([]) });
   map.addSource("vehicles", { type: "geojson", data: featureCollection([]) });
@@ -1122,13 +1126,26 @@ function addSurfaceLayers(map) {
     "icon-allow-overlap": true, "icon-ignore-placement": true,
   }, paint: { "icon-color": modeColour } }, "outages");
   map.addLayer({ id: "vehicle-icon", type: "symbol", source: "vehicles", minzoom: 14, layout: {
-    "icon-image": ["match", ["get", "mode"], "streetcar", "badge-streetcar", "badge-bus"], "icon-size": iconSize,
+    "icon-image": ["concat", "badge-", ["get", "mode"]], "icon-size": iconSize,
     "icon-allow-overlap": true, "icon-ignore-placement": true,
   }, paint: { "icon-opacity": ["interpolate", ["linear"], ["zoom"], 14, 0, 14.3, ["get", "fade"]] } }, "outages");
   map.addLayer({ id: "vehicle-label", type: "symbol", source: "vehicles", minzoom: 15, layout: {
-    "text-field": ["get", "route"], "text-font": ["Noto Sans Medium"], "text-size": 11, "text-anchor": "left", "text-offset": [1.3, 0],
+    "text-field": ["get", "label"], "text-font": ["Noto Sans Medium"], "text-size": 11, "text-anchor": "left", "text-offset": [1.3, 0],
     "text-allow-overlap": false, "text-optional": true,
   }, paint: { "text-color": modeColour, "text-halo-color": c.halo, "text-halo-width": 1.8 } });
+}
+
+// "Stop 1234", or "Brampton Transit stop 1001" for another agency's.
+function stopKicker(stop) {
+  const kind = stop.agency ? `${stop.agency} stop` : "Stop";
+  return stop.code ? `${kind} ${stop.code}` : kind;
+}
+
+// How a stop's arrival times are worked out, for the TTC's stops or another agency's.
+function estimateNote(stopId) {
+  return String(stopId).includes(":")
+    ? "Estimated from each bus's live position and the scheduled time between stops."
+    : "TTC publishes no bus or streetcar predictions, so these are estimated from each vehicle's live position and the scheduled time between stops.";
 }
 
 function routePill(view, routeId, { button = true } = {}) {
@@ -1215,12 +1232,12 @@ function stopSheet(view, id, data) {
   }
   const routes = [...new Set(data.routes.map((r) => r.route_id))];
   return [
-    el("p", { class: "sheet-kicker" }, data.stop.code ? `Stop ${data.stop.code}` : "Stop"),
+    el("p", { class: "sheet-kicker" }, stopKicker(data.stop)),
     el("h2", {}, data.stop.name),
     el("p", { class: "route-pills" }, routes.map((r) => routePill(view, r))),
     el("p", { class: "sheet-label" }, "Next vehicles (estimated)"),
     stopArrivals(data),
-    el("p", { class: "muted small" }, "TTC publishes no bus or streetcar predictions, so these are estimated from each vehicle's live position and the scheduled time between stops."),
+    el("p", { class: "muted small" }, estimateNote(id)),
     stop ? planHere(view, [stop[4], stop[3]], data.stop.name) : null,
     el("p", { class: "sheet-actions" }, el("a", { class: "button", href: `#/stop/${encodeURIComponent(id)}` }, "Stop page")),
   ];
@@ -2633,14 +2650,14 @@ function legendRow(symbol, text) {
 }
 
 function mapLegend() {
-  const surface = [["bus", "Bus"], ["streetcar", "Streetcar"]];
+  const surface = Object.entries(SURFACE_LABELS);
   return el(
     "div",
     { class: "map-legend" },
     el("p", { class: "panel-heading" }, "Legend"),
     el("ul", { class: "legend-list" },
       lines.map((l) => legendRow(badgeEl("subway", l.color || "#777", textOn(l.color || "#777777"), { size: 22 }), `Line ${l.id} train (estimated position)`)),
-      surface.map(([mode, label]) => legendRow(badgeEl(mode, SURFACE_COLOURS[mode], "#ffffff", { size: 22 }), `${label}, with the pointer showing its heading`)),
+      surface.map(([mode, label]) => legendRow(badgeEl(surfaceGlyph(mode), SURFACE_COLOURS[mode], "#ffffff", { size: 22 }), `${label}, with the pointer showing its heading`)),
       legendRow(el("span", { class: "swatch-pill" }, "LW"), "Regional train, placed by timetable"),
       legendRow(el("span", { class: "swatch-station", "aria-hidden": "true" }), "Station"),
       legendRow(badgeEl("elevator", OUTAGE_COLOUR, "#111418", { size: 20 }), "Elevator or escalator out of service"),
@@ -2732,11 +2749,11 @@ async function renderStop(id) {
     entry.towards.push(r.towards);
   }
   return [
-    el("p", { class: "eyebrow" }, data.stop.code ? `Stop ${data.stop.code}` : "Stop"),
+    el("p", { class: "eyebrow" }, stopKicker(data.stop)),
     el("h1", {}, data.stop.name),
     el("h2", {}, "Next vehicles (estimated)"),
     el("div", { class: "card" }, stopArrivals(data)),
-    el("p", { class: "muted small" }, "TTC publishes no bus or streetcar predictions, so these are estimated from each vehicle's live position and the scheduled time between stops. They assume the vehicle keeps the schedule's pace."),
+    el("p", { class: "muted small" }, `${estimateNote(id)} They assume the vehicle keeps the schedule's pace.`),
     el("h2", {}, "Routes at this stop"),
     el(
       "ul",
@@ -3028,7 +3045,7 @@ async function renderMap(focusKey) {
     });
     map.touchZoomRotate.disableRotation();
     map.addControl(new lib.NavigationControl({ showCompass: false }), "bottom-right");
-    map.addControl(new lib.AttributionControl({ compact: true, customAttribution: "Data: TTC, Bike Share Toronto, City of Toronto and Toronto Parking Authority (OGL – Toronto); regional rail data provided with the permission of Metrolinx" }), "bottom-left");
+    map.addControl(new lib.AttributionControl({ compact: true, customAttribution: "Data: TTC, Bike Share Toronto, City of Toronto and Toronto Parking Authority (OGL – Toronto); regional rail data provided with the permission of Metrolinx; Brampton Transit data: City of Brampton (CC BY 4.0); MiWay data: City of Mississauga Terms of Use" }), "bottom-left");
     view.map = map;
     activeMap = view;
     renderChips();
