@@ -8,7 +8,7 @@ production differences; the base `compose.yaml` is unchanged.
 Internet ──443──> Caddy ──> web (FastAPI, read-only DB login)
                                    │
    ttc-collector ──> PostgreSQL <──┘   (127.0.0.1 only)
-   Airflow ────────> PostgreSQL        (127.0.0.1:8080, SSH tunnel)
+   scheduler ──────> PostgreSQL        (scheduled jobs, transit.scheduler)
    dashboard ──────> PostgreSQL        (127.0.0.1:8501, SSH tunnel)
    backup ─────────> ./backups         (daily pg_dump, 7 days kept)
 ```
@@ -18,7 +18,7 @@ Internet ──443──> Caddy ──> web (FastAPI, read-only DB login)
 | Concern | How |
 | --- | --- |
 | HTTPS | Caddy obtains and renews a certificate for `SITE_ADDRESS` automatically. A free `<ip-with-dashes>.sslip.io` name works until a domain is bought. |
-| Exposure | Only Caddy publishes ports (80, 443). PostgreSQL, Airflow and the dashboard keep the base file's `127.0.0.1` bindings. |
+| Exposure | Only Caddy publishes ports (80, 443). PostgreSQL and the dashboard keep the base file's `127.0.0.1` bindings. |
 | Secrets | Passwords, the Ticketmaster key and the alert URLs are files in `./secrets`, mounted into only the containers that use them ([Secrets](#secrets)). They are not in any container's environment, so `docker inspect` and child processes do not see them. |
 | Least privilege | `init-db` creates a `transit_web` login with the password in `secrets/web_db_password`: `SELECT` on `normalized`, `staging`, `analytics` and `ops` (including tables dbt creates later), no access to `raw`, read-only transactions. The site connects with it. |
 | Rate limiting | Behind a proxy every request comes from Caddy. Caddy sets `X-Forwarded-For` to the connecting client (it ignores the header from untrusted clients), and uvicorn runs with `--proxy-headers`, so the per-client limit applies to real visitors. |
@@ -55,22 +55,13 @@ Build and start everything, then turn on the schedules:
 
 ```bash
 alias dc='docker compose -f compose.yaml -f compose.prod.yaml'
-dc --profile tools --profile airflow build
-dc --profile airflow up -d --wait
-dc exec airflow airflow dags unpause toronto_bikeshare_reliability
-dc exec airflow airflow dags unpause ttc_static_gtfs
-dc exec airflow airflow dags unpause open_data_export
-dc exec airflow airflow dags unpause ttc_official_delays
-dc exec airflow airflow dags unpause weather_hourly
-dc exec airflow airflow dags unpause regional_schedule
-dc exec airflow airflow dags unpause road_restrictions
-dc exec airflow airflow dags unpause bikeshare_trips
-dc exec airflow airflow dags unpause city_events
-dc exec airflow airflow dags unpause ticketed_events   # needs secrets/ticketmaster_api_key
-dc exec airflow airflow dags unpause agency_schedules   # Brampton Transit, MiWay and YRT
-dc exec airflow /opt/app-venv/bin/transit bikeshare-trips-refresh   # first load, a few minutes
-dc exec airflow /opt/app-venv/bin/transit regional-refresh   # first load, then daily
-dc exec airflow /opt/app-venv/bin/transit weather-refresh --since 2026-10-09   # one-time backfill
+dc --profile tools --profile scheduler build
+dc --profile scheduler up -d --wait
+# The scheduler runs the same jobs as the Airflow DAGs on their schedules (UTC), in
+# one small process instead of Airflow's ~1.1 GB; Airflow stays available locally.
+dc exec scheduler /opt/app-venv/bin/transit bikeshare-trips-refresh   # first load, a few minutes
+dc exec scheduler /opt/app-venv/bin/transit regional-refresh   # first load, then daily
+dc exec scheduler /opt/app-venv/bin/transit weather-refresh --since 2026-10-09   # one-time backfill
 dc --profile tools run --rm map-tiles   # street map for the site (docs/map.md)
 ```
 
@@ -78,8 +69,7 @@ The trip planner is optional. It needs about 4 GB of free memory while it rebuil
 graph and 1.5 GB while serving ([trip planner](planner.md)):
 
 ```bash
-dc --profile airflow --profile planner up -d
-dc exec airflow airflow dags unpause planner_data
+dc --profile scheduler --profile planner up -d
 ```
 
 The site is then at `https://<SITE_ADDRESS>`. The first certificate takes a few seconds.
@@ -91,7 +81,7 @@ before starting the collectors:
 dc up -d --wait postgres
 dc exec -T postgres pg_restore -U transit -d transit --no-owner --role=transit < transit.dump
 dc exec -T postgres psql -U transit -d transit -q < deploy/fix_sequences.sql
-dc --profile airflow up -d --wait
+dc --profile scheduler up -d --wait
 ```
 
 The second step matters when the dump comes from a database that received its
@@ -120,7 +110,7 @@ inside are world-readable because the containers' users (postgres, app, airflow)
 the owner.
 
 To set an optional secret later, write the file and recreate what uses it, for example
-`printf '%s' "$KEY" > secrets/ticketmaster_api_key` and `dc --profile airflow up -d airflow`.
+`printf '%s' "$KEY" > secrets/ticketmaster_api_key` and `dc --profile scheduler up -d scheduler`.
 PostgreSQL applies `postgres_password` only when it creates a new data directory;
 changing the file afterwards requires `ALTER ROLE` as well.
 
@@ -159,7 +149,7 @@ proxy and `WEB_BIND` both refer to it.
 
 ```bash
 dc ps                                   # health of every service
-dc logs --tail 50 ttc-collector         # or web, caddy, airflow, backup
+dc logs --tail 50 ttc-collector         # or web, caddy, scheduler, backup
 curl -s https://<SITE_ADDRESS>/health   # ok / degraded / no_data
 ```
 
@@ -174,8 +164,8 @@ Deploy a new version:
 
 ```bash
 git pull
-dc --profile tools --profile airflow build
-dc --profile airflow up -d --wait
+dc --profile tools --profile scheduler build
+dc --profile scheduler up -d --wait
 ```
 
 Restore a backup:

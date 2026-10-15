@@ -1060,7 +1060,10 @@ function moveVehicles(view) {
     map.getSource("trains").setData(featureCollection(view.trainFeatures));
   }
   if (view.vehicles && map.getSource("vehicles")) {
-    view.vehicleFeatures = view.vehicles.map((v) => {
+    // Only vehicles near the view are estimated each frame; one coming into view starts
+    // afresh (motion.js glide), so it does not catch up on its time off screen.
+    const near = (v) => v.lon > b.getWest() - 2 * padLon && v.lon < b.getEast() + 2 * padLon && v.lat > b.getSouth() - 2 * padLat && v.lat < b.getNorth() + 2 * padLat;
+    view.vehicleFeatures = view.vehicles.filter(near).map((v) => {
       const at = vehiclePlace(v, view.patterns && view.patterns.get(v.pattern), now);
       const heading = at.bearing !== null && at.bearing !== undefined;
       const coord = place(`v:${v.id}`, at.coord);

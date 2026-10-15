@@ -462,11 +462,7 @@ def create_app(
                 pace = slow.get(f"pace:{version}", lambda: surface.typical_pace(conn, version, now))
             except (psycopg.Error, queries.NotFound):
                 pace = {}  # Without a usual pace, vehicles move at the timetable's.
-            try:
-                predicted = surface.vehicle_predictions(conn, now)
-            except psycopg.Error:
-                predicted = {}
-            return surface.vehicles(matched(conn, now), now, pace, predicted)
+            return surface.vehicles(matched(conn, now), now, pace)
 
         return cached("vehicles", build, attribution=SURFACE_ATTRIBUTION, store=live)
 

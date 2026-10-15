@@ -40,6 +40,7 @@ const QUICK_MS = 3000;
 const FAR_DEG = 0.005; // About 500 m.
 const HOLD_DEG = 0.0015; // A vehicle up to ~150 m ahead of its estimate waits for it.
 const TURN_DEG_PER_S = 180;
+const OFFSCREEN_MS = 2000; // Not drawn for this long: it was off screen.
 
 // ---- Subway -------------------------------------------------------------------------
 
@@ -139,6 +140,7 @@ function degrees(dx, dy) {
 
 function glide(state, id, target, nowMs) {
   let item = state.items.get(id);
+  if (item && nowMs - item.seen > OFFSCREEN_MS) item = null; // Back in view: start afresh.
   if (!item) {
     item = { seq: state.seq, start: nowMs, dx: 0, dy: 0, vx: 0, vy: 0, span: CORRECT_MS, quick: false, coord: target, target, at: nowMs, vel: [0, 0], tvel: [0, 0], dir: null };
     state.items.set(id, item);

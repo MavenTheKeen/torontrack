@@ -175,17 +175,3 @@ def test_ttc_predictions_replace_estimates_at_a_stop(client, settings):
         ("8001", "Brimley", 190, "prediction"),
         ("8002", "Brimley", 590, "prediction"),
     ]
-
-
-def test_pace_meets_ttc_prediction_for_a_stop_far_enough_ahead():
-    from transit.web.surface import predicted_pace
-
-    pattern = {"order": {"a": 0, "b": 1, "c": 2, "d": 3}, "offsets": [0, 30, 120, 240]}
-    v = {"pattern": pattern, "position": 0.5, "reported_at": T0}  # 15 timetable s along.
-    # b is behind 60 s of timetable from here; c is 105 s ahead, predicted 70 s after the
-    # report: the vehicle is running 1.5x the timetable.
-    stops = [("b", T0 + timedelta(seconds=10)), ("c", T0 + timedelta(seconds=70))]
-    assert predicted_pace(v, stops) == pytest.approx(105 / 70)
-    # Stops behind it, not on its pattern, or nothing far enough ahead: no prediction.
-    assert predicted_pace(v, [("a", T0), ("x", T0 + timedelta(seconds=90))]) is None
-    assert predicted_pace(v, [("b", T0 + timedelta(seconds=10))]) is None

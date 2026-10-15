@@ -171,7 +171,7 @@ def run_forever(
     fast_interval: float = 10,
     raw_days: int = 3,
     event_days: int = 90,
-    vehicle_raw_hours: int = 6,
+    vehicle_raw_hours: int = 1,
     client: FeedClient | None = None,
     stop: threading.Event | None = None,
 ):

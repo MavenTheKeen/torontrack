@@ -34,7 +34,7 @@ class Settings:
     ttc_fast_poll_seconds: float = 10
     ttc_raw_retention_days: int = 3
     ttc_event_retention_days: int = 90
-    ttc_vehicle_raw_retention_hours: int = 6
+    ttc_vehicle_raw_retention_hours: int = 1
     # Public site.
     web_rate_limit_per_minute: int = 120
     web_plan_rate_limit_per_minute: int = 20
