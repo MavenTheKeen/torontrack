@@ -2,6 +2,7 @@
 parser or validation fix can be replayed from stored protobuf without refetching."""
 
 import hashlib
+import re
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 
@@ -295,6 +296,10 @@ def _normalize_alerts(conn, raw, snapshot, stops):
             # themselves are kept. Elevator alerts come from alerts_accessibility.
             named = {e["route_id"] for e in a["informed_entities"] if e["route_id"]}
             if not named & LIGHT_RAIL_LINES or a["effect"] == "ACCESSIBILITY_ISSUE":
+                continue
+            # The feed also carries rider surveys, which are not service alerts.
+            text = f"{a['header_text']} {a.get('description_text') or ''}"
+            if re.search(r"\bsurveys?\b", text, re.IGNORECASE):
                 continue
             route_ids = named & LIGHT_RAIL_LINES
             stop_ids = [s for s in stop_ids if stops.get(s, {}).get("route_id") in route_ids]
