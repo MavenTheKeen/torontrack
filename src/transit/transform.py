@@ -14,6 +14,7 @@ from transit import locks
 from transit.db import connect
 
 TRANSFORM_LOCK = locks.DBT_TRANSFORM
+DBT_TIMEOUT_SECONDS = 600
 
 
 def dbt_environment(database_url: str) -> dict[str, str]:
@@ -32,6 +33,17 @@ def dbt_environment(database_url: str) -> dict[str, str]:
         }
     )
     return env
+
+
+def end_dbt_queries(conn) -> int:
+    """End dbt's sessions still running on the server. Killing the dbt process on timeout
+    leaves its current query running, holding locks that stall the next build into the
+    same timeout. Builds hold TRANSFORM_LOCK, so every dbt session is this build's."""
+    return conn.execute(
+        """SELECT count(pg_terminate_backend(pid)) AS ended FROM pg_stat_activity
+           WHERE application_name = 'dbt' AND datname = current_database()
+             AND pid <> pg_backend_pid()"""
+    ).fetchone()["ended"]
 
 
 def run_transform(
@@ -60,24 +72,28 @@ def run_transform(
             try:
                 # Isolated artifacts prevent accidentally importing a previous build's results.
                 with tempfile.TemporaryDirectory(prefix="transit-dbt-") as artifacts:
-                    result = subprocess.run(
-                        [
-                            str(executable),
-                            "build",
-                            "--project-dir",
-                            str(project),
-                            "--profiles-dir",
-                            str(project),
-                            "--target-path",
-                            artifacts,
-                            "--log-path",
-                            str(Path(artifacts) / "logs"),
-                            *(["--full-refresh"] if full_refresh else []),
-                        ],
-                        env=dbt_environment(database_url),
-                        check=False,
-                        timeout=600,
-                    )
+                    try:
+                        result = subprocess.run(
+                            [
+                                str(executable),
+                                "build",
+                                "--project-dir",
+                                str(project),
+                                "--profiles-dir",
+                                str(project),
+                                "--target-path",
+                                artifacts,
+                                "--log-path",
+                                str(Path(artifacts) / "logs"),
+                                *(["--full-refresh"] if full_refresh else []),
+                            ],
+                            env=dbt_environment(database_url),
+                            check=False,
+                            timeout=DBT_TIMEOUT_SECONDS,
+                        )
+                    except subprocess.TimeoutExpired:
+                        end_dbt_queries(conn)
+                        raise
                     result_file = Path(artifacts) / "run_results.json"
                     raw_results = (
                         json.loads(result_file.read_text()) if result_file.exists() else {}
