@@ -102,7 +102,7 @@ def test_refresh_loads_changed_years_and_serves_a_docks_trips(settings):
             1,
             "2025-07-05",
         )
-    app = create_app(settings.database_url, clock=lambda: datetime(2025, 8, 1, tzinfo=UTC))
+    app = create_app(settings, clock=lambda: datetime(2025, 8, 1, tzinfo=UTC))
     body = TestClient(app).get("/api/docks/7001/trips").json()
     assert body["totals"]["departures"] == 3 and body["totals"]["member_departures"] == 2
     [top] = body["destinations"]

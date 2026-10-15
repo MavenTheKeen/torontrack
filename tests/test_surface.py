@@ -112,7 +112,7 @@ def client(settings):
         )
         store.normalize_snapshot(conn, snapshot_id)
     matching._index.clear()
-    return TestClient(create_app(settings.database_url, clock=lambda: T0 + timedelta(seconds=10)))
+    return TestClient(create_app(settings, clock=lambda: T0 + timedelta(seconds=10)))
 
 
 @pytest.mark.integration

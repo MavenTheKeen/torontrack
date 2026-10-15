@@ -127,7 +127,7 @@ def test_refresh_stores_changes_marks_removals_and_ignores_partial_feeds(setting
 def test_endpoint_lists_only_restrictions_in_effect(settings):
     future = item("later", startTime=ms(NOW + timedelta(days=3)))
     roads.refresh(settings.database_url, Client([body([item("now"), future])]), NOW)
-    client = TestClient(create_app(settings.database_url, clock=lambda: NOW))
+    client = TestClient(create_app(settings, clock=lambda: NOW))
     data = client.get("/api/roads").json()
     assert [r["restriction_id"] for r in data["restrictions"]] == ["now"]
     assert "Open Government Licence" in data["attribution"]

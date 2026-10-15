@@ -7,6 +7,7 @@ import httpx
 from fastapi.testclient import TestClient
 
 from transit import planner
+from transit.config import Settings
 from transit.web import planner as web_planner
 from transit.web.app import create_app
 
@@ -193,9 +194,8 @@ def test_itineraries_are_shaped_for_the_map_without_regional_brand_names():
 def planner_app(handler):
     client = httpx.Client(transport=httpx.MockTransport(handler))
     app = create_app(
-        "postgresql://unused/db",
+        Settings("postgresql://unused/db", planner_url="http://otp:8080"),
         clock=lambda: NOW,
-        planner_url="http://otp:8080",
         planner_client=client,
     )
     return TestClient(app)

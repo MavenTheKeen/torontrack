@@ -4,6 +4,7 @@ import psycopg
 import pytest
 from psycopg.conninfo import make_conninfo
 
+from transit.config import Settings
 from transit.db import connect, ensure_readonly_role
 from transit.web.app import create_app
 
@@ -41,7 +42,7 @@ def test_readonly_role_reads_but_cannot_write(settings, readonly_url):
 def test_site_runs_on_the_readonly_role(readonly_url):
     from fastapi.testclient import TestClient
 
-    client = TestClient(create_app(readonly_url))
+    client = TestClient(create_app(Settings(readonly_url)))
     assert client.get("/health").status_code == 200
     # Every page's data, so none of them reads what the login cannot (such as raw).
     for path in (

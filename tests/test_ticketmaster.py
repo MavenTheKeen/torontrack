@@ -160,16 +160,14 @@ def test_each_day_is_requested_from_toronto_midnight_and_pages_followed():
 
 
 @pytest.mark.integration
-def test_refresh_without_a_key_is_skipped_and_with_one_replaces_upcoming(settings, monkeypatch):
-    monkeypatch.delenv("TICKETMASTER_API_KEY", raising=False)
+def test_refresh_without_a_key_is_skipped_and_with_one_replaces_upcoming(settings):
     now = datetime(2026, 10, 17, 14, tzinfo=UTC)
-    assert ticketmaster.refresh(settings.database_url, None, now)["status"] == "skipped"
+    assert ticketmaster.refresh(settings.database_url, None, None, now)["status"] == "skipped"
 
     class Client:
         def fetch_bytes(self, url, host):
             return page([GAME]) if "2026-10-17T" in url else page([])
 
-    monkeypatch.setenv("TICKETMASTER_API_KEY", "secret-key")
     with connect(settings.database_url) as conn:
         conn.execute(
             """INSERT INTO normalized.ticketed_events (event_id, name, local_date, time_tbd,
@@ -178,7 +176,9 @@ def test_refresh_without_a_key_is_skipped_and_with_one_replaces_upcoming(setting
                       ('gone', 'Dropped from the listing', '2026-10-20', true, 'onsale',
                        43.6, -79.4, now())"""
         )
-    result = ticketmaster.refresh(settings.database_url, Client(), now, sleep=lambda s: None)
+    result = ticketmaster.refresh(
+        settings.database_url, Client(), "secret-key", now, sleep=lambda s: None
+    )
     assert result["status"] == "loaded" and result["events"] == 1
     with connect(settings.database_url) as conn:
         ids = [
@@ -192,5 +192,7 @@ def test_refresh_without_a_key_is_skipped_and_with_one_replaces_upcoming(setting
         def fetch_bytes(self, url, host):
             raise ticketmaster.FetchError(f"HTTP 401 for {url}")
 
-    failed = ticketmaster.refresh(settings.database_url, Failing(), now, sleep=lambda s: None)
+    failed = ticketmaster.refresh(
+        settings.database_url, Failing(), "secret-key", now, sleep=lambda s: None
+    )
     assert failed["status"] == "failed" and "secret-key" not in failed["error"]
