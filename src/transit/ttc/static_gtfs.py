@@ -1,4 +1,5 @@
-"""Parse the subway subset of TTC static GTFS and load it as an immutable feed version.
+"""Parse the rapid transit subset of TTC static GTFS (subway and light rail lines) and
+load it as an immutable feed version.
 
 Every row is keyed by feed_version (the zip's SHA-256), so a new schedule never rewrites
 the rows that historical observations were joined against.
@@ -14,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 
 from transit.bikeshare.parsing import FeedValidationError
-from transit.ttc.sources import SUBWAY_ROUTE_TYPE
+from transit.ttc.sources import LIGHT_RAIL_LINES, SUBWAY_ROUTE_TYPE
 
 # Interchange platforms that GTFS names differently on each line.
 STATION_ALIASES = {"Bloor": "Bloor-Yonge", "Yonge": "Bloor-Yonge"}
@@ -35,13 +36,22 @@ class StaticFeed:
     service_end: date | None = None
 
 
+def is_rapid_transit(route: dict) -> bool:
+    return route["route_type"] == SUBWAY_ROUTE_TYPE or route["route_id"] in LIGHT_RAIL_LINES
+
+
 def station_parts(stop_name: str) -> tuple[str, str]:
-    """'Union Station - Northbound Platform Towards X' -> ('Union', 'Northbound towards X')."""
+    """'Union Station - Northbound Platform Towards X' -> ('Union', 'Northbound towards X');
+    light rail platforms: 'Cedarvale Station Eastbound Platform' -> ('Cedarvale',
+    'Eastbound'), 'Kennedy Station LRT Platform' -> ('Kennedy', 'LRT')."""
     name, sep, platform = stop_name.partition(" Station - ")
     if not sep:
         # e.g. "York University - Northbound Platform" omits the word Station.
         name, sep, platform = stop_name.partition(" - ")
     if not sep:
+        match = re.fullmatch(r"(.+?) Station (\w+) Platform", stop_name.strip())
+        if match:
+            return STATION_ALIASES.get(match[1], match[1]), match[2]
         return stop_name.strip(), ""
     platform = platform.replace(" Platform", "").replace(" Towards ", " towards ").strip()
     name = name.strip()
@@ -85,7 +95,7 @@ def parse(zip_bytes: bytes) -> StaticFeed:
             "text_color": r.get("route_text_color") or None,
         }
         for r in _rows(archive, "routes.txt")
-        if r["route_type"] == SUBWAY_ROUTE_TYPE
+        if is_rapid_transit(r)
     ]
     route_ids = {r["route_id"] for r in routes}
     if not route_ids:
@@ -242,51 +252,7 @@ def load(conn, feed: StaticFeed, source_url: str, downloaded_at) -> bool:
             return False
         v = feed.feed_version
         with conn.cursor() as cur:
-            cur.executemany(
-                """INSERT INTO normalized.ttc_routes
-                   (feed_version, route_id, short_name, long_name, color, text_color)
-                   VALUES (%s,%s,%s,%s,%s,%s)""",
-                [
-                    (v, r["route_id"], r["short_name"], r["long_name"], r["color"], r["text_color"])
-                    for r in feed.routes
-                ],
-            )
-            cur.executemany(
-                """INSERT INTO normalized.ttc_stops
-                   (feed_version, stop_id, stop_name, station_name, station_key, platform,
-                    lat, lon, wheelchair_boarding)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                [
-                    (
-                        v,
-                        s["stop_id"],
-                        s["stop_name"],
-                        s["station_name"],
-                        s["station_key"],
-                        s["platform"],
-                        s["lat"],
-                        s["lon"],
-                        s["wheelchair_boarding"],
-                    )
-                    for s in feed.stops
-                ],
-            )
-            cur.executemany(
-                """INSERT INTO normalized.ttc_line_stops
-                   (feed_version, route_id, direction_id, stop_order, stop_id, towards)
-                   VALUES (%s,%s,%s,%s,%s,%s)""",
-                [
-                    (
-                        v,
-                        r["route_id"],
-                        r["direction_id"],
-                        r["stop_order"],
-                        r["stop_id"],
-                        r["towards"],
-                    )
-                    for r in feed.line_stops
-                ],
-            )
+            _insert_lines(cur, v, feed, {r["route_id"] for r in feed.routes})
             cur.executemany(
                 """INSERT INTO normalized.ttc_calendar
                    (feed_version, service_id, monday, tuesday, wednesday, thursday, friday,
@@ -302,27 +268,87 @@ def load(conn, feed: StaticFeed, source_url: str, downloaded_at) -> bool:
                    (feed_version, service_id, date, exception_type) VALUES (%s,%s,%s,%s)""",
                 [(v, c["service_id"], c["date"], c["exception_type"]) for c in feed.calendar_dates],
             )
-            with cur.copy(
-                """COPY normalized.ttc_trips
-                   (feed_version, trip_id, route_id, service_id, direction_id, headsign)
-                   FROM STDIN"""
-            ) as copy:
-                for t in feed.trips:
-                    copy.write_row(
-                        (
-                            v,
-                            t["trip_id"],
-                            t["route_id"],
-                            t["service_id"],
-                            t["direction_id"],
-                            t["headsign"],
-                        )
-                    )
-            with cur.copy(
-                """COPY normalized.ttc_stop_times
-                   (feed_version, trip_id, stop_sequence, stop_id, arrival_seconds,
-                    departure_seconds) FROM STDIN"""
-            ) as copy:
-                for row in feed.stop_times:
-                    copy.write_row((v, *row))
     return True
+
+
+def add_lines(conn, feed: StaticFeed) -> list[str]:
+    """Add the lines an already loaded version lacks, such as the light rail lines in a
+    version loaded before they were included. Rows already stored are never changed, so
+    observations joined against the version keep their meaning. Returns the line IDs."""
+    with conn.transaction(), conn.cursor() as cur:
+        stored = {
+            r["route_id"]
+            for r in cur.execute(
+                "SELECT route_id FROM normalized.ttc_routes WHERE feed_version = %s",
+                (feed.feed_version,),
+            ).fetchall()
+        }
+        missing = {r["route_id"] for r in feed.routes} - stored
+        if stored and missing:
+            _insert_lines(cur, feed.feed_version, feed, missing)
+    return sorted(missing, key=int) if stored else []
+
+
+def _insert_lines(cur, v: str, feed: StaticFeed, route_ids: set[str]):
+    """Routes, platforms, line order, trips and stop times of the given lines."""
+    line_stops = [r for r in feed.line_stops if r["route_id"] in route_ids]
+    stop_ids = {r["stop_id"] for r in line_stops}
+    trips = [t for t in feed.trips if t["route_id"] in route_ids]
+    trip_ids = {t["trip_id"] for t in trips}
+    cur.executemany(
+        """INSERT INTO normalized.ttc_routes
+           (feed_version, route_id, short_name, long_name, color, text_color)
+           VALUES (%s,%s,%s,%s,%s,%s)""",
+        [
+            (v, r["route_id"], r["short_name"], r["long_name"], r["color"], r["text_color"])
+            for r in feed.routes
+            if r["route_id"] in route_ids
+        ],
+    )
+    cur.executemany(
+        """INSERT INTO normalized.ttc_stops
+           (feed_version, stop_id, stop_name, station_name, station_key, platform,
+            lat, lon, wheelchair_boarding)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        [
+            (
+                v,
+                s["stop_id"],
+                s["stop_name"],
+                s["station_name"],
+                s["station_key"],
+                s["platform"],
+                s["lat"],
+                s["lon"],
+                s["wheelchair_boarding"],
+            )
+            for s in feed.stops
+            if s["stop_id"] in stop_ids
+        ],
+    )
+    cur.executemany(
+        """INSERT INTO normalized.ttc_line_stops
+           (feed_version, route_id, direction_id, stop_order, stop_id, towards)
+           VALUES (%s,%s,%s,%s,%s,%s)""",
+        [
+            (v, r["route_id"], r["direction_id"], r["stop_order"], r["stop_id"], r["towards"])
+            for r in line_stops
+        ],
+    )
+    with cur.copy(
+        """COPY normalized.ttc_trips
+           (feed_version, trip_id, route_id, service_id, direction_id, headsign)
+           FROM STDIN"""
+    ) as copy:
+        for t in trips:
+            copy.write_row(
+                (v, t["trip_id"], t["route_id"], t["service_id"], t["direction_id"], t["headsign"])
+            )
+    with cur.copy(
+        """COPY normalized.ttc_stop_times
+           (feed_version, trip_id, stop_sequence, stop_id, arrival_seconds,
+            departure_seconds) FROM STDIN"""
+    ) as copy:
+        for row in feed.stop_times:
+            if row[0] in trip_ids:
+                copy.write_row((v, *row))

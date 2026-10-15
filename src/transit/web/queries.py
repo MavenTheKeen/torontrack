@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 from transit.config import FUTURE_TOLERANCE_SECONDS, STALE_SECONDS
 from transit.ttc.realtime import TORONTO, service_date
+from transit.ttc.sources import LIGHT_RAIL_LINES
 
 PREDICTIONS_STALE = timedelta(minutes=2)
 ALERTS_STALE = timedelta(minutes=3)
@@ -76,6 +77,9 @@ def lines(conn, version: str) -> list[dict]:
                 "short_name": r["short_name"],
                 "color": f"#{r['color']}" if r["color"] else None,
                 "text_color": f"#{r['text_color']}" if r["text_color"] else None,
+                # TTC publishes no realtime data for light rail: trains are placed by
+                # timetable and arrivals are scheduled times.
+                "timetable": r["route_id"] in LIGHT_RAIL_LINES,
                 "directions": [],
             },
         )
@@ -133,24 +137,121 @@ def segment_seconds(conn, version: str) -> dict[tuple, float]:
     return {(r["route_id"], r["direction_id"], r["stop_order"]): r["seconds"] for r in rows}
 
 
+SERVICES_SQL = """
+    (SELECT service_id FROM normalized.ttc_calendar
+     WHERE feed_version = %(v)s AND {weekday}
+       AND start_date <= %(d)s AND end_date >= %(d)s
+     UNION
+     SELECT service_id FROM normalized.ttc_calendar_dates
+     WHERE feed_version = %(v)s AND date = %(d)s AND exception_type = 1)
+    EXCEPT
+    SELECT service_id FROM normalized.ttc_calendar_dates
+    WHERE feed_version = %(v)s AND date = %(d)s AND exception_type = 2"""
+
+
+def service_clock(now: datetime) -> tuple:
+    """Today's service date, its weekday column, and seconds since its local midnight
+    (over 24 hours after midnight, as GTFS times are)."""
+    day = service_date(now)
+    local_midnight = datetime.combine(day, datetime.min.time(), TORONTO)
+    return day, day.strftime("%A").lower(), int((now - local_midnight).total_seconds())
+
+
+def _clock_time(day, seconds_after_midnight: int) -> datetime:
+    midnight = datetime.combine(day, datetime.min.time(), TORONTO)
+    return midnight + timedelta(seconds=seconds_after_midnight)
+
+
+def scheduled_predictions(conn, version: str, route_id: str, now: datetime) -> list[dict]:
+    """For a line without realtime data: each trip running now, as a train with its
+    remaining scheduled arrivals, in the shape of ttc_current_predictions."""
+    day, weekday, seconds_now = service_clock(now)
+    rows = conn.execute(
+        f"""WITH services AS ({SERVICES_SQL.format(weekday=weekday)}),
+            running AS (
+              SELECT t.trip_id
+              FROM normalized.ttc_trips t
+              JOIN normalized.ttc_stop_times st USING (feed_version, trip_id)
+              WHERE t.feed_version = %(v)s AND t.route_id = %(r)s
+                AND t.service_id IN (SELECT service_id FROM services)
+              GROUP BY t.trip_id
+              HAVING min(st.departure_seconds) <= %(now)s
+                 AND max(st.arrival_seconds) >= %(now)s - %(at)s)
+            SELECT st.trip_id AS train_id, ls.direction_id, ls.stop_order, st.arrival_seconds
+            FROM running
+            JOIN normalized.ttc_stop_times st
+              ON st.feed_version = %(v)s AND st.trip_id = running.trip_id
+            JOIN normalized.ttc_line_stops ls
+              ON ls.feed_version = %(v)s AND ls.stop_id = st.stop_id
+            WHERE st.arrival_seconds >= %(now)s - %(at)s
+            ORDER BY st.trip_id, ls.stop_order""",
+        {"v": version, "d": day, "r": route_id, "now": seconds_now, "at": AT_STATION_SECONDS},
+    ).fetchall()
+    return [
+        {
+            "train_id": r["train_id"],
+            "direction_id": r["direction_id"],
+            "stop_order": r["stop_order"],
+            "predicted_arrival": _clock_time(day, r["arrival_seconds"]),
+        }
+        for r in rows
+    ]
+
+
+def line_predictions(conn, version: str, route_id: str, now: datetime) -> list[dict]:
+    """Upcoming arrivals of every train on a line: TTC's predictions, or the timetable
+    for a light rail line."""
+    if route_id in LIGHT_RAIL_LINES:
+        return scheduled_predictions(conn, version, route_id, now)
+    return conn.execute(
+        """SELECT train_id, direction_id, stop_order, predicted_arrival
+           FROM normalized.ttc_current_predictions
+           WHERE route_id = %s AND predicted_arrival >= %s
+           ORDER BY train_id, stop_order""",
+        (route_id, now - timedelta(seconds=AT_STATION_SECONDS)),
+    ).fetchall()
+
+
+def scheduled_arrivals(conn, version: str, stop_ids: list[str], now: datetime, limit=3):
+    """The next scheduled arrivals at each platform, for lines without realtime data."""
+    day, weekday, seconds_now = service_clock(now)
+    rows = conn.execute(
+        f"""WITH services AS ({SERVICES_SQL.format(weekday=weekday)})
+            SELECT stop_id, trip_id, arrival_seconds FROM (
+              SELECT st.stop_id, st.trip_id, st.arrival_seconds,
+                     row_number() OVER (PARTITION BY st.stop_id
+                                        ORDER BY st.arrival_seconds) AS n
+              FROM normalized.ttc_stop_times st
+              JOIN normalized.ttc_trips t USING (feed_version, trip_id)
+              WHERE st.feed_version = %(v)s AND st.stop_id = ANY(%(s)s)
+                AND st.arrival_seconds >= %(now)s - %(at)s
+                AND t.service_id IN (SELECT service_id FROM services)) a
+            WHERE n <= %(limit)s ORDER BY arrival_seconds""",
+        {
+            "v": version,
+            "d": day,
+            "s": stop_ids,
+            "now": seconds_now,
+            "at": AT_STATION_SECONDS,
+            "limit": limit,
+        },
+    ).fetchall()
+    return [
+        {
+            "stop_id": r["stop_id"],
+            "train_id": r["trip_id"],
+            "predicted_arrival": _clock_time(day, r["arrival_seconds"]),
+        }
+        for r in rows
+    ]
+
+
 def scheduled_headways(conn, version: str, route_id: str, now: datetime) -> dict[int, float]:
     """Scheduled seconds between trains per direction, from trips within +/-30 minutes at
     a mid-line platform on today's active service."""
-    day = service_date(now)
-    local_midnight = datetime.combine(day, datetime.min.time(), TORONTO)
-    seconds_now = int((now - local_midnight).total_seconds())
-    weekday = day.strftime("%A").lower()
+    day, weekday, seconds_now = service_clock(now)
     rows = conn.execute(
-        f"""WITH services AS (
-              (SELECT service_id FROM normalized.ttc_calendar
-               WHERE feed_version = %(v)s AND {weekday}
-                 AND start_date <= %(d)s AND end_date >= %(d)s
-               UNION
-               SELECT service_id FROM normalized.ttc_calendar_dates
-               WHERE feed_version = %(v)s AND date = %(d)s AND exception_type = 1)
-              EXCEPT
-              SELECT service_id FROM normalized.ttc_calendar_dates
-              WHERE feed_version = %(v)s AND date = %(d)s AND exception_type = 2),
+        f"""WITH services AS ({SERVICES_SQL.format(weekday=weekday)}),
             mid AS (
               SELECT direction_id, stop_id FROM normalized.ttc_line_stops ls
               WHERE feed_version = %(v)s AND route_id = %(r)s
@@ -179,9 +280,11 @@ def scheduled_headways(conn, version: str, route_id: str, now: datetime) -> dict
     return {r["direction_id"]: 3600 / r["trips"] for r in rows if r["trips"]}
 
 
-def train_positions(conn, route_id: str, stations: list[dict], segments: dict, now: datetime):
-    """Estimate where each train is from its predicted arrivals (the subway feed has no
-    vehicle positions).
+def train_positions(
+    predictions: list[dict], route_id: str, stations: list[dict], segments: dict, now: datetime
+):
+    """Estimate where each train is from its predicted arrivals (line_predictions: the
+    subway feed has no vehicle positions, and light rail has only its timetable).
 
     TTC often predicts the first listed platform at the current time even while the train
     is between stations, so the next platform is the first one predicted more than
@@ -193,13 +296,7 @@ def train_positions(conn, route_id: str, stations: list[dict], segments: dict, n
         for direction, platform in station["platforms"].items():
             index[(direction, platform["stop_order"])] = i
     by_train = {}
-    for r in conn.execute(
-        """SELECT train_id, direction_id, stop_order, predicted_arrival
-           FROM normalized.ttc_current_predictions
-           WHERE route_id = %s AND predicted_arrival >= %s
-           ORDER BY train_id, stop_order""",
-        (route_id, now - timedelta(seconds=AT_STATION_SECONDS)),
-    ):
+    for r in predictions:
         by_train.setdefault(r["train_id"], []).append(r)
     cumulative = {}
     for (route, direction, order), seconds in sorted(segments.items()):
@@ -246,6 +343,7 @@ def train_positions(conn, route_id: str, stations: list[dict], segments: dict, n
                 "eta_seconds": round(eta),
                 "position": round(position, 3),
                 "in_service": order > 1,
+                "scheduled": route_id in LIGHT_RAIL_LINES,
                 "_progress": cumulative.get((direction, order), 0.0) - (segment or 0.0) * fraction,
             }
         )
@@ -420,6 +518,9 @@ def station(conn, version: str, key: str, now: datetime) -> dict:
            WHERE n <= 3 ORDER BY predicted_arrival""",
         (stop_ids, now - timedelta(seconds=AT_STATION_SECONDS)),
     ).fetchall()
+    timetabled = [p["stop_id"] for p in platforms if p["route_id"] in LIGHT_RAIL_LINES]
+    if timetabled:
+        predictions += scheduled_arrivals(conn, version, timetabled, now)
     by_stop = {}
     for p in predictions:
         by_stop.setdefault(p["stop_id"], []).append(
@@ -427,6 +528,7 @@ def station(conn, version: str, key: str, now: datetime) -> dict:
                 "train_id": p["train_id"],
                 "arrival": p["predicted_arrival"],
                 "minutes": max(0, math.floor((p["predicted_arrival"] - now).total_seconds() / 60)),
+                "scheduled": p["stop_id"] in timetabled,
             }
         )
     lat = sum(p["lat"] for p in platforms) / len(platforms)

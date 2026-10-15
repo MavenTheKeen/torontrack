@@ -299,7 +299,10 @@ def create_app(
             if meta is None:
                 raise queries.NotFound(f"Unknown line {route_id}")
             stations = queries.line_stations(conn, static["version"], route_id)
-            trains = queries.train_positions(conn, route_id, stations, static["segments"], now)
+            predictions = queries.line_predictions(conn, static["version"], route_id, now)
+            trains = queries.train_positions(
+                predictions, route_id, stations, static["segments"], now
+            )
             headways = queries.scheduled_headways(conn, static["version"], route_id, now)
             gaps = queries.gaps(trains, headways)
             return {
@@ -378,8 +381,9 @@ def create_app(
             lines = []
             for meta in static["lines"]:
                 stations = queries.line_stations(conn, static["version"], meta["id"])
+                predictions = queries.line_predictions(conn, static["version"], meta["id"], now)
                 positions = queries.train_positions(
-                    conn, meta["id"], stations, static["segments"], now
+                    predictions, meta["id"], stations, static["segments"], now
                 )
                 lines.append(
                     {

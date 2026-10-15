@@ -7,6 +7,7 @@ on its pattern. stop_times.txt has millions of rows; it is streamed trip by trip
 running sums per pattern are kept, never the whole file.
 """
 
+import dataclasses
 import re
 import zipfile
 from collections import defaultdict
@@ -165,6 +166,64 @@ def parse(zip_bytes: bytes, modes: dict = MODES, name_towards=towards) -> Surfac
             "trips": trip_count,
         },
     )
+
+
+def without_routes(feed: SurfaceFeed, route_ids) -> SurfaceFeed:
+    """The network without the given routes: the light rail lines, which TTC's GTFS types
+    as streetcars but which are loaded with the subway (transit.ttc.static_gtfs). Pattern
+    IDs are kept, so they still match a re-parse of the same zip."""
+    dropped = {p["pattern_id"] for p in feed.patterns if p["route_id"] in route_ids}
+    routes = [r for r in feed.routes if r["route_id"] not in route_ids]
+    patterns = [p for p in feed.patterns if p["pattern_id"] not in dropped]
+    pattern_stops = [row for row in feed.pattern_stops if row[0] not in dropped]
+    used = {row[2] for row in pattern_stops}
+    stops = [s for s in feed.stops if s["stop_id"] in used]
+    return dataclasses.replace(
+        feed,
+        routes=routes,
+        stops=stops,
+        patterns=patterns,
+        pattern_stops=pattern_stops,
+        starts=[row for row in feed.starts if row[0] not in dropped],
+        stats={**feed.stats, "routes": len(routes), "stops": len(stops), "patterns": len(patterns)},
+    )
+
+
+def remove_routes(conn, feed_version: str, route_ids) -> list[str]:
+    """Remove routes from a version loaded before they were excluded, with their patterns
+    and the stops no other route serves. Returns the route IDs removed."""
+    ids = sorted(route_ids)
+    with conn.transaction(), conn.cursor() as cur:
+        removed = [
+            r["route_id"]
+            for r in cur.execute(
+                """DELETE FROM normalized.ttc_surface_routes
+                   WHERE feed_version = %s AND route_id = ANY(%s) RETURNING route_id""",
+                (feed_version, ids),
+            ).fetchall()
+        ]
+        if not removed:
+            return []
+        cur.execute(
+            """DELETE FROM normalized.ttc_surface_pattern_starts
+               WHERE feed_version = %(v)s AND pattern_id IN (
+                 SELECT pattern_id FROM normalized.ttc_surface_patterns
+                 WHERE feed_version = %(v)s AND route_id = ANY(%(r)s))""",
+            {"v": feed_version, "r": ids},
+        )
+        cur.execute(  # Cascades to the pattern stops.
+            """DELETE FROM normalized.ttc_surface_patterns
+               WHERE feed_version = %s AND route_id = ANY(%s)""",
+            (feed_version, ids),
+        )
+        cur.execute(
+            """DELETE FROM normalized.ttc_surface_stops s
+               WHERE feed_version = %s AND NOT EXISTS (
+                 SELECT 1 FROM normalized.ttc_surface_pattern_stops ps
+                 WHERE ps.feed_version = s.feed_version AND ps.stop_id = s.stop_id)""",
+            (feed_version,),
+        )
+    return sorted(removed, key=int)
 
 
 def loaded(conn, feed_version: str) -> bool:
