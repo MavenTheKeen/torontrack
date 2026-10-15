@@ -1162,7 +1162,7 @@ function stopKicker(stop) {
 function estimateNote(stopId) {
   return String(stopId).includes(":")
     ? "Estimated from each bus's live position and the scheduled time between stops."
-    : "TTC publishes no bus or streetcar predictions, so these are estimated from each vehicle's live position and the scheduled time between stops.";
+    : "Times are TTC's predictions where it publishes them; others, marked est., are estimated from the vehicle's live position and the scheduled time between stops.";
 }
 
 function routePill(view, routeId, { button = true } = {}) {
@@ -1234,8 +1234,8 @@ function stopArrivals(data) {
           el(
             "li",
             { class: "arrival-row" },
-            el("span", { class: "with-badge" }, el("span", { class: `route-pill ${a.mode}` }, a.short_name), el("span", {}, a.towards)),
-            el("span", { class: "mins" }, a.seconds < 60 ? "Due" : `${Math.round(a.seconds / 60)} min`),
+            el("span", { class: "with-badge" }, el("span", { class: `route-pill ${a.mode || "bus"}` }, a.short_name), el("span", {}, a.towards)),
+            el("span", { class: "mins" }, a.seconds < 60 ? "Due" : `${Math.round(a.seconds / 60)} min`, a.source === "estimate" && !String(a.route_id).includes(":") ? el("span", { class: "muted small" }, " est.") : null),
           ),
         ),
       )

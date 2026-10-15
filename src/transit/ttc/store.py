@@ -99,6 +99,8 @@ def normalize_snapshot(conn, snapshot_id: int) -> dict:
             accepted, record_issues = _normalize_trips(conn, raw, snapshot, stops)
         elif raw["feed"] == "vehicles":
             accepted, record_issues = _normalize_vehicles(conn, raw, snapshot)
+        elif raw["feed"] == "trips_surface":
+            accepted, record_issues = _normalize_surface_trips(conn, raw, snapshot)
         else:
             accepted, record_issues = _normalize_alerts(conn, raw, snapshot, stops)
         issues += record_issues
@@ -344,6 +346,68 @@ def _normalize_alerts(conn, raw, snapshot, stops):
     return len(alerts), issues
 
 
+# Predictions this far ahead are kept; stop pages show the next hour.
+SURFACE_PREDICTION_HORIZON = timedelta(minutes=90)
+
+
+def _normalize_surface_trips(conn, raw, snapshot):
+    """Replace the current bus and streetcar predictions: one row per trip and stop still
+    ahead. Cancelled trips and skipped stops are left out."""
+    tu_type = realtime.gtfs_realtime_pb2.TripDescriptor
+    stu_type = realtime.gtfs_realtime_pb2.TripUpdate.StopTimeUpdate
+    since = raw["feed_timestamp"] - timedelta(minutes=1)
+    until = raw["feed_timestamp"] + SURFACE_PREDICTION_HORIZON
+    issues, rows, trips = [], [], 0
+    for entity in snapshot.message.entity:
+        if not entity.HasField("trip_update"):
+            continue
+        update = entity.trip_update
+        if update.trip.schedule_relationship == tu_type.CANCELED or not update.trip.route_id:
+            continue
+        if update.trip.schedule_relationship == 7:  # DELETED, newer than this protobuf.
+            continue
+        trips += 1
+        for stu in update.stop_time_update:
+            if stu.schedule_relationship == stu_type.SKIPPED or not stu.stop_id:
+                continue
+            epoch = stu.arrival.time or stu.departure.time
+            if not epoch:
+                continue
+            at = datetime.fromtimestamp(epoch, UTC)
+            if since <= at <= until:
+                rows.append(
+                    (
+                        stu.stop_id,
+                        update.trip.trip_id,
+                        update.trip.route_id,
+                        update.vehicle.id or None,
+                        at,
+                        raw["snapshot_id"],
+                    )
+                )
+    current = conn.execute(
+        "SELECT count(DISTINCT trip_id) AS n FROM normalized.ttc_surface_predictions"
+    ).fetchone()["n"]
+    if current >= DROPOUT_MIN_VEHICLES and trips < DROPOUT_SHARE * current:
+        issues.append(
+            realtime.Issue("feed_dropout", "rejected", detail={"listed": trips, "recent": current})
+        )
+        return 0, issues
+    if _claim_newest(conn, raw):
+        conn.execute("DELETE FROM normalized.ttc_surface_predictions")
+        with (
+            conn.cursor() as cur,
+            cur.copy(
+                """COPY normalized.ttc_surface_predictions
+               (stop_id, trip_id, route_id, vehicle_id, predicted_arrival, snapshot_id)
+               FROM STDIN"""
+            ) as copy,
+        ):
+            for row in rows:
+                copy.write_row(row)
+    return len(rows), issues
+
+
 def _normalize_vehicles(conn, raw, snapshot):
     """Replace the current position of every bus and streetcar in revenue service.
     Vehicles without a route are out of service and are not listed."""
@@ -436,14 +500,20 @@ def apply_retention(
 ) -> dict:
     """Raw protobuf is short-lived; derived history lives longer. Never deletes the
     snapshot a feed currently points at. Vehicle snapshots are ~130 KB every 30 seconds,
-    so they are kept for hours rather than days."""
+    so they are kept for hours rather than days; surface trip updates (~700 KB) for one
+    hour."""
     now = datetime.now(UTC)
     with conn.transaction():
         raw = conn.execute(
             """DELETE FROM raw.ttc_realtime_snapshots
-               WHERE (fetched_at < %s OR (feed = 'vehicles' AND fetched_at < %s))
+               WHERE (fetched_at < %s OR (feed = 'vehicles' AND fetched_at < %s)
+                      OR (feed = 'trips_surface' AND fetched_at < %s))
                  AND snapshot_id NOT IN (SELECT snapshot_id FROM ops.ttc_feed_state)""",
-            (now - timedelta(days=raw_days), now - timedelta(hours=vehicle_raw_hours)),
+            (
+                now - timedelta(days=raw_days),
+                now - timedelta(hours=vehicle_raw_hours),
+                now - timedelta(hours=1),
+            ),
         ).rowcount
         events = conn.execute(
             "DELETE FROM normalized.ttc_train_stop_events WHERE predicted_arrival < %s",

@@ -23,6 +23,7 @@ Data: Toronto Transit Commission. Predictions may be inaccurate.
 | Subway trip updates | `https://gtfsrt.ttc.ca/trips/subway?format=binary` | Predicted arrivals for the next few platforms per train |
 | Subway alerts | `https://gtfsrt.ttc.ca/alerts/subway?format=binary` | Delays, closures, planned track work |
 | Accessibility alerts | `https://gtfsrt.ttc.ca/alerts/accessibility?format=binary` | Elevator and escalator outages |
+| Surface trip updates | `https://gtfsrt.ttc.ca/trips/update?format=binary` | Bus and streetcar arrival predictions, every 30 s |
 | Static GTFS | Toronto Open Data, "TTC Routes and Schedules" (ZIP) | Platforms, line order, scheduled trips |
 
 The realtime feeds need no API key and publish no rate limits or terms of use. One
@@ -169,14 +170,22 @@ schedule. A pattern is one exact stop sequence on a route and direction, with th
 scheduled time from its first stop to each stop across every trip using it. The 5-million-row
 `stop_times.txt` is streamed trip by trip; only running sums per pattern are kept.
 
-TTC publishes no arrival predictions for surface routes, and neither the feed's trip IDs nor
-its stop IDs match the published schedule (a 504 streetcar on King St reported a stop the
+TTC's vehicle feed carries no arrival times, and neither its trip IDs nor its stop IDs match the published schedule (a 504 streetcar on King St reported a stop the
 schedule places on Coxwell Ave). So the site places each vehicle by geometry: it snaps to
 the nearest point on one of its route's patterns, skipping segments running against its
 heading, and is unmatched if more than 120 m from all of them. On 2026-10-13, 96% of
 vehicles matched. An arrival estimate at a stop is the scheduled time along the matched
 pattern from the vehicle's point to that stop, less the age of the position report; the
 site labels these as estimates.
+
+TTC's own predictions come from its surface trip updates feed (`trips_surface`; about
+2,400 trips and 31,000 stop predictions, 700 KB, polled every 30 s). Only the newest
+snapshot is kept, in `normalized.ttc_surface_predictions`: cancelled trips, skipped stops
+and times over 90 minutes ahead are left out, and raw snapshots are deleted after an hour.
+Vehicle IDs match the vehicle feed (1,601 of 1,613 on 2026-10-16). At a stop, a
+prediction replaces the estimate for the same vehicle and adds vehicles not yet on the
+map; vehicles TTC does not predict keep their estimate, labelled "est.". Predictions are
+ignored if the feed is over three minutes old.
 
 ### Stop passages
 
