@@ -2,8 +2,9 @@
 scheduled travel times, stored under the same feed version as the subway schedule.
 
 The site estimates arrivals from a vehicle's position and the scheduled time between
-stops on its pattern, where TTC's own predictions (feed trips_surface) have none. stop_times.txt has millions of rows; it is streamed trip by trip and only
-running sums per pattern are kept, never the whole file.
+stops on its pattern, where TTC's own predictions (feed trips_surface) have none.
+stop_times.txt has millions of rows; it is streamed trip by trip and only running sums
+per pattern are kept, never the whole file.
 """
 
 import dataclasses

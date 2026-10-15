@@ -13,6 +13,8 @@ LIMITS = {
     "alerts_subway": timedelta(minutes=3),
     "alerts_accessibility": timedelta(minutes=3),
     "vehicles": timedelta(minutes=2),
+    "trips_surface": timedelta(minutes=3),
+    "alerts_light_rail": timedelta(minutes=3),
     "bikeshare": timedelta(minutes=35),
     "dbt": timedelta(minutes=35),
     # Loaded hourly; Environment Canada itself publishes hours several hours late.
@@ -25,6 +27,8 @@ FEED_LABELS = {
     "alerts_subway": "Subway service alerts",
     "alerts_accessibility": "Elevator and escalator alerts",
     "vehicles": "Bus and streetcar positions",
+    "trips_surface": "Bus and streetcar predictions",
+    "alerts_light_rail": "Line 5 and 6 service alerts",
 }
 # Row counts come from planner statistics (pg_class.reltuples): close, and free to read.
 VOLUME_TABLES = {

@@ -27,6 +27,8 @@ LABELS = {
     "alerts_subway": "TTC service alerts",
     "alerts_accessibility": "TTC elevator alerts",
     "vehicles": "TTC bus and streetcar positions",
+    "trips_surface": "TTC bus and streetcar predictions",
+    "alerts_light_rail": "TTC Line 5 and 6 alerts",
     "bikeshare": "Bike Share collection",
     "dbt": "dbt build",
     "weather": "Weather load",

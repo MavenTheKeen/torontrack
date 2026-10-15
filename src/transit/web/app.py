@@ -173,6 +173,10 @@ def create_app(
         state = queries.feed_state(conn)
         alerts = queries.current_alerts(conn, now)
         alerts_fresh = queries.freshness(state, "alerts_subway", now, queries.ALERTS_STALE)
+        # Light rail alerts come from their own feed (alerts_light_rail).
+        alerts_fresh["light_rail_stale"] = queries.freshness(
+            state, "alerts_light_rail", now, queries.ALERTS_STALE
+        )["stale"]
         detected = {}
         if not queries.freshness(state, "trips_subway", now, queries.PREDICTIONS_STALE)["stale"]:
             headways = {
@@ -458,7 +462,11 @@ def create_app(
                 pace = slow.get(f"pace:{version}", lambda: surface.typical_pace(conn, version, now))
             except (psycopg.Error, queries.NotFound):
                 pace = {}  # Without a usual pace, vehicles move at the timetable's.
-            return surface.vehicles(matched(conn, now), now, pace)
+            try:
+                predicted = surface.vehicle_predictions(conn, now)
+            except psycopg.Error:
+                predicted = {}
+            return surface.vehicles(matched(conn, now), now, pace, predicted)
 
         return cached("vehicles", build, attribution=SURFACE_ATTRIBUTION, store=live)
 

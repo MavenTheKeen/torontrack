@@ -202,7 +202,7 @@ async function renderHome() {
     el("ul", { class: "status-list" }, lineData.lines.map((l) => statusRow(l.status))),
     stationSearch(lineData.stations),
     el("h2", {}, "Active alerts"),
-    alertData.active.length ? alertData.active.map(alertCard) : el("p", { class: "muted" }, "No active subway alerts."),
+    alertData.active.length ? alertData.active.map(alertCard) : el("p", { class: "muted" }, "No active subway or light rail alerts."),
     el("h2", {}, "Planned closures and notices"),
     alertData.upcoming.length
       ? [
@@ -1161,7 +1161,7 @@ function stopKicker(stop) {
 // How a stop's arrival times are worked out, for the TTC's stops or another agency's.
 function estimateNote(stopId) {
   return String(stopId).includes(":")
-    ? "Estimated from each bus's live position and the scheduled time between stops."
+    ? "Times are the agency's own predictions where it publishes them; others, marked est., are estimated from the bus's live position and the scheduled time between stops."
     : "Times are TTC's predictions where it publishes them; others, marked est., are estimated from the vehicle's live position and the scheduled time between stops.";
 }
 
@@ -1235,7 +1235,7 @@ function stopArrivals(data) {
             "li",
             { class: "arrival-row" },
             el("span", { class: "with-badge" }, el("span", { class: `route-pill ${a.mode || "bus"}` }, a.short_name), el("span", {}, a.towards)),
-            el("span", { class: "mins" }, a.seconds < 60 ? "Due" : `${Math.round(a.seconds / 60)} min`, a.source === "estimate" && !String(a.route_id).includes(":") ? el("span", { class: "muted small" }, " est.") : null),
+            el("span", { class: "mins" }, a.seconds < 60 ? "Due" : `${Math.round(a.seconds / 60)} min`, a.source === "estimate" ? el("span", { class: "muted small" }, " est.") : null),
           ),
         ),
       )

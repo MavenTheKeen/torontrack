@@ -48,9 +48,12 @@ area (`transit.maptiles.BOUNDS`, north to latitude 44.34).
   riders see them (`transit.agencies.route_number`): YRT's "001" becomes "1" and Viva's
   "blue" becomes "Blue". Names published in capitals are shown in normal case (`route_title`): "MARKHAM DISTRICT SS VIA CARLTON" becomes "Markham District SS via Carlton".
 
-Arrival times at these stops are estimates from each bus's position and the schedule,
-as for TTC buses. The agencies also publish trip updates (their own predictions), which
-are not used yet.
+Arrival times at these stops are each agency's own predictions, from its GTFS-Realtime
+trip updates (polled every 30 s, kept in `normalized.agency_predictions`; Brampton
+`merged_TripUpdate.pb`, MiWay `GTFS_RT/TripUpdate/TripUpdates.pb`, YRT
+`gtfsrealtime/TripUpdates`). Their vehicle IDs match the position feeds (checked
+2026-10-16). Buses an agency does not predict keep an estimate from their position and the
+schedule, as for TTC buses, marked "est."; predictions over three minutes old are ignored.
 
 ## Not yet covered
 

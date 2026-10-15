@@ -5,6 +5,9 @@ REALTIME_FEEDS = {
     "trips_subway": f"https://{REALTIME_HOST}/trips/subway?format=binary",
     "alerts_subway": f"https://{REALTIME_HOST}/alerts/subway?format=binary",
     "alerts_accessibility": f"https://{REALTIME_HOST}/alerts/accessibility?format=binary",
+    # Every alert; only those naming Lines 5 and 6 (light rail, absent from the subway
+    # feed) are kept.
+    "alerts_light_rail": f"https://{REALTIME_HOST}/alerts/all?format=binary",
     # Every bus and streetcar in service.
     "vehicles": f"https://{REALTIME_HOST}/vehicles/position?format=binary",
     # Bus and streetcar trip updates: TTC's own arrival predictions (not listed in the

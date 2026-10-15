@@ -7,9 +7,9 @@ from datetime import timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.ttc_helpers import LINE_6_EAST, LINE_6_WEST, T0, static_zip
+from tests.ttc_helpers import LINE_6_EAST, LINE_6_WEST, T0, alert_feed, static_zip
 from transit.db import connect
-from transit.ttc import static_gtfs, surface
+from transit.ttc import static_gtfs, store, surface
 from transit.ttc.sources import LIGHT_RAIL_LINES
 from transit.web.app import create_app
 
@@ -131,3 +131,22 @@ def test_light_rail_stations_show_scheduled_arrivals(client):
         ("602", 15, True),
     ]
     assert [a["train_id"] for a in by_stop["16290"]["arrivals"]] == ["610"]
+
+
+@pytest.mark.integration
+def test_light_rail_alerts_come_from_the_combined_feed(client, settings):
+    payload = alert_feed(
+        T0,
+        [
+            {"id": "60", "effect": "NO_SERVICE", "routes": ["6"], "text": "Line 6: No service"},
+            {"id": "61", "stops": ["16291"], "text": "Westmore: platform closed"},
+            {"id": "50", "effect": "DETOUR", "routes": ["501"], "text": "501 Queen detour"},
+        ],
+    )
+    with connect(settings.database_url) as conn:
+        snapshot_id, _ = store.store_snapshot(conn, "alerts_light_rail", "test://", payload, T0)
+        assert store.normalize_snapshot(conn, snapshot_id)["accepted"] == 2
+    alerts = client.get("/api/alerts").json()
+    assert {a["id"]: a["lines"] for a in alerts["active"]} == {"60": ["6"], "61": ["6"]}
+    status = {s["line"]: s["status"] for s in client.get("/api/status").json()["lines"]}
+    assert status["6"] == "no_service"

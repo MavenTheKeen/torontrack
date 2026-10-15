@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.ttc_helpers import vehicle_feed
+from tests.ttc_helpers import surface_trip_feed, vehicle_feed
 from transit import agencies
 from transit.config import Settings
 from transit.db import connect
@@ -151,6 +151,20 @@ def test_a_network_and_live_buses_are_served_with_prefixed_ids(settings):
         [arrival] = stop["arrivals"]
         assert arrival["short_name"] == "1" and arrival["towards"] == "Queen East"
         assert 30 < arrival["seconds"] < 90  # About a minute of timetable, less the report's age.
+        assert arrival["source"] == "estimate"
+        # Brampton's own prediction for the bus replaces the estimate.
+        trips = surface_trip_feed(
+            NOW, [{"trip_id": "t1", "route_id": "1", "vehicle": "1051", "stops": [("102", 45)]}]
+        )
+        assert agencies.poll_predictions(conn, Client(trips), BRAMPTON, NOW) == {
+            "agency": "br", "status": "ok", "predictions": 1,
+        }  # fmt: skip
+        [arrival] = web.stop(conn, "br:102", matched, NOW)["arrivals"]
+        assert (arrival["vehicle_id"], arrival["seconds"], arrival["source"]) == (
+            "br:1051",
+            45,
+            "prediction",
+        )
         assert web.stop(conn, "zz:102", matched, NOW) is None
 
     app = TestClient(create_app(Settings(settings.database_url), clock=lambda: NOW))

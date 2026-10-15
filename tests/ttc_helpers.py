@@ -218,3 +218,21 @@ def vehicle_feed(timestamp: datetime, vehicles: list[dict]) -> bytes:
         position.stop_id = v.get("stop_id", "9999")
         position.occupancy_status = gtfs_realtime_pb2.VehiclePosition.MANY_SEATS_AVAILABLE
     return message.SerializeToString()
+
+
+def surface_trip_feed(timestamp, trips):
+    """trips: [{"trip_id", "route_id", "vehicle"?, "cancelled"?, "stops": [(stop_id, offset_s)]}]"""
+    message = gtfs_realtime_pb2.FeedMessage()
+    message.header.gtfs_realtime_version = "2.0"
+    message.header.timestamp = int(timestamp.timestamp())
+    for trip in trips:
+        update = message.entity.add(id=trip["trip_id"]).trip_update
+        update.trip.trip_id, update.trip.route_id = trip["trip_id"], trip["route_id"]
+        if trip.get("cancelled"):
+            update.trip.schedule_relationship = gtfs_realtime_pb2.TripDescriptor.CANCELED
+        if trip.get("vehicle"):
+            update.vehicle.id = trip["vehicle"]
+        for stop_id, offset in trip["stops"]:
+            stu = update.stop_time_update.add(stop_id=stop_id)
+            stu.arrival.time = int(timestamp.timestamp()) + offset
+    return message.SerializeToString()

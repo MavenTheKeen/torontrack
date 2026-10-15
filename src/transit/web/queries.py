@@ -466,7 +466,12 @@ def line_statuses(
         ]
         ranked = [a for a in active if a["status"] in STATUS_ORDER]
         ranked.sort(key=lambda a: STATUS_ORDER.index(a["status"]))
-        if alerts_fresh["stale"]:
+        stale = (
+            alerts_fresh.get("light_rail_stale", True)
+            if line["id"] in LIGHT_RAIL_LINES
+            else alerts_fresh["stale"]
+        )
+        if stale:
             status, label = "unknown", "Status unavailable"
         elif ranked:
             status, label = ranked[0]["status"], STATUS_LABELS[ranked[0]["status"]]

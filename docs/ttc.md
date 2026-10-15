@@ -39,7 +39,10 @@ reliability or delay detection, which need observed arrivals. Their platforms ar
 "Cedarvale Station Eastbound Platform" rather than "... Station - Eastbound Platform";
 both forms reduce to the same station, so Cedarvale, Eglinton, Kennedy and Finch West
 are single interchange stations. A schedule version loaded before light rail was
-included gains it on the next refresh (`static_gtfs.add_lines`).
+included gains it on the next refresh (`static_gtfs.add_lines`). Their service alerts
+are only in TTC's combined alerts feed, so it is polled as `alerts_light_rail` and only the
+alerts naming Line 5 or 6, or one of their platforms, are kept; their line status uses that
+feed's freshness.
 
 ## Data flow
 

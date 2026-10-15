@@ -7,7 +7,7 @@ mode is its agency's key, which the map uses for its colour.
 """
 
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from transit.agencies import AGENCIES
 from transit.ttc.matching import M_PER_DEG_LAT, M_PER_DEG_LON, index_rows, locate
@@ -186,6 +186,10 @@ def stop(conn, prefixed: str, matched: list[dict], now: datetime) -> dict | None
         for r in routes
     ]
     own = [v for v in matched if v["mode"] == agency]
+    short_names = {r["route_id"]: r["short_name"] for r in routes}
+    towards: dict[str, set] = {}
+    for r in routes:
+        towards.setdefault(r["route_id"], set()).add(r["towards"])
     return {
         "stop": {
             "id": prefixed,
@@ -196,10 +200,43 @@ def stop(conn, prefixed: str, matched: list[dict], now: datetime) -> dict | None
             "agency": AGENCIES[agency].name,
         },
         "routes": routes,
-        "arrivals": surface.estimate_arrivals(
-            own, stop_id, {r["route_id"]: r["short_name"] for r in routes}, now
+        "arrivals": surface.with_predictions(
+            surface.estimate_arrivals(own, stop_id, short_names, now, limit=None),
+            predictions(conn, agency, stop_id, now),
+            own,
+            short_names,
+            towards,
+            now,
         ),
     }
+
+
+def predictions(conn, agency: str, stop_id: str, now: datetime) -> list[dict]:
+    """The agency's own predictions at a stop, with IDs prefixed as on the site; none
+    when its trip updates are stale."""
+    rows = conn.execute(
+        """SELECT p.trip_id, p.route_id, p.vehicle_id, p.predicted_arrival
+           FROM normalized.agency_predictions p
+           JOIN ops.agency_polls s ON s.agency = p.agency AND s.predictions_at > %s
+           WHERE p.agency = %s AND p.stop_id = %s
+             AND p.predicted_arrival BETWEEN %s AND %s
+           ORDER BY p.predicted_arrival""",
+        (
+            now - surface.PREDICTIONS_STALE,
+            agency,
+            stop_id,
+            now - timedelta(seconds=30),
+            now + surface.MAX_ESTIMATE,
+        ),
+    ).fetchall()
+    return [
+        {
+            **r,
+            "route_id": f"{agency}:{r['route_id']}",
+            "vehicle_id": f"{agency}:{r['vehicle_id']}" if r["vehicle_id"] else None,
+        }
+        for r in rows
+    ]
 
 
 def route(conn, prefixed: str) -> dict | None:

@@ -10,6 +10,7 @@ from psycopg.types.json import Jsonb
 from transit import locks
 from transit.bikeshare.parsing import FeedValidationError
 from transit.ttc import realtime
+from transit.ttc.sources import LIGHT_RAIL_LINES
 
 EVENT_LOCK_ID = locks.TTC_EVENT_MATCHING
 # A train revisits a platform at most once per round trip (20+ minutes), so a prediction
@@ -282,11 +283,19 @@ def _normalize_trips(conn, raw, snapshot, stops):
 def _normalize_alerts(conn, raw, snapshot, stops):
     alerts, issues = realtime.parse_alerts(snapshot)
     seen_at, snapshot_id, feed = raw["feed_timestamp"], raw["snapshot_id"], raw["feed"]
+    kept = 0
     for a in alerts:
         stop_ids = sorted({e["stop_id"] for e in a["informed_entities"] if e["stop_id"]})
         route_ids = {e["route_id"] for e in a["informed_entities"] if e["route_id"]}
         # Accessibility alerts name only platforms; derive their lines from static GTFS.
         route_ids |= {stops[s]["route_id"] for s in stop_ids if s in stops}
+        if feed == "alerts_light_rail":
+            # The combined feed: only alerts naming a light rail line or its platforms.
+            if not route_ids & LIGHT_RAIL_LINES:
+                continue
+            route_ids &= LIGHT_RAIL_LINES
+            stop_ids = [s for s in stop_ids if stops.get(s, {}).get("route_id") in route_ids]
+        kept += 1
         conn.execute(
             """INSERT INTO normalized.ttc_alerts AS a
                (feed, alert_id, first_seen_at, last_seen_at, last_snapshot_id,
@@ -343,7 +352,7 @@ def _normalize_alerts(conn, raw, snapshot, stops):
             ),
         )
     _claim_newest(conn, raw)
-    return len(alerts), issues
+    return kept, issues
 
 
 # Predictions this far ahead are kept; stop pages show the next hour.
