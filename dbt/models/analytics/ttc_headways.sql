@@ -12,7 +12,11 @@
 {% if is_incremental() %}
     {% set since = "(select coalesce(max(service_date), date '1900-01-01') - 1 from " ~ this ~ ")" %}
 {% endif %}
-with arrivals as (
+-- The gap list is computed once: referenced directly inside exists(), the view would be
+-- re-evaluated for every row (over 9 minutes once polls ran every 10 seconds).
+with gaps as materialized (
+    select gap_start, gap_end from {{ ref('stg_ttc_collection_gaps') }}
+), arrivals as (
     select *
     from {{ ref('stg_ttc_arrivals') }}
     {% if is_incremental() %}
@@ -48,7 +52,7 @@ select
     o.previous_arrival_at is not null
         and o.arrived_at - o.previous_arrival_at < interval '60 seconds' as implausible,
     exists (
-        select 1 from {{ ref('stg_ttc_collection_gaps') }} g
+        select 1 from gaps g
         where g.gap_start < o.arrived_at and g.gap_end > o.previous_arrival_at
     ) as spans_collection_gap,
     -- A train passed more than 10 minutes before the platform's first scheduled train
