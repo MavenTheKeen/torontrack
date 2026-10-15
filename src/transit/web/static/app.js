@@ -3059,6 +3059,14 @@ async function renderMap(focusKey) {
         if (activeMap !== view || !status.available) return;
         view.planner = status;
         planButton.hidden = false;
+        // "Get there" from the Events page: plan a trip to the venue.
+        const trip = mapState.pendingTrip;
+        if (trip) {
+          mapState.pendingTrip = null;
+          map.jumpTo({ center: trip.coord, zoom: Math.max(map.getZoom(), 14) });
+          view.plan = newPlan();
+          setPlanEnd(view, "to", trip);
+        }
       }).catch(() => { /* No planner: the map works without directions. */ });
       applyLayerToggles(map);
       refreshRoads(view);
@@ -3339,6 +3347,147 @@ function restoreState(state) {
   window.scrollTo(0, state.scroll);
 }
 
+// ---- Events page ---------------------------------------------------------------------
+// What's on over the next 14 days (/api/agenda): a strip of days, then the chosen day's
+// events in time order. Arena and stadium events are highlighted with the station they
+// fill; exhibits and markets running most days are folded into "ongoing".
+const EVENT_FILTERS = [["all", "All"], ["concerts", "Concerts"], ["sports", "Sports"], ["arts", "Arts & theatre"], ["community", "Festivals & community"], ["free", "Free"]];
+const eventsState = { filter: "all" };
+const dayLongFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", weekday: "long", month: "long", day: "numeric" });
+const dayShortFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", weekday: "short" });
+const dayDateFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "long", day: "numeric" });
+
+function dayName(iso, days) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (iso === days[0]) return { short: "Today", long: `Today, ${dayDateFmt.format(d)}` };
+  if (iso === days[1]) return { short: "Tmrw", long: `Tomorrow, ${dayDateFmt.format(d)}` };
+  return { short: dayShortFmt.format(d), long: dayLongFmt.format(d) };
+}
+
+function stationText(s) {
+  if (!s) return null;
+  return `${s.name}${s.kind === "regional" ? " (regional)" : ""}, ${s.walk_min} min walk`;
+}
+
+function eventTime(e) {
+  if (e.all_day) return "All day";
+  return e.time_tbd || !e.starts_at ? "Time TBA" : timeFmt.format(new Date(e.starts_at));
+}
+
+function agendaItem(e, categories) {
+  const crowd = e.major && e.station
+    ? `Expect crowds at ${e.station.name} ${e.time_tbd ? "around the event" : `before ${eventTime(e)}`} and when it ends.`
+    : null;
+  return el(
+    "li",
+    { class: `agenda-item${e.major ? " major" : ""}` },
+    el("p", { class: "agenda-time" }, eventTime(e)),
+    el(
+      "div",
+      { class: "agenda-body" },
+      el("p", { class: "agenda-title" }, e.name),
+      el(
+        "p",
+        { class: "agenda-tags" },
+        el("span", { class: `tag cat-${e.category}` }, categories[e.category] || "Event"),
+        e.major ? el("span", { class: "tag major" }, "Major venue") : null,
+        e.free ? el("span", { class: "tag free" }, "Free") : null,
+        e.status ? el("span", { class: "tag warn" }, e.status === "postponed" ? "Postponed" : "Rescheduled") : null,
+      ),
+      el("p", { class: "muted small" }, [e.venue, stationText(e.station)].filter(Boolean).join(" · ")),
+      crowd ? el("p", { class: "agenda-crowd small" }, crowd) : null,
+      el(
+        "p",
+        { class: "agenda-actions" },
+        el("button", { type: "button", class: "button small", "data-event-go": e.id }, iconSvg("directions", { size: 16 }), "Get there"),
+        e.url ? el("a", { class: "linkish small", href: e.url, target: "_blank", rel: "noopener" }, e.source === "ticketmaster" ? "Tickets" : "Website") : null,
+      ),
+    ),
+  );
+}
+
+async function renderEvents(dayParam) {
+  const data = await api("/api/agenda");
+  const { days, categories } = data;
+  const day = days.includes(dayParam) ? dayParam : days[0];
+  const f = eventsState.filter;
+  const shown = data.events.filter((e) => f === "all" || (f === "free" ? e.free === true : e.category === f));
+  const counts = new Map(days.map((d) => [d, { all: 0, major: 0 }]));
+  for (const e of shown) {
+    const c = counts.get(e.date);
+    if (!c || e.ongoing) continue;
+    c.all += 1;
+    if (e.major) c.major += 1;
+  }
+  const onDay = shown.filter((e) => e.date === day);
+  const timed = onDay.filter((e) => !e.ongoing);
+  const ongoing = onDay.filter((e) => e.ongoing);
+  const majorCount = timed.filter((e) => e.major).length;
+  const page = el(
+    "div",
+    { class: "events-page" },
+    el("h1", {}, "Events"),
+    el("p", { class: "muted" }, "What's on in Toronto over the next two weeks, and the station to get there."),
+    el(
+      "div",
+      { class: "event-filters", role: "group", "aria-label": "Show" },
+      EVENT_FILTERS.map(([key, label]) => el("button", { type: "button", class: "chip small", "aria-pressed": String(f === key), "data-event-filter": key }, label)),
+    ),
+    el(
+      "nav",
+      { class: "day-strip", "aria-label": "Days" },
+      days.map((d) => {
+        const c = counts.get(d);
+        const name = dayName(d, days);
+        return el(
+          "a",
+          { class: `day${c.major ? " has-major" : ""}`, href: `#/events/${d}`, "aria-current": d === day ? "date" : null, "aria-label": `${name.long}: ${plural(c.all, "event", "events")}` },
+          el("span", { class: "day-name" }, name.short),
+          el("span", { class: "day-num" }, String(Number(d.slice(8)))),
+          el("span", { class: "day-dots", "aria-hidden": "true" }, Array.from({ length: Math.min(3, Math.ceil(c.all / 4)) }, () => el("i"))),
+        );
+      }),
+    ),
+    el("h2", { class: "agenda-day" }, dayName(day, days).long),
+    majorCount ? el("p", { class: "muted small" }, `${plural(majorCount, "event", "events")} at a major venue: stations nearby will be busy.`) : null,
+    timed.length
+      ? el("ol", { class: "agenda" }, timed.map((e) => agendaItem(e, categories)))
+      : el("p", { class: "muted" }, f === "all" ? "Nothing listed for this day yet." : "Nothing of this kind listed for this day."),
+    ongoing.length
+      ? el(
+          "details",
+          { class: "card ongoing", "data-key": "ongoing" },
+          el("summary", {}, plural(ongoing.length, "ongoing exhibit, market or program", "ongoing exhibits, markets and programs")),
+          el("ol", { class: "agenda" }, ongoing.map((e) => agendaItem(e, categories))),
+        )
+      : null,
+    el(
+      "p",
+      { class: "muted small" },
+      "Festivals and community events: City of Toronto festivals and events calendar, under the Open Government Licence – Toronto.",
+      data.sources.ticketmaster ? " Concerts, games and shows: Ticketmaster; tickets are sold on Ticketmaster." : "",
+      " Walking times are straight-line estimates.",
+    ),
+  );
+  page.addEventListener("click", (event) => {
+    const filter = event.target.closest("[data-event-filter]");
+    if (filter) {
+      eventsState.filter = filter.dataset.eventFilter;
+      route({ refresh: true });
+      return;
+    }
+    const go = event.target.closest("[data-event-go]");
+    if (go) {
+      const e = data.events.find((x) => x.id === go.dataset.eventGo);
+      if (!e) return;
+      // The map picks this up once its trip planner is ready (renderMap).
+      mapState.pendingTrip = { coord: [e.lon, e.lat], name: e.venue || e.name };
+      location.hash = "#/map";
+    }
+  });
+  return page;
+}
+
 function markCurrentNav(kind, id) {
   for (const link of document.querySelectorAll("#line-nav a, nav.primary a, .tabs a")) {
     const href = link.getAttribute("href");
@@ -3399,6 +3548,7 @@ async function route({ refresh = false } = {}) {
     else if (kind === "map") content = await renderMap(id);
     else if (kind === "stop" && id) content = await renderStop(decodeURIComponent(id));
     else if (kind === "pipeline") content = await renderPipeline();
+    else if (kind === "events") content = await renderEvents(id);
     else content = await renderHome();
     clearTimeout(waiting);
     if (seq !== renderSeq) return; // A newer navigation or refresh finished first.

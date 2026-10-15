@@ -24,7 +24,17 @@ from fastapi.staticfiles import StaticFiles
 
 from transit import events, places, roads
 from transit.db import connect
-from transit.web import access, bikes, pipeline, planner, queries, regional, report, surface
+from transit.web import (
+    access,
+    agenda,
+    bikes,
+    pipeline,
+    planner,
+    queries,
+    regional,
+    report,
+    surface,
+)
 
 logger = logging.getLogger(__name__)
 CACHE_SECONDS = 15
@@ -43,6 +53,7 @@ EVENTS_ATTRIBUTION = (
     "Events: City of Toronto festivals and events calendar. Contains information licensed "
     "under the Open Government Licence – Toronto."
 )
+AGENDA_ATTRIBUTION = EVENTS_ATTRIBUTION + " Concerts, games and shows: Ticketmaster."
 ROADS_ATTRIBUTION = (
     "Road restrictions: City of Toronto. Contains information licensed under the "
     "Open Government Licence – Toronto."
@@ -478,6 +489,28 @@ def create_app(
             lambda conn, now: {"events": events.upcoming(conn, now)},
             EVENTS_ATTRIBUTION,
         )
+
+    @app.get("/api/agenda")
+    def event_agenda():
+        """The Events page: city events and Ticketmaster events for the next 14 days."""
+
+        def build(conn, now):
+            days = agenda.window(now)
+            stations = [{**s, "kind": "subway"} for s in schedule(conn)["network"]["stations"]]
+            idx = regional_index(conn, now)
+            if idx:
+                stations += [
+                    {**s, "kind": "regional", "key": None}
+                    for s in regional.network(idx)["stations"]
+                ]
+            return agenda.build(
+                agenda.city_rows(conn, days[0], days[-1]),
+                agenda.ticketed_rows(conn, days[0], days[-1]),
+                stations,
+                days,
+            )
+
+        return cached("agenda", build, AGENDA_ATTRIBUTION)
 
     @app.get("/api/roads")
     def road_restrictions():
