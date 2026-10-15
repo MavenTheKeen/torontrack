@@ -9,9 +9,9 @@ reliability reports.
 
 ![Map of downtown Toronto showing subway lines and trains, bus stops, Bike Share docks and roadwork](docs/screenshots/site-map.png)
 
-Status: live data has been collected since 2026-10-09. Collection runs on an always-on
-server and is replicated to a development machine that runs the rest of the stack
-([collector server](docs/collector.md)). The site is not yet publicly accessible.
+Status: live at <https://torontrack.skynetlab.duckdns.org>, with live data collected
+since 2026-10-09. The whole stack runs on one server behind an existing reverse proxy
+([deployment](docs/deploy.md#behind-an-existing-proxy)).
 
 ## Features
 
