@@ -42,6 +42,10 @@
   --bar: #545454;
   --grey: #9a9a9a;
   --map-bg: #eeeeec;
+  /* Buttons floating on the map: their own fill and a visible edge. */
+  --control-bg: #ffffff;
+  --control-edge: #b8b8b8;
+  --control-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 3px 10px rgba(0, 0, 0, 0.18);
   --sign: #ffffff;
   --sign-text: #111111;
   --sign-muted: #545454;
@@ -82,6 +86,9 @@
   --bar: #b0b0b0;
   --grey: #6b6b6b;
   --map-bg: #151515;
+  --control-bg: #2a2a2a;
+  --control-edge: #5c5c5c;
+  --control-shadow: 0 2px 4px rgba(0, 0, 0, 0.6), 0 4px 14px rgba(0, 0, 0, 0.55);
   --sign: #000000;
   --sign-text: #ffffff;
   --sign-muted: #a8a8a8;
@@ -113,6 +120,9 @@
     --bar: #b0b0b0;
     --grey: #6b6b6b;
     --map-bg: #151515;
+  --control-bg: #2a2a2a;
+  --control-edge: #5c5c5c;
+  --control-shadow: 0 2px 4px rgba(0, 0, 0, 0.6), 0 4px 14px rgba(0, 0, 0, 0.55);
     --sign: #000000;
     --sign-text: #ffffff;
     --sign-muted: #a8a8a8;
@@ -455,12 +465,12 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
 .map-search-wrap { position: relative; flex: 1; min-width: 0; }
 .map-tool {
   flex: none; width: 46px; height: 46px; border-radius: var(--radius); border: 0; cursor: pointer; display: flex; align-items: center; justify-content: center;
-  background: var(--surface); color: var(--muted); box-shadow: var(--shadow-md); transition: background 0.2s, color 0.2s;
+  background: var(--control-bg); color: var(--text); border: 1px solid var(--control-edge); box-shadow: var(--control-shadow);
+  transition: background 0.2s, color 0.2s;
 }
-.map-tool.on { background: var(--accent); color: var(--on-accent); }
-/* On a dark map the surface colour alone barely separates the controls from it. */
-:root[data-theme="dark"] :is(.map-tool, .map-fab, .map-page input.map-search) { border: 1px solid var(--border); }
-.map-page input.map-search { box-shadow: var(--shadow-md); border-color: transparent; }
+.map-tool.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.map-tool:hover, .map-fab:hover { border-color: var(--accent); }
+.map-page input.map-search { background-color: var(--control-bg); border: 1px solid var(--control-edge); box-shadow: var(--control-shadow); }
 .map-results { list-style: none; margin: 6px 0 0; padding: 0; }
 .map-results:not(:empty) { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-lg); overflow: hidden; }
 .map-results li + li { border-top: 1px solid var(--border); }
@@ -488,14 +498,14 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
 .chip.small { box-shadow: none; padding: 5px 11px; min-height: 30px; }
 .map-status {
   align-self: flex-start; margin: -2px 0 0; font-size: 0.76rem; font-weight: 650; color: var(--muted);
-  background: var(--surface); padding: 5px 10px; border-radius: var(--radius-sm); box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 6px;
+  background: var(--control-bg); border: 1px solid var(--control-edge); padding: 5px 10px; border-radius: var(--radius-sm); box-shadow: var(--control-shadow); display: flex; align-items: center; gap: 6px;
 }
 .map-note { position: absolute; z-index: 3; left: 12px; bottom: 56px; margin: 0; max-width: 320px; font-size: 0.8rem; background: var(--surface); padding: 8px 12px; border-radius: var(--radius); box-shadow: var(--shadow-md); }
 .map-fab {
   position: absolute; z-index: 3; right: 10px; bottom: 120px; width: 44px; height: 44px; border-radius: var(--radius);
-  border: 0; background: var(--surface); box-shadow: var(--shadow-md); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--control-edge); background: var(--control-bg); box-shadow: var(--control-shadow); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: var(--text);
 }
-.map-fab { color: var(--muted); }
 .map-fab.on { color: var(--accent); }
 .map-fab.plan { bottom: 172px; color: var(--accent); }
 .map-fab[hidden] { display: none; }
@@ -625,13 +635,13 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
 .stat b { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
 .stat span { font-size: 0.78rem; color: var(--muted); }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; flex: none; }
-.maplibregl-ctrl-group { border-radius: var(--radius) !important; box-shadow: var(--shadow-md) !important; overflow: hidden; }
+.maplibregl-ctrl-group { border-radius: var(--radius) !important; box-shadow: var(--control-shadow) !important; border: 1px solid var(--control-edge); overflow: hidden; }
 .maplibregl-ctrl-group button { width: 40px !important; height: 40px !important; }
 .maplibregl-ctrl-bottom-right { bottom: 8px; }
 .maplibregl-ctrl-attrib { font-size: 11px; }
 /* MapLibre's own controls are white; in dark they match the other map controls. */
-:root[data-theme="dark"] .maplibregl-ctrl-group, :root[data-theme="dark"] .maplibregl-ctrl-attrib { background: var(--surface); color: var(--text); }
-:root[data-theme="dark"] .maplibregl-ctrl-group button + button { border-top-color: var(--border); }
+:root[data-theme="dark"] .maplibregl-ctrl-group, :root[data-theme="dark"] .maplibregl-ctrl-attrib { background: var(--control-bg); color: var(--text); }
+:root[data-theme="dark"] .maplibregl-ctrl-group button + button { border-top-color: var(--control-edge); }
 :root[data-theme="dark"] .maplibregl-ctrl-icon, :root[data-theme="dark"] .maplibregl-ctrl-attrib-button { filter: invert(1); }
 :root[data-theme="dark"] .maplibregl-ctrl-attrib a { color: var(--muted); }
 
