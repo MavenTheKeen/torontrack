@@ -107,7 +107,7 @@ def test_a_correction_keeps_position_and_speed_continuous(page):
             for (let t = 0; t <= 1000; t += 100) out.push(glide(state, "a", [0, t * 1e-7], t)[1]);
             // New data: the estimate jumps 0.001 degrees (about 110 m) ahead, same speed.
             state.seq += 1;
-            for (let t = 1100; t <= 12000; t += 100) {
+            for (let t = 1100; t <= 25000; t += 100) {
                 out.push(glide(state, "a", [0, 0.001 + t * 1e-7], t)[1]);
             }
             return out;
@@ -118,8 +118,11 @@ def test_a_correction_keeps_position_and_speed_continuous(page):
     assert steps[10] == pytest.approx(steps[9], rel=0.05)
     # Speed changes gradually: no frame differs much from the one before.
     assert max(abs(b - a) for a, b in zip(steps, steps[1:], strict=False)) < 0.2e-5
-    # And it is on the new estimate by the next refresh, moving at its speed.
-    assert ys[-1] == pytest.approx(0.001 + 12000 * 1e-7, abs=1e-9)
+    # No faster than the catch-up limit (6 m/s, ~5.4e-8 degrees/ms, 1.5x at the curve's
+    # peak) above its 1e-5 per frame.
+    assert max(steps) < 1e-5 + 1.5 * 5.5e-8 * 100
+    # 110 m takes about 18 s; after that it is on the new estimate, moving at its speed.
+    assert ys[-1] == pytest.approx(0.001 + 25000 * 1e-7, abs=1e-9)
     assert steps[-1] == pytest.approx(1e-5, rel=0.01)
 
 
