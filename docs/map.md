@@ -91,9 +91,13 @@ estimate, so they travel along their routes instead of jumping. The rules are in
 animation frame when zoomed in to street level (every 50 ms at zoom 12 to 14 and every
 250 ms further out, where a frame's movement is under a pixel), and only vehicles in or
 near the view are sent to the map; recomputing all 1,500 vehicles takes about 2 ms. When
-fresh data moves an estimate, the vehicle glides to it over 2.5 seconds, easing in and
-out, and heading arrows turn at up to 180 degrees a second instead of snapping at each
-corner of the route.
+fresh data moves an estimate, the difference is made up evenly over the 10 seconds until
+the next refresh, so a vehicle drawn behind runs slightly faster throughout instead of
+lurching forward after each refresh (a 2.5-second eased glide did that: drawn speed
+peaked at about twice the usual). A vehicle drawn up to about 150 m ahead of its
+estimate waits rather than backing up, and a correction over about 250 m (a detour, a
+report long missing) glides in 1.2 seconds. Heading arrows turn at up to 180 degrees a
+second instead of snapping at each corner of the route.
 
 - **Subway trains** follow TTC's predicted arrival at the next station: a train runs from
   the previous station to the next over the scheduled run time, arriving at the predicted

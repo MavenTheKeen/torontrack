@@ -15,14 +15,20 @@
 //   halved the map's position error (docs/map.md).
 // - Regional trains follow their timetable track, sent ahead by the server.
 //
-// When fresh data moves a vehicle's estimate, the vehicle glides to it over CORRECT_MS
-// instead of jumping, and its heading arrow turns at up to TURN_DEG_PER_S instead of
-// snapping at each corner of its route.
+// When fresh data moves a vehicle's estimate, the difference is made up evenly over
+// CORRECT_MS, the time until the next refresh: a vehicle drawn behind runs a little faster
+// for the whole interval rather than lurching forward in a burst, and one drawn ahead
+// waits instead of backing up. A correction over FAR_DEG (a detour, a report long missing)
+// glides over QUICK_MS instead. Heading arrows turn at up to TURN_DEG_PER_S instead of
+// snapping at each corner of the route.
 
 const STOPPED_HOLD_S = 20;
 const MAX_MOVE_S = 120;
 const FADE_AFTER_S = 150;
-const CORRECT_MS = 2500;
+const CORRECT_MS = 10000; // The map refreshes trains and vehicles every 10 s.
+const QUICK_MS = 1200;
+const FAR_DEG = 0.0025; // About 250 m.
+const HOLD_DEG = 0.0015; // A vehicle up to ~150 m ahead of its estimate waits for it.
 const TURN_DEG_PER_S = 180;
 
 // ---- Subway -------------------------------------------------------------------------
@@ -108,26 +114,45 @@ function trackPoint(track, nowMs) {
 // ---- Gliding to corrected positions -------------------------------------------------------
 
 // Tracks what each vehicle was last drawn at. After new data (a new `seq`), the difference
-// between where a vehicle was drawn and its new estimate shrinks to nothing over CORRECT_MS,
-// easing in and out so the vehicle neither lurches at the start nor stops abruptly.
+// between where a vehicle is drawn and its new estimate shrinks to nothing: evenly over
+// CORRECT_MS, or eased over QUICK_MS when far.
 function newGlide() {
   return { seq: 0, items: new Map() };
+}
+
+// Distance in degrees of latitude, with longitude scaled for Toronto's latitude.
+function degrees(dx, dy) {
+  return Math.hypot(dx * 0.72, dy);
 }
 
 function glide(state, id, target, nowMs) {
   let item = state.items.get(id);
   if (!item) {
-    item = { seq: state.seq, start: nowMs, dx: 0, dy: 0, coord: target };
+    item = { seq: state.seq, start: nowMs, dx: 0, dy: 0, span: CORRECT_MS, quick: false, coord: target, dir: null };
     state.items.set(id, item);
   } else if (item.seq !== state.seq) {
     item.dx = item.coord[0] - target[0];
     item.dy = item.coord[1] - target[1];
     item.start = nowMs;
     item.seq = state.seq;
+    item.quick = degrees(item.dx, item.dy) > FAR_DEG;
+    item.span = item.quick ? QUICK_MS : CORRECT_MS;
   }
-  const p = Math.min(1, Math.max(0, (nowMs - item.start) / CORRECT_MS));
-  const ease = 1 - p * p * (3 - 2 * p);
-  item.coord = [target[0] + item.dx * ease, target[1] + item.dy * ease];
+  const p = Math.min(1, Math.max(0, (nowMs - item.start) / item.span));
+  const left = item.quick ? 1 - p * p * (3 - 2 * p) : 1 - p;
+  let coord = [target[0] + item.dx * left, target[1] + item.dy * left];
+  const step = [coord[0] - item.coord[0], coord[1] - item.coord[1]];
+  if (!item.quick && item.dir && step[0] * item.dir[0] + step[1] * item.dir[1] < 0 && degrees(item.coord[0] - target[0], item.coord[1] - target[1]) < HOLD_DEG) {
+    // The correction would move it backwards: it waits where it is, and what remains is
+    // made up from here once the estimate comes level.
+    coord = item.coord;
+    item.dx = coord[0] - target[0];
+    item.dy = coord[1] - target[1];
+    item.start = nowMs;
+  } else if (step[0] || step[1]) {
+    item.dir = step;
+  }
+  item.coord = coord;
   item.seen = nowMs;
   return item.coord;
 }

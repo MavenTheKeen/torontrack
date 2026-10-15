@@ -98,20 +98,45 @@ def test_a_regional_train_follows_its_timetable_track(page):
     assert points[2] == pytest.approx([-79.4, 43.75])
 
 
-def test_corrections_glide_instead_of_jumping(page):
+def test_a_correction_is_made_up_evenly_until_the_next_refresh(page):
     steps = page.evaluate(
         """() => {
             const state = newGlide();
             const out = [glide(state, "a", [0, 0], 0)];
-            state.seq += 1;  // New data puts the vehicle 1 unit east.
-            out.push(glide(state, "a", [1, 0], 1000));
-            out.push(glide(state, "a", [1, 0], 2000));
-            out.push(glide(state, "a", [1, 0], 3500));
-            return out;
+            // New data: the estimate is 0.001 degrees (about 80 m) east and keeps still.
+            state.seq += 1;
+            for (const t of [0, 2500, 5000, 7500, 10000, 12000]) out.push(glide(state, "a", [0.001, 0], t));
+            return out.map((c) => c[0]);
         }"""
     )
-    assert steps[0] == [0, 0] and steps[1] == [0, 0]
-    assert 0 < steps[2][0] < 1 and steps[3] == [1, 0]
+    # Even steps, no burst: a quarter of the way every 2.5 s, arriving at the next refresh.
+    assert steps[:2] == [0, 0]
+    gaps = [b - a for a, b in zip(steps[1:6], steps[2:6])]
+    assert all(g == pytest.approx(0.00025) for g in gaps)
+    assert steps[6] == pytest.approx(0.001)
+
+
+def test_a_vehicle_ahead_of_its_estimate_waits_and_a_far_one_glides_quickly(page):
+    held, far = page.evaluate(
+        """() => {
+            // Drawn moving north; new data puts the estimate 0.0005 degrees behind it,
+            // moving north slowly. It must not go back south.
+            const state = newGlide();
+            glide(state, "a", [0, 0], 0);
+            glide(state, "a", [0, 0.0001], 100);
+            state.seq += 1;
+            const held = [];
+            for (let t = 200; t <= 6200; t += 1000) held.push(glide(state, "a", [0, -0.0004 + t * 1e-7], t)[1]);
+            // A correction of about 1 km is a quick glide, done well before the next refresh.
+            const far = newGlide();
+            glide(far, "b", [0, 0], 0);
+            far.seq += 1;
+            glide(far, "b", [0, 0.01], 0);
+            return [held, glide(far, "b", [0, 0.01], 1500)];
+        }"""
+    )
+    assert all(b >= a for a, b in zip(held, held[1:]))
+    assert far == [0, 0.01]
 
 
 def test_heading_arrows_turn_instead_of_snapping(page):
