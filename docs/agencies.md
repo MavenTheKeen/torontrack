@@ -46,7 +46,7 @@ area (`transit.maptiles.BOUNDS`, north to latitude 44.34).
   "Queen East", "Newmarket Terminal - NB" becomes "Newmarket Terminal", and the regional
   rail brand is dropped from station names as elsewhere. Route numbers are shown as
   riders see them (`transit.agencies.route_number`): YRT's "001" becomes "1" and Viva's
-  "blue" becomes "Blue".
+  "blue" becomes "Blue". Names published in capitals are shown in normal case (`route_title`): "MARKHAM DISTRICT SS VIA CARLTON" becomes "Markham District SS via Carlton".
 
 Arrival times at these stops are estimates from each bus's position and the schedule,
 as for TTC buses. The agencies also publish trip updates (their own predictions), which

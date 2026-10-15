@@ -108,6 +108,30 @@ def route_number(short_name: str) -> str:
     return name.title() if name.islower() else name
 
 
+KEEP_CAPITALS = {"SS", "GO", "YRT"}  # Secondary school, GO Transit.
+LOWER_WORDS = {"via", "of", "the", "and", "at"}
+
+
+def route_title(long_name: str) -> str:
+    """A route name in all capitals in normal case: 'MARKHAM DISTRICT SS VIA CARLTON' ->
+    'Markham District SS via Carlton', 'DR G.W. WILLIAMS SS' -> 'Dr G.W. Williams SS',
+    '16TH AVENUE' -> '16th Avenue', 'MCCALLUM' -> 'McCallum'. Mixed-case names are kept."""
+    if not long_name.isupper():
+        return long_name
+
+    def word(w: str, first: bool) -> str:
+        core = w.strip("()")
+        if core in KEEP_CAPITALS or re.fullmatch(r"(?:[A-Z]\.){2,}", core):
+            return w
+        if core.lower() in LOWER_WORDS and not first:
+            return w.lower()
+        titled = w[:1] + w[1:].lower() if w[:1].isalpha() else w[:2] + w[2:].lower()
+        return re.sub(r"\bMc([a-z])", lambda m: "Mc" + m.group(1).upper(), titled)
+
+    words = long_name.split()
+    return " ".join(word(w, i == 0) for i, w in enumerate(words))
+
+
 # ---- Static network ----------------------------------------------------------------------
 
 
@@ -185,6 +209,7 @@ def refresh(database_url: str, client: FeedClient, agencies=None) -> dict:
             feed = surface.parse(body, modes={"3": "bus"}, name_towards=towards)
             for route in feed.routes:
                 route["short_name"] = route_number(route["short_name"])
+                route["long_name"] = route_title(route["long_name"])
             with connect(database_url) as conn:
                 result = load(conn, agency, feed, sha, started)
         except (FetchError, FeedValidationError, KeyError, ValueError) as exc:
