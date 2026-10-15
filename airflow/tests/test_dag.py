@@ -34,7 +34,6 @@ def dag_bag():
         "city_events",
         "ticketed_events",
         "planner_data",
-        "dbt_build",
     }
     return bag
 
@@ -194,28 +193,6 @@ def test_planner_data_downloads_daily(dag_bag, monkeypatch):
             ["/opt/app-venv/bin/transit", "planner-data", "--out", "/opt/airflow/planner"],
             {"check": True, "timeout": 840},
         )
-    ]
-
-
-def test_dbt_build_runs_on_its_own_every_fifteen_minutes(dag_bag, monkeypatch):
-    dag = dag_bag.dags["dbt_build"]
-    assert dag.catchup is False and dag.is_paused_upon_creation is True
-    assert dag.timetable.expression == "5,20,35,50 * * * *"
-    transform = dag.get_task("transform").python_callable
-    calls = []
-    monkeypatch.setattr(
-        transform.__globals__["subprocess"], "run", lambda args, **kw: calls.append(args)
-    )
-    transform()
-    assert calls == [
-        [
-            "/opt/app-venv/bin/transit",
-            "transform",
-            "--dbt-executable",
-            "/opt/dbt-venv/bin/dbt",
-            "--project-dir",
-            "/app/dbt",
-        ]
     ]
 
 

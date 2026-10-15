@@ -220,22 +220,6 @@ services:
     restart: unless-stopped
     stop_grace_period: 30s
 
-  # Development machine with a separate collector server (docs/collector.md): forwards
-  # the server's PostgreSQL into this network so the local database can subscribe to it.
-  server-tunnel:
-    image: toronto-transit-tunnel:local
-    build:
-      context: .
-      dockerfile: docker/tunnel.Dockerfile
-    profiles: ["collector"]
-    environment:
-      COLLECTOR_SSH: ${COLLECTOR_SSH:-}
-      COLLECTOR_SSH_PORT: ${COLLECTOR_SSH_PORT:-22}
-    volumes:
-      - ${COLLECTOR_SSH_KEY:-./collector-ssh-key}:/keys/id:ro
-      - ${COLLECTOR_KNOWN_HOSTS:-./collector-known-hosts}:/keys/known_hosts:ro
-    restart: unless-stopped
-
   airflow-db-init:
     <<: *app
     profiles: ["airflow"]

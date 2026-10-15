@@ -93,9 +93,9 @@ dc exec -T postgres psql -U transit -d transit -q < deploy/fix_sequences.sql
 dc --profile airflow up -d --wait
 ```
 
-The second step matters when the dump comes from a development machine that receives
-collected tables by logical replication ([collector server](collector.md)). Replication
-copies rows but not sequence positions, so without it the first new rows reuse existing
+The second step matters when the dump comes from a database that received its
+collected tables by logical replication. Replication copies rows but not sequence
+positions, so without it the first new rows reuse existing
 IDs and the collectors fail with unique violations. It is harmless otherwise.
 
 ## Secrets
