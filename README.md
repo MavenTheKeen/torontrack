@@ -313,8 +313,7 @@ uv run --locked uvicorn transit.web.app:app --host 127.0.0.1 --port 8000
   [trip planner](docs/planner.md), [trip guidance](docs/navigation.md)
 - **Analysis:** [reliability analytics](docs/reliability.md),
   [metric definitions](docs/metrics.md), [open data](docs/datasets.md)
-- **Operations:** [deployment](docs/deploy.md), [collector server](docs/collector.md),
-  [Airflow](docs/airflow.md),
+- **Operations:** [deployment](docs/deploy.md), [Airflow](docs/airflow.md),
   [phone alerts](docs/alerts.md), [Windows setup](docs/setup-windows.md)
 - **Background:** [engineering decisions](docs/decisions.md),
   [demo walkthrough](docs/demo.md), [source verification](docs/source.md)
