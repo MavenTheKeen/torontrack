@@ -13,7 +13,11 @@
 {% if is_incremental() %}
     {% set since = "(select coalesce(max(service_date), date '1900-01-01') - 1 from " ~ this ~ ")" %}
 {% endif %}
-with passages as (
+-- The gap list is computed once: referenced directly inside exists(), the view would be
+-- re-evaluated for every row (over 9 minutes once polls ran every 10 seconds).
+with gaps as materialized (
+    select gap_start, gap_end from {{ ref('stg_ttc_vehicle_gaps') }}
+), passages as (
     select * from {{ ref('stg_ttc_surface_passages') }}
     {% if is_incremental() %}
         where service_date >= {{ since }} - 1
@@ -44,7 +48,7 @@ select
     -- The same vehicle twice in a row looped back past the stop: not a headway.
     o.vehicle_id = o.previous_vehicle_id as same_vehicle,
     exists (
-        select 1 from {{ ref('stg_ttc_vehicle_gaps') }} g
+        select 1 from gaps g
         where g.gap_start < o.passed_at and g.gap_end > o.previous_passed_at
     ) as spans_collection_gap
 from ordered o
