@@ -225,8 +225,7 @@ def data_volume(conn) -> dict:
         )
     }
     since = conn.execute(
-        """SELECT (SELECT min(fetched_at) FROM raw.ttc_realtime_snapshots) AS ttc_raw_since,
-                  (SELECT min(first_seen_at) FROM normalized.ttc_train_stop_events) AS ttc_since,
+        """SELECT (SELECT min(first_seen_at) FROM normalized.ttc_train_stop_events) AS ttc_since,
                   (SELECT min(collected_at) FROM normalized.collections) AS bikeshare_since,
                   pg_database_size(current_database()) AS database_bytes,
                   (SELECT max(version) FROM ops.schema_migrations) AS schema_version"""

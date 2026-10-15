@@ -43,4 +43,19 @@ def test_site_runs_on_the_readonly_role(readonly_url):
 
     client = TestClient(create_app(readonly_url))
     assert client.get("/health").status_code == 200
-    assert client.get("/api/reliability").status_code == 200
+    # Every page's data, so none of them reads what the login cannot (such as raw).
+    for path in (
+        "/api/status",
+        "/api/alerts",
+        "/api/map",
+        "/api/trains",
+        "/api/surface",
+        "/api/vehicles",
+        "/api/patterns",
+        "/api/reliability",
+        "/api/report",
+        "/api/pipeline",
+        "/api/lines/1",
+        "/api/stations/bloor-yonge",
+    ):
+        assert client.get(path).status_code < 500, path
