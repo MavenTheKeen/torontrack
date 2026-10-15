@@ -83,17 +83,19 @@ official delay log is loaded for comparison.
 Observed train gaps and Bike Share dock readings are published daily as Parquet and CSV
 files, with checksums and column descriptions.
 
-| Trip planner | Trip guidance |
+| Trip planner | Station entrances |
 | --- | --- |
-| ![Directions from Kennedy to St Andrew with the route drawn on the map](docs/screenshots/site-planner.png) | ![Guidance on Line 2: get off at St George, four stops left](docs/screenshots/site-guidance.png) |
+| ![Directions from Casa Loma to 100 Queen St W, typed as a place and an address, with the travel modes to use](docs/screenshots/site-planner.png) | ![Spadina station's entrances, each with its side of the street and whether it is step-free](docs/screenshots/site-entrances.png) |
+| **Trip guidance** | **Where Bike Share trips go** |
+| ![Guidance on Line 2: get off at St George, four stops left](docs/screenshots/site-guidance.png) | ![A Bike Share dock's trips by hour and its top destinations, drawn as lines](docs/screenshots/site-bike-trips.png) |
 
-| Where Bike Share trips go | Reliability report |
-| --- | --- |
-| ![A Bike Share dock's trips by hour and its top destinations, drawn as lines](docs/screenshots/site-bike-trips.png) | ![Extra wait by line and time of day](docs/screenshots/site-report.png) |
+| Reliability report |
+| --- |
+| ![Extra wait by line and time of day](docs/screenshots/site-report.png) |
 
-| Service status | Station panel (dark mode) | Bike Share dock |
+| Service status | Station panel | Bike Share dock |
 | --- | --- | --- |
-| ![Subway status on a phone](docs/screenshots/phone-status.png) | ![Union station with nearby docks and directions](docs/screenshots/phone-station.png) | ![Dock with live bikes and trip history](docs/screenshots/phone-dock.png) |
+| ![Subway status on a phone](docs/screenshots/phone-status.png) | ![Union station: Line 1 running here with a closure elsewhere on the line, and its entrances](docs/screenshots/phone-station.png) | ![Dock with live bikes and trip history](docs/screenshots/phone-dock.png) |
 
 ## How it works
 

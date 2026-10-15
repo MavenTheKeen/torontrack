@@ -337,6 +337,23 @@ def _iso(epoch):
     return datetime.fromtimestamp(epoch, TORONTO).isoformat() if epoch else None
 
 
+def station_disrupted_lines(lines: list[str], stop_ids: list[str], alerts: list[dict]) -> list[str]:
+    """Lines at a station with an active service alert that covers it: one naming one of
+    its platforms, or naming no stations at all (which applies to the whole line). A
+    closure between Eglinton and Lawrence does not cover Union."""
+    stops = set(stop_ids)
+    return sorted(
+        {
+            line
+            for a in alerts
+            if a["kind"] == "service" and a["timing"] == "active"
+            and (not a["stop_ids"] or stops & set(a["stop_ids"]))
+            for line in a["lines"]
+            if line in lines
+        }
+    )  # fmt: skip
+
+
 def line_statuses(
     line_list: list[dict], alerts: list[dict], alerts_fresh: dict, detected: dict | None = None
 ) -> list[dict]:

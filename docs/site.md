@@ -106,7 +106,11 @@ map opens. On top of the streets:
   the same rule the dashboard uses. Docks refresh every 2 minutes.
 
 Tapping a station, dock or train opens a panel: line status, outages, entrances, nearby
-bike parking and the nearest docks for a station; counts for a dock; next stop for a train. The locate button asks for the
+bike parking and the nearest docks for a station; counts for a dock; next stop for a train.
+A station's line status reflects only alerts that cover it: an alert naming other stations
+(a closure from Eglinton to Lawrence, seen from Union) shows as "Running here" with the
+alert beneath it as elsewhere on the line, and an alert naming no stations applies to the
+whole line. The locate button asks for the
 browser's location, shows it with its accuracy, and lists the closest stations and docks
 with walking distance (straight line at 80 m a minute). The location is used only in the
 page and never sent anywhere; it needs HTTPS (or localhost).

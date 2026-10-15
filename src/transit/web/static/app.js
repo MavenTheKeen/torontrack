@@ -1704,7 +1704,7 @@ const PLAN_MODES = { subway: "Subway", tram: "Streetcar", bus: "Bus", rail: "Tra
 const PLAN_NAME_M = 150;
 
 // Ways to travel a visitor can switch off; walking is always allowed. Bike Share starts off.
-const PLAN_MODE_CHOICES = [["subway", "Subway"], ["tram", "Streetcar"], ["bus", "TTC bus"], ["rail", "GO train"], ["regional_bus", "GO bus"], ["bike_share", "Bike Share"]];
+const PLAN_MODE_CHOICES = [["subway", "Subway"], ["tram", "Streetcar"], ["bus", "TTC bus"], ["rail", "Regional train"], ["regional_bus", "Regional bus"], ["bike_share", "Bike Share"]];
 const PLAN_DEFAULT_MODES = ["subway", "tram", "bus", "rail", "regional_bus"];
 const PLAN_PREFS_KEY = "torontrack.plan";
 
@@ -2292,7 +2292,15 @@ function stationSheet(view, key) {
   return [
     el("p", { class: "sheet-kicker" }, "Subway station"),
     el("h2", { class: "with-badge" }, s.name, el("span", { class: "badges" }, s.lines.map((l) => badge(l, { small: true })))),
-    statuses.map((st) => el("p", { class: "status-line" }, badge(st.line, { link: false, small: true }), statusPill(st.status, st.label))),
+    statuses.map((st) => {
+      // A disruption on another part of the line (say Eglinton to Lawrence, seen from
+      // Union) is shown as elsewhere, not as this station's status.
+      const elsewhere = !["normal", "unknown"].includes(st.status) && s.disrupted && !s.disrupted.includes(st.line);
+      return [
+        el("p", { class: "status-line" }, badge(st.line, { link: false, small: true }), elsewhere ? statusPill("normal", "Running here") : statusPill(st.status, st.label)),
+        elsewhere && st.summary ? el("p", { class: "muted small" }, `Elsewhere on the line: ${st.summary}`) : null,
+      ];
+    }),
     s.outages.length
       ? el("div", { class: "sheet-block" }, el("p", { class: "sheet-label" }, `${plural(s.outages.length, "elevator or escalator", "elevators or escalators")} out of service`), el("ul", { class: "plain" }, s.outages.map((o) => el("li", {}, o))))
       : null,

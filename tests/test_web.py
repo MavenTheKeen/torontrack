@@ -230,6 +230,21 @@ def test_station_page_has_arrivals_alerts_and_bikes(client):
     assert client.get("/api/stations/" + "x" * 80).status_code == 404
 
 
+def test_a_station_is_disrupted_only_by_alerts_that_cover_it():
+    def alert(lines, stops, kind="service", timing="active"):
+        return {"kind": kind, "timing": timing, "lines": lines, "stop_ids": stops}
+
+    closed = alert(["1"], ["13793", "13794"])  # Eglinton to Lawrence
+    # Union (platforms 14404, 14405) is on Line 1 but outside the closed section.
+    assert queries.station_disrupted_lines(["1"], ["14404", "14405"], [closed]) == []
+    assert queries.station_disrupted_lines(["1"], ["13793", "13800"], [closed]) == ["1"]
+    # An alert naming no stations covers the whole line; other lines are unaffected.
+    assert queries.station_disrupted_lines(["1", "2"], ["x"], [alert(["2"], [])]) == ["2"]
+    # Elevator alerts and upcoming closures do not change service status.
+    others = [alert(["1"], [], kind="accessibility"), alert(["1"], [], timing="upcoming")]
+    assert queries.station_disrupted_lines(["1"], ["x"], others) == []
+
+
 @pytest.mark.integration
 def test_map_has_line_paths_stations_and_every_dock(client):
     response = client.get("/api/map", headers={"Accept-Encoding": "gzip"})
@@ -243,7 +258,7 @@ def test_map_has_line_paths_stations_and_every_dock(client):
     # Elevator alerts are attached through the station's platforms, and nowhere else.
     assert bloor["outages"] == ["Bloor-Yonge: Elevator out of service"]
     assert all(not s["outages"] for s in body["stations"] if s["key"] != "bloor-yonge")
-    assert "stop_ids" not in bloor
+    assert "stop_ids" not in bloor and isinstance(bloor["disrupted"], list)
     docks = body["bike_share"]["docks"]
     assert len(docks) == 2
     for dock in docks:
