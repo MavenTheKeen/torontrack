@@ -4,8 +4,12 @@ x-app: &app
   image: toronto-transit-app:local
   build:
     context: .
+  # Secrets are files in ./secrets (deploy/make_secrets.sh), mounted in /run/secrets, so
+  # they are not in the containers' environment (docs/deploy.md#secrets).
+  secrets: [postgres_password]
   environment: &app-environment
-    DATABASE_URL: postgresql://transit:${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}@postgres:5432/transit
+    DATABASE_URL: postgresql://transit@postgres:5432/transit
+    DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
     GBFS_DISCOVERY_URL: ${GBFS_DISCOVERY_URL:-https://toronto.publicbikesystem.net/customer/gbfs/v3.0/gbfs.json}
     TZ: UTC
 
@@ -15,9 +19,10 @@ services:
     environment:
       POSTGRES_USER: transit
       POSTGRES_DB: transit
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       TZ: UTC
       PGTZ: UTC
+    secrets: [postgres_password]
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -105,8 +110,9 @@ services:
     environment:
       <<: *app-environment
       # Phone notifications (see docs/alerts.md); without NTFY_URL they are only recorded.
-      NTFY_URL: ${NTFY_URL:-}
-      HEARTBEAT_URL: ${HEARTBEAT_URL:-}
+      NTFY_URL_FILE: /run/secrets/ntfy_url
+      HEARTBEAT_URL_FILE: /run/secrets/heartbeat_url
+    secrets: [postgres_password, ntfy_url, heartbeat_url]
     depends_on:
       postgres:
         condition: service_healthy
@@ -158,6 +164,7 @@ services:
       dockerfile: docker/transform.Dockerfile
     profiles: ["tools"]
     environment: *app-environment
+    secrets: [postgres_password]
     depends_on:
       postgres:
         condition: service_healthy
@@ -248,7 +255,11 @@ services:
     environment:
       <<: *app-environment
       AIRFLOW_CONFIG: /opt/airflow/state/airflow.cfg
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://transit:${POSTGRES_PASSWORD:?Copy .env.example to .env and set POSTGRES_PASSWORD}@postgres:5432/airflow_metadata
+      # Airflow reads its metadata connection from this command's output, so the password
+      # stays in the secret file.
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN_CMD: >-
+        sh -c 'printf "postgresql+psycopg2://transit:%s@postgres:5432/airflow_metadata"
+        "$$(cat /run/secrets/postgres_password)"'
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__PARALLELISM: "2"
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
@@ -259,7 +270,8 @@ services:
       AIRFLOW__DAG_PROCESSOR__PARSING_PROCESSES: "1"
       EXPORT_DIR: /opt/airflow/open-data
       # Concerts and games for the Events page (docs/events.md); optional.
-      TICKETMASTER_API_KEY: ${TICKETMASTER_API_KEY:-}
+      TICKETMASTER_API_KEY_FILE: /run/secrets/ticketmaster_api_key
+    secrets: [postgres_password, ticketmaster_api_key]
     command: ["standalone"]
     ports:
       - "127.0.0.1:${AIRFLOW_PORT:-8080}:8080"
@@ -287,6 +299,16 @@ services:
       start_period: 120s
     restart: unless-stopped
     stop_grace_period: 30s
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password
+  ticketmaster_api_key:
+    file: ./secrets/ticketmaster_api_key
+  ntfy_url:
+    file: ./secrets/ntfy_url
+  heartbeat_url:
+    file: ./secrets/heartbeat_url
 
 volumes:
   postgres-data:

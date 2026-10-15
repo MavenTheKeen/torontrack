@@ -10,12 +10,13 @@ claims about recurring station reliability.
 Install the prerequisites in the root README or [Windows setup](setup-windows.md).
 The commands below are the Compose workflow.
 
-From the repository root, copy `.env.example` to `.env` once and replace its
-example password. Preserve an existing `.env`. In PowerShell:
+From the repository root, copy `.env.example` to `.env` once and create the secret
+files, which generates a local database password. Preserve an existing `.env`. In
+PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
-notepad .env
+sh deploy/make_secrets.sh
 docker compose config --quiet
 docker compose build
 docker compose up -d postgres

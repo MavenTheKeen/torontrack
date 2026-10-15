@@ -66,10 +66,10 @@ jobs:
   compose-smoke:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
-    env:
-      POSTGRES_PASSWORD: ci-only
     steps:
       - uses: actions/checkout@v4
+      - name: Create the secret files
+        run: sh deploy/make_secrets.sh
       - name: Validate and build all images
         run: |
           docker compose --profile tools --profile airflow config --quiet

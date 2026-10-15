@@ -203,11 +203,13 @@ Problems found in the source data, and how each is handled:
 
 Requirements: Docker with Compose v2 (on Windows, Docker Desktop with WSL2; see
 [Windows setup](docs/setup-windows.md)) and about 6–8 GB of RAM, plus 4 GB while the trip
-planner rebuilds its graph. Replace the example password in `.env` with a
-URL-safe value (`.env` is ignored by Git).
+planner rebuilds its graph. Passwords and keys are files in `secrets/`, created by
+`deploy/make_secrets.sh` (run in Git Bash on Windows) and ignored by Git
+([secrets](docs/deploy.md#secrets)).
 
 ```powershell
 Copy-Item .env.example .env
+sh deploy/make_secrets.sh
 docker compose --profile tools build
 docker compose up -d --wait postgres
 docker compose run --rm init-db
@@ -280,7 +282,7 @@ Compose PostgreSQL running:
 uv sync --locked
 uv sync --project dbt --locked
 docker compose exec postgres createdb -U transit transit_test
-$env:TEST_DATABASE_URL='postgresql://transit:YOUR_ENV_PASSWORD@127.0.0.1:5432/transit_test'
+$env:TEST_DATABASE_URL="postgresql://transit:$(Get-Content secrets/postgres_password)@127.0.0.1:5432/transit_test"
 $env:DBT_EXECUTABLE="$PWD/dbt/.venv/Scripts/dbt.exe"
 uv run --locked pytest -q
 uv run --locked ruff check src tests dashboard scripts airflow
@@ -292,10 +294,12 @@ PostgreSQL is published on IPv4 only. On Linux and macOS, use `export NAME=value
 tests are skipped; to run offline only, use
 `uv run --locked pytest -m 'not integration' -q`.
 
-Native commands read `DATABASE_URL`; the app does not load `.env` by itself:
+Native commands read `DATABASE_URL` and, optionally, `DATABASE_PASSWORD_FILE`; the app
+does not load `.env` by itself:
 
 ```powershell
-$env:DATABASE_URL='postgresql://transit:YOUR_ENV_PASSWORD@127.0.0.1:5432/transit'
+$env:DATABASE_URL='postgresql://transit@127.0.0.1:5432/transit'
+$env:DATABASE_PASSWORD_FILE='secrets/postgres_password'
 uv run --locked transit --help
 uv run --locked uvicorn transit.web.app:app --host 127.0.0.1 --port 8000
 ```
@@ -337,7 +341,8 @@ uv run --locked uvicorn transit.web.app:app --host 127.0.0.1 --port 8000
 - **Docker unavailable:** start Docker Desktop and check `docker info`; a Compose CLI
   alone is not an engine.
 - **Database unavailable:** `docker compose ps` and `docker compose logs postgres`.
-  Changing `.env` does not change an existing PostgreSQL volume's password.
+  Changing `secrets/postgres_password` does not change an existing PostgreSQL volume's
+  password.
 - **No trains on the site:** `docker compose logs --tail 20 ttc-collector`; `/health`
   reports `degraded` when predictions are more than 2 minutes old.
 - **No Directions button:** the trip planner is not running or is still building;

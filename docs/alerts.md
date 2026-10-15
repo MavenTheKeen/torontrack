@@ -12,18 +12,18 @@ apps and no account. Anyone who knows a topic name can read it, so use a long ra
 name:
 
 ```powershell
-# In .env (ignored by Git):
-NTFY_URL=https://ntfy.sh/transit-alerts-<random text>
+# In secrets/ (ignored by Git; see deploy.md#secrets):
+Set-Content -NoNewline secrets/ntfy_url 'https://ntfy.sh/transit-alerts-<random text>'
 docker compose up -d alerts
 ```
 
-Subscribe to the same topic in the ntfy app. Without `NTFY_URL`, alerts are recorded but
-not sent.
+Subscribe to the same topic in the ntfy app. With `secrets/ntfy_url` empty, alerts are
+recorded but not sent.
 
 ## When the whole machine stops
 
 A service cannot report its own absence: if the computer sleeps, Docker stops or the
-power goes out, nothing inside the stack runs. For that, set `HEARTBEAT_URL` to a dead
+power goes out, nothing inside the stack runs. For that, put in `secrets/heartbeat_url` a dead
 man's switch such as a free [healthchecks.io](https://healthchecks.io) check with a
 1-minute period. The service pings it after every successful check, and healthchecks.io
 notifies you (including through ntfy) when the pings stop. When monitoring resumes after
