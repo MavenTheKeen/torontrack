@@ -38,17 +38,19 @@ def towards(headsign: str) -> str:
     return text or headsign.strip()
 
 
-def parse(zip_bytes: bytes) -> SurfaceFeed:
+def parse(zip_bytes: bytes, modes: dict = MODES, name_towards=towards) -> SurfaceFeed:
+    """`modes` maps the route types kept to a mode; `name_towards` turns a trip headsign
+    into a destination. Neighbouring agencies (transit.agencies) pass their own."""
     archive = zipfile.ZipFile(BytesIO(zip_bytes))
     routes = [
         {
             "route_id": r["route_id"],
             "short_name": r["route_short_name"],
             "long_name": r["route_long_name"],
-            "mode": MODES[r["route_type"]],
+            "mode": modes[r["route_type"]],
         }
         for r in _rows(archive, "routes.txt")
-        if r["route_type"] in MODES
+        if r["route_type"] in modes
     ]
     route_ids = {r["route_id"] for r in routes}
     if not route_ids:
@@ -127,7 +129,7 @@ def parse(zip_bytes: bytes) -> SurfaceFeed:
     for (_, _, stops), pattern_id in pattern_ids.items():
         meta = pattern_meta[pattern_id]
         headsign = max(headsigns[pattern_id].items(), key=lambda kv: kv[1])[0]
-        patterns.append({**meta, "pattern_id": pattern_id, "towards": towards(headsign)})
+        patterns.append({**meta, "pattern_id": pattern_id, "towards": name_towards(headsign)})
         sums = offset_sums[pattern_id]
         for order, stop_id in enumerate(stops):
             pattern_stops.append((pattern_id, order, stop_id, round(sums[order] / meta["trips"])))
