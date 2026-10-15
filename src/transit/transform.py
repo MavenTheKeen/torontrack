@@ -15,11 +15,18 @@ from transit.db import connect
 
 TRANSFORM_LOCK = locks.DBT_TRANSFORM
 DBT_TIMEOUT_SECONDS = 600
+# What dbt inherits from this process: enough to run (search path, home, temporary files,
+# locale, Windows system folders) and dbt's own options, but not the other secrets in the
+# environment (the Ticketmaster key, the alert URLs).
+INHERITED = {
+    "PATH", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "SYSTEMROOT", "SYSTEMDRIVE",
+    "COMSPEC", "PATHEXT", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "LC_CTYPE", "TZ",
+}  # fmt: skip
 
 
-def dbt_environment(database_url: str) -> dict[str, str]:
+def dbt_environment(database_url: str, environ=os.environ) -> dict[str, str]:
     config = conninfo_to_dict(database_url)
-    env = os.environ.copy()
+    env = {k: v for k, v in environ.items() if k.upper() in INHERITED or k.startswith("DBT_")}
     env.update(
         {
             "DBT_HOST": config.get("host", "localhost"),
