@@ -220,8 +220,8 @@ services:
     profiles: ["planner"]
     entrypoint: ["/bin/bash", "/planner.sh"]
     environment:
-      JAVA_OPTS: ${PLANNER_JAVA_OPTS:--Xmx1536m}
-      BUILD_JAVA_OPTS: ${PLANNER_BUILD_JAVA_OPTS:--Xmx4g}
+      JAVA_OPTS: ${PLANNER_JAVA_OPTS:--Xmx3g}
+      BUILD_JAVA_OPTS: ${PLANNER_BUILD_JAVA_OPTS:--Xmx7g}
     volumes:
       - planner-data:/var/opentripplanner
       - ./docker/planner.sh:/planner.sh:ro

@@ -16,6 +16,7 @@ from datetime import datetime
 
 import httpx
 
+from transit.agencies import route_number, route_title, towards
 from transit.planner import EXTENT
 from transit.regional import clean_name
 
@@ -90,14 +91,22 @@ def _feed(gtfs_id: str | None) -> str | None:
     return gtfs_id.split(":", 1)[0] if gtfs_id else None
 
 
+def _network(gtfs_id: str | None) -> str | None:
+    """'ttc', 'regional' (GO and UP Express), or a neighbouring agency's key ('br')."""
+    feed = _feed(gtfs_id)
+    return "regional" if feed == "go" else feed
+
+
 def _place(place: dict) -> str | None:
     if place.get("vehicleRentalStation"):
         return place["vehicleRentalStation"]["name"]  # A Bike Share station.
     if not place.get("stop"):
         return None  # The origin or destination itself.
-    regional = _feed(place["stop"]["gtfsId"]) == "go"
-    if regional:
+    network = _network(place["stop"]["gtfsId"])
+    if network == "regional":
         return clean_name(place["name"])
+    if network != "ttc":
+        return route_title(place["name"])
     # TTC names each subway platform: 'St George Station - Eastbound Platform' -> 'St George
     # Station'. The direction is already in the headsign.
     return re.sub(r"\s+-\s+[^-]*Platform\b.*$", "", place["name"])
@@ -120,12 +129,14 @@ def _step(step: dict) -> dict:
     }
 
 
-def _headsign(headsign: str | None, regional: bool) -> str | None:
+def _headsign(headsign: str | None, network: str | None) -> str | None:
     """Regional 'Kennedy GO 09:01 - Union Station GO 09:20' -> 'Union Station';
     TTC 'South - 904 Sheppard-Kennedy Express towards Kennedy Stn' -> 'Kennedy Stn'."""
     if not headsign:
         return None
-    if regional:
+    if network not in ("ttc", "regional"):
+        return towards(headsign)
+    if network == "regional":
         last = headsign.rsplit(" - ", 1)[-1]
         return clean_name(re.sub(r"\s+\d{1,2}:\d{2}$", "", last))
     return headsign.split(" towards ", 1)[-1]
@@ -134,14 +145,27 @@ def _headsign(headsign: str | None, regional: bool) -> str | None:
 def _leg(leg: dict) -> dict:
     route = leg.get("route") or {}
     transit = leg["mode"] in TRANSIT_MODES
-    regional = _feed(route.get("gtfsId")) == "go"
+    network = _network(route.get("gtfsId"))
+    local = network not in ("ttc", "regional")
     return {
         "mode": leg["mode"].lower(),
-        "network": ("regional" if regional else "ttc") if transit else None,
-        "route": (route.get("shortName") or route.get("longName")) if transit else None,
-        "route_name": route.get("longName") if transit else None,
+        "network": network if transit else None,
+        "route": (
+            (
+                route_number(route["shortName"])
+                if local and route.get("shortName")
+                else route.get("shortName") or route.get("longName")
+            )
+            if transit
+            else None
+        ),
+        "route_name": (
+            (route_title(route["longName"]) if local else route["longName"])
+            if transit and route.get("longName")
+            else None
+        ),
         "color": f"#{route['color']}" if transit and route.get("color") else None,
-        "headsign": _headsign(leg.get("headsign"), regional) if transit else None,
+        "headsign": _headsign(leg.get("headsign"), network) if transit else None,
         # A ride on a Bike Share bike, from one station to another.
         "rented": bool(leg.get("rentedBike")),
         "from": _place(leg["from"]),
@@ -193,7 +217,7 @@ def itineraries(data: dict) -> list[dict]:
 
 
 def bus_routes(client: httpx.Client, base_url: str) -> dict[str, list[str]]:
-    """{"ttc": [route IDs], "go": [...]} of bus routes, from the planner; cached."""
+    """{"ttc": [route IDs], "go": [...], "br": [...]} of bus routes, by feed; cached."""
     cached = _bus_routes.get(base_url)
     if cached and time.monotonic() - cached[0] < BUS_ROUTES_SECONDS:
         return cached[1]
@@ -246,9 +270,13 @@ def plan(
     when_key = "latestArrival" if arrive_by else "earliestDeparture"
     preferences: dict = {"accessibility": {"wheelchair": {"enabled": step_free}}}
     try:
-        # Both bus networks share one mode, so leaving out one excludes its routes.
+        # Local and regional buses share one mode, so leaving out one excludes its routes.
         if ("bus" in modes) != ("regional_bus" in modes):
-            routes = bus_routes(client, base_url)["go" if "bus" in modes else "ttc"]
+            by_feed = bus_routes(client, base_url)
+            if "bus" in modes:
+                routes = by_feed.get("go", [])
+            else:
+                routes = [r for feed, ids in by_feed.items() if feed != "go" for r in ids]
             if routes:
                 preferences["transit"] = {"filters": [{"exclude": [{"routes": routes}]}]}
         response = client.post(

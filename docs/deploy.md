@@ -65,8 +65,8 @@ dc exec scheduler /opt/app-venv/bin/transit weather-refresh --since 2026-10-09  
 dc --profile tools run --rm map-tiles   # street map for the site (docs/map.md)
 ```
 
-The trip planner is optional. It needs about 4 GB of free memory while it rebuilds its
-graph and 1.5 GB while serving ([trip planner](planner.md)):
+The trip planner is optional. It needs about 5 GB of free memory while it rebuilds its
+graph and 2.2 GB while serving ([trip planner](planner.md)):
 
 ```bash
 dc --profile scheduler --profile planner up -d

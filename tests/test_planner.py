@@ -29,7 +29,8 @@ def test_inputs_are_replaced_only_when_they_change(tmp_path):
     assert planner.prepare(tmp_path, Client(bodies))["changed"] is True
     assert (tmp_path / "ttc-gtfs.zip").read_bytes() == b"ttc-gtfs.zip"
     config = json.loads((tmp_path / "build-config.json").read_text())
-    assert [f["feedId"] for f in config["transitFeeds"]] == ["ttc", "go"]
+    assert [f["feedId"] for f in config["transitFeeds"]] == ["ttc", "go", "br", "mi", "yr"]
+    assert (tmp_path / "yr-gtfs.zip").exists()
     manifest = (tmp_path / "manifest.json").read_text()
 
     assert planner.prepare(tmp_path, Client(bodies))["changed"] is False
@@ -39,6 +40,11 @@ def test_inputs_are_replaced_only_when_they_change(tmp_path):
     assert planner.prepare(tmp_path, Client(bodies))["changed"] is True
     assert (tmp_path / "go-gtfs.zip").read_bytes() == b"new timetable"
     assert [p.name for p in tmp_path.iterdir() if p.name.startswith(".")] == []
+
+    # The Toronto-only street extract of earlier versions is removed.
+    (tmp_path / "toronto.osm.pbf").write_bytes(b"old")
+    assert planner.prepare(tmp_path, Client(bodies))["changed"] is True
+    assert not (tmp_path / "toronto.osm.pbf").exists()
 
 
 def test_polyline_decodes_to_lon_lat():
@@ -268,7 +274,7 @@ def test_leaving_out_one_bus_network_excludes_its_routes():
             return httpx.Response(200)
         body = json.loads(request.content)
         if "routes(transportModes" in body["query"]:
-            routes = [{"gtfsId": "ttc:7"}, {"gtfsId": "ttc:29"}, {"gtfsId": "go:21"}]
+            routes = [{"gtfsId": "ttc:7"}, {"gtfsId": "go:21"}, {"gtfsId": "yr:98"}]
             return httpx.Response(200, json={"data": {"routes": routes}})
         sent.append(body["variables"])
         return httpx.Response(200, json={"data": PLAN})
@@ -279,10 +285,8 @@ def test_leaving_out_one_bus_network_excludes_its_routes():
     web.get("/api/plan", params={**trip, "modes": "subway,bus"})
     assert sent[0]["preferences"]["transit"] == {"filters": [{"exclude": [{"routes": ["go:21"]}]}]}
     web.get("/api/plan", params={**trip, "modes": "regional_bus"})
-    assert sent[1]["preferences"]["transit"]["filters"][0]["exclude"][0]["routes"] == [
-        "ttc:7",
-        "ttc:29",
-    ]
+    excluded = sent[1]["preferences"]["transit"]["filters"][0]["exclude"][0]["routes"]
+    assert excluded == ["ttc:7", "yr:98"]  # Neighbouring agencies' buses are local buses.
     # Both bus networks, or neither: no route filter.
     web.get("/api/plan", params={**trip, "modes": "bus,regional_bus"})
     web.get("/api/plan", params={**trip, "modes": ""})
@@ -310,3 +314,21 @@ def test_bike_share_rides_are_named_by_their_stations():
     [bike] = trip["legs"]
     assert bike["mode"] == "bicycle" and bike["rented"] and bike["network"] is None
     assert (bike["from"], bike["to"]) == ("Queen St W / Spadina Ave", "Union Station")
+
+
+def test_neighbouring_agency_legs_are_named_in_normal_case():
+    bus = leg(
+        "BUS",
+        "08:40",
+        "09:05",
+        route={"gtfsId": "yr:98", "shortName": "098", "longName": "YONGE", "color": None},
+        headsign="98 YONGE SB - FINCH TERMINAL",
+        frm={"name": "YONGE / 16TH AVENUE", "stop": {"gtfsId": "yr:1234"}},
+        to={"name": "FINCH GO BUS TERMINAL", "stop": {"gtfsId": "yr:5678"}},
+    )
+    [trip] = web_planner.itineraries(
+        {"planConnection": {"routingErrors": [], "edges": [itinerary("08:40", "09:05", [bus])]}}
+    )
+    [ride] = trip["legs"]
+    assert (ride["network"], ride["route"], ride["route_name"]) == ("yr", "98", "Yonge")
+    assert ride["from"] == "Yonge / 16th Avenue" and ride["from_stop_id"] == "1234"

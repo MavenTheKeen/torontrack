@@ -192,7 +192,7 @@ Problems found in the source data, and how each is handled:
   periods when the collector was not running. Results based on a short collection period
   are labelled as preliminary.
 - The routing graph is rebuilt only when its source data changes, and the routing server
-  is stopped during the rebuild. Peak memory is that of the build, about 3.7 GB. See
+  is stopped during the rebuild. Peak memory is that of the build, about 5 GB. See
   [trip planner](docs/planner.md).
 - The web application uses a read-only database role, a 15-second response cache,
   per-client rate limits and a strict Content Security Policy.

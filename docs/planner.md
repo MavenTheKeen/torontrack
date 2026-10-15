@@ -17,18 +17,20 @@ with:
 - TTC schedules (City of Toronto Open Data, Open Government Licence – Toronto);
 - regional train and bus schedules: Data used in this product or service is provided with
   the permission of Metrolinx;
+- Brampton Transit, MiWay and York Region Transit schedules, from each agency's public
+  GTFS (the same files the map's buses use, `transit.agencies`);
 - streets and paths © OpenStreetMap contributors (ODbL), as
-  [BBBike's](https://download.bbbike.org/osm/bbbike/Toronto/) daily Toronto extract;
+  [OpenStreetMap France's](https://download.openstreetmap.fr/extracts/north-america/canada/ontario/)
+  daily Golden Horseshoe extract;
 - Bike Share Toronto stations, with live bikes and docks, from its public GBFS feed
   (version 2), read by the planner every minute.
 
 ## Area
 
-The street extract covers longitude −79.79 to −79.0 and latitude 43.48 to 43.92: Oakville
-to Ajax, and from Lake Ontario to about Major Mackenzie Drive. Trips must start and end
-inside it (`planner.EXTENT`). Regional trains still run beyond it, but stations further
-out have no streets to walk from. A larger area would need a bigger OpenStreetMap
-extract, and the graph's memory grows with it.
+Trips must start and end within longitude −79.98 to −79.05 and latitude 43.47 to 44.34
+(`planner.EXTENT`, the same area the map shows buses in): Toronto, Brampton, Mississauga
+and York Region up to Keswick. The street extract reaches further (Niagara to Peterborough),
+so walks near the edge of the area are complete.
 
 ## Running it
 
@@ -38,7 +40,7 @@ It is optional and runs as its own Compose profile:
 docker compose --profile planner up -d
 ```
 
-1. `planner-data` downloads the three inputs (about 156 MB) into the `planner-data`
+1. `planner-data` downloads the six inputs (about 260 MB) into the `planner-data`
    volume, with the configuration files OpenTripPlanner reads. A file is replaced only
    when its content changed, and `manifest.json` is rewritten only then.
 2. `planner` (`docker/planner.sh`) builds the routing graph whenever `manifest.json` is
@@ -59,12 +61,12 @@ once a minute. Without a running planner, `/api/plan/status` reports
 
 | | |
 | --- | --- |
-| Graph build | about 4 minutes, 3.7 GB peak (`PLANNER_BUILD_JAVA_OPTS`, default `-Xmx4g`) |
-| Serving | about 1.5 GB (`PLANNER_JAVA_OPTS`, default `-Xmx2g`) |
-| Disk | 156 MB of inputs, 245 MB graph |
+| Graph build | about 3 minutes, 5.0 GB peak (`PLANNER_BUILD_JAVA_OPTS`, default `-Xmx7g`) |
+| Serving | about 2.2 GB (`PLANNER_JAVA_OPTS`, default `-Xmx3g`) |
+| Transit | 20,710 stops in five networks |
 | A plan | 0.3–3 s |
 
-So the planner needs about 4 GB of free memory while it rebuilds, on top of the rest of
+So the planner needs about 5 GB of free memory while it rebuilds, on top of the rest of
 the stack.
 
 ## Typing a start or end
