@@ -178,6 +178,8 @@ nav.primary a[aria-current="page"] { color: var(--sign-text); border-bottom-colo
 /* Type */
 h1 { font-size: 1.9rem; line-height: 1.15; letter-spacing: -0.01em; font-weight: 700; margin: 26px 0 14px; }
 h2 { font-size: 1.15rem; font-weight: 700; margin: 34px 0 0; padding-bottom: 6px; border-bottom: 2px solid var(--rule); }
+/* Inside a box or a map panel the box already groups the content: no rule. */
+.card h2, .sheet-body h2, .map-panel h2 { margin-bottom: 10px; padding-bottom: 0; border-bottom: 0; }
 h3 { font-size: 1rem; font-weight: 700; margin: 0 0 8px; }
 .with-badge { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 h3.with-badge { flex-wrap: nowrap; align-items: flex-start; }
