@@ -1,13 +1,14 @@
 """Input files for the trip planner (OpenTripPlanner), and the configuration it builds from.
 
-The planner routes on three public sources, downloaded here into one directory that the
+The planner routes on these public sources, downloaded here into one directory that the
 OpenTripPlanner container reads:
 
 - the TTC schedule (GTFS, City of Toronto Open Data, Open Government Licence – Toronto);
 - the GO Transit and UP Express schedule (GTFS, Metrolinx Open Data);
+- the Brampton Transit, MiWay and York Region Transit schedules (transit.agencies);
 - streets and paths for walking, from OpenStreetMap (© OpenStreetMap contributors, ODbL),
-  as BBBike's daily Toronto extract: Oakville to Ajax, Lake Ontario to about Major
-  Mackenzie Drive. Trips must start and end inside it (EXTENT).
+  as OpenStreetMap France's daily Golden Horseshoe extract. Trips must start and end
+  inside EXTENT, the area the map shows buses in.
 
 Files are replaced only when their content changes, and manifest.json is rewritten only
 then, so the build step can rebuild the graph only when the manifest is newer than it.
@@ -20,19 +21,27 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-from transit import regional
+from transit import agencies, maptiles, regional
 from transit.http import FeedClient, FetchError
 from transit.ttc.sources import STATIC_GTFS_URL, STATIC_HOST
 
-OSM_HOST = "download.bbbike.org"
-OSM_URL = f"https://{OSM_HOST}/osm/bbbike/Toronto/Toronto.osm.pbf"
-# West, south, east, north of the OpenStreetMap extract (its Toronto.poly).
-EXTENT = (-79.79, 43.48, -79.0, 43.92)
+OSM_HOST = "download.openstreetmap.fr"
+OSM_URL = f"https://{OSM_HOST}/extracts/north-america/canada/ontario/golden_horseshoe.osm.pbf"
+OSM_FILE = "golden-horseshoe.osm.pbf"
+# West, south, east, north: Brampton, Mississauga and York Region up to Keswick, well
+# inside the extract (longitude -80.27 to -78.41, latitude 42.67 to 44.54).
+EXTENT = maptiles.BOUNDS
 SOURCES = {
     "ttc-gtfs.zip": (STATIC_GTFS_URL, STATIC_HOST, 200 << 20),
     "go-gtfs.zip": (regional.GTFS_URL, regional.HOST, 100 << 20),
-    "toronto.osm.pbf": (OSM_URL, OSM_HOST, 400 << 20),
+    **{
+        f"{a.key}-gtfs.zip": (a.static_url, a.host(a.static_url), agencies.STATIC_MAX_BYTES)
+        for a in agencies.AGENCIES.values()
+    },
+    OSM_FILE: (OSM_URL, OSM_HOST, 400 << 20),
 }
+# Inputs of earlier versions, removed so the build does not read them.
+OLD_FILES = ("toronto.osm.pbf",)
 MANIFEST = "manifest.json"
 # GBFS version 2 discovery; the collector reads version 3 of the same feed.
 BIKE_SHARE_GBFS = "https://toronto.publicbikesystem.net/customer/gbfs/v2/gbfs.json"
@@ -41,8 +50,14 @@ BUILD_CONFIG = {
     "transitFeeds": [
         {"type": "gtfs", "feedId": "ttc", "source": "ttc-gtfs.zip"},
         {"type": "gtfs", "feedId": "go", "source": "go-gtfs.zip"},
+        *(
+            {"type": "gtfs", "feedId": key, "source": f"{key}-gtfs.zip"}
+            for key in agencies.AGENCIES
+        ),
     ],
-    "osm": [{"source": "toronto.osm.pbf", "timeZone": "America/Toronto"}],
+    "osm": [{"source": OSM_FILE, "timeZone": "America/Toronto"}],
+    # MiWay names America/New_York, the same clock; OpenTripPlanner needs one zone.
+    "transitModelTimeZone": "America/Toronto",
     # Keep a week of past service for late-night trips and two months ahead.
     "transitServiceStart": "-P7D",
     "transitServiceEnd": "P60D",
@@ -104,6 +119,10 @@ def prepare(out: str | os.PathLike, client: FeedClient) -> dict:
             os.replace(tmp.name, out / name)
             changed = True
         files[name] = digest
+    for name in OLD_FILES:
+        if (out / name).exists():
+            (out / name).unlink()
+            changed = True
     changed |= _write_json(out / "build-config.json", BUILD_CONFIG)
     changed |= _write_json(out / "router-config.json", ROUTER_CONFIG)
     changed |= _write_json(out / "otp-config.json", OTP_CONFIG)

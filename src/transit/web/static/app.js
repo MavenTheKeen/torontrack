@@ -1889,7 +1889,7 @@ function fitPlan(view) {
 function setPlanEnd(view, key, place) {
   const p = view.plan;
   if (!insidePlanner(view, place.coord)) {
-    p.error = "The planner covers Oakville to Ajax and north to about Major Mackenzie Drive.";
+    p.error = "The planner covers Toronto, Brampton, Mississauga and York Region, north to Keswick.";
   } else {
     p[key] = place;
     p.query[key] = null; // Show the chosen place, not what was typed.
