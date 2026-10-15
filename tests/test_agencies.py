@@ -104,6 +104,17 @@ def test_route_numbers_are_shown_as_riders_see_them():
     assert agencies.route_number("A") == "A"
 
 
+def test_route_names_in_capitals_are_shown_in_normal_case():
+    title = agencies.route_title
+    assert title("MARKHAM DISTRICT SS VIA CARLTON") == "Markham District SS via Carlton"
+    assert title("DR G.W. WILLIAMS SS VIA HENDERSON") == "Dr G.W. Williams SS via Henderson"
+    assert title("16TH AVENUE") == "16th Avenue"
+    assert title("MCCALLUM") == "McCallum"
+    assert title("YONGE (LATE NIGHT)") == "Yonge (Late Night)"
+    assert title("VAUGHAN MILLS / WONDERLAND") == "Vaughan Mills / Wonderland"
+    assert title("Queen Street") == "Queen Street"
+
+
 @pytest.mark.integration
 def test_a_network_and_live_buses_are_served_with_prefixed_ids(settings):
     first = agencies.refresh(settings.database_url, Client(), [BRAMPTON])
