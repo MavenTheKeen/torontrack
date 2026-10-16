@@ -885,8 +885,8 @@ def reliability(conn, now: datetime) -> dict:
         {"today": today, "start": week_start},
     ).fetchall()
     outages = conn.execute(
-        """SELECT station_key, station_name, device_type, header_text, first_seen_at,
-                  resolved_at, active, duration_minutes, began_before_collection
+        """SELECT alert_id, station_key, station_name, device_type, header_text,
+                  first_seen_at, resolved_at, active, duration_minutes, began_before_collection
            FROM analytics.ttc_elevator_outages
            WHERE active OR resolved_at >= %s
            ORDER BY active DESC, duration_minutes DESC""",
@@ -918,6 +918,13 @@ def reliability(conn, now: datetime) -> dict:
                 "week_scheduled_headway_seconds": r["week_scheduled"],
             }
         )
+    # Out of service now by the status page's rule: in TTC's current feed and within the
+    # alert's active period. Planned work that has not started is in the feed but not out.
+    now_out = {
+        a["id"]
+        for a in current_alerts(conn, now)
+        if a["kind"] == "accessibility" and a["timing"] == "active"
+    }
     resolved = sorted(o["duration_minutes"] for o in outages if not o["active"])
     return {
         "service_date": today,
@@ -926,7 +933,7 @@ def reliability(conn, now: datetime) -> dict:
         "longest_gaps_today": longest,
         "hourly": by_line,
         "outages": {
-            "active": [o for o in outages if o["active"]],
+            "active": [o for o in outages if o["active"] and o["alert_id"] in now_out],
             "resolved_last_7_days": len(resolved),
             "median_resolved_minutes": resolved[len(resolved) // 2] if resolved else None,
             "longest_resolved_minutes": resolved[-1] if resolved else None,
