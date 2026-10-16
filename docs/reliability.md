@@ -20,7 +20,7 @@ started. They are estimates from predicted arrival times, not official TTC stati
 | `analytics.ttc_station_reliability` | table | The same measures per platform and day, for ranking platforms. |
 | `analytics.ttc_collection_gaps` | incremental | Every collection gap, kept after poll runs expire, for the report's coverage. |
 | `analytics.ttc_service_days` | incremental | Day type of each observed service day (`weekday`, `saturday`, `sunday`, `holiday`) from TTC's calendar: a date whose regular service a calendar exception removes runs a holiday schedule. |
-| `analytics.ttc_longest_gaps` | table | Ten longest gaps per line and day. |
+| `analytics.ttc_long_gaps` | table | Every long gap, once per pair of consecutive trains, with its excess over the scheduled headway. |
 | `analytics.ttc_elevator_outages` | view | Elevator/escalator outages with durations. |
 
 ## Definitions
@@ -30,9 +30,14 @@ started. They are estimates from predicted arrival times, not official TTC stati
 - **Regular headway**: at most 1.5 times the scheduled headway for that platform and hour.
 - **Long gap**: more than twice the scheduled headway and more than the scheduled headway
   plus 5 minutes. The live site uses the same rule.
-- **Longest gaps** are counted once per pair of consecutive trains. A held train shows the
-  same gap at every platform downstream; the incident is reported at the platform where
-  it was longest.
+- **Delay (gap incident)**: long gaps on one line whose times overlap, in either
+  direction, are one incident. A held train shows the same gap at every platform
+  downstream, and a disruption usually delays several trains in both directions, so
+  counting gaps would count one delay many times. Each incident is reported at the gap
+  that ran furthest over its scheduled headway, and incidents are ranked by that excess,
+  not by raw length: a 12-minute gap where trains are scheduled every 12 minutes is not a
+  delay. The reliability page's "Delays today" column counts incidents by the hour they
+  began.
 - **Excess wait time (EWT)**: how much longer than the schedule promises a rider who
   arrives at a random moment waits on average. With observed headways h and scheduled
   headways s, the average wait is sum(h²) / (2 sum(h)) and the scheduled wait is

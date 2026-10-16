@@ -131,8 +131,8 @@ models:
         data_tests:
           - not_null
 
-  - name: ttc_longest_gaps
-    description: Ten longest measurable gaps per line and service day, one row per pair of trains.
+  - name: ttc_long_gaps
+    description: Every long gap per line and service day, one row per pair of trains.
     columns:
       - name: event_id
         data_tests:

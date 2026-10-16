@@ -804,16 +804,70 @@ def detected_delays(
     return incidents
 
 
+def gap_incidents(gaps: list[dict]) -> list[dict]:
+    """Long gaps (analytics.ttc_long_gaps rows) grouped into incidents: on one line, gaps
+    whose times overlap, in either direction, are one disruption. Each incident is reported
+    at its gap furthest over schedule."""
+    groups, current, end = [], [], None
+    for g in sorted(gaps, key=lambda g: (g["route_id"], g["gap_start"])):
+        if current and (g["route_id"] != current[0]["route_id"] or g["gap_start"] >= end):
+            groups.append(current)
+            current = []
+        end = g["gap_end"] if not current else max(end, g["gap_end"])
+        current.append(g)
+    if current:
+        groups.append(current)
+    incidents = []
+    for group in groups:
+        worst = max(group, key=lambda g: (g["excess_seconds"], g["gap_seconds"]))
+        first = min(group, key=lambda g: g["gap_start"])
+        incidents.append(
+            {
+                "route_id": worst["route_id"],
+                "service_hour": first["service_hour"],
+                "start": first["gap_start"],
+                "end": max(g["gap_end"] for g in group),
+                "both_directions": len({g["direction_id"] for g in group}) > 1,
+                "towards": worst["towards"],
+                "station_key": worst["station_key"],
+                "station_name": worst["station_name"],
+                "gap_seconds": round(worst["gap_seconds"]),
+                "scheduled_headway_seconds": round(worst["scheduled_headway_seconds"]),
+                "excess_seconds": round(worst["excess_seconds"]),
+                "gaps": len(group),
+            }
+        )
+    return incidents
+
+
 def reliability(conn, now: datetime) -> dict:
     today = service_date(now)
     week_start = today - timedelta(days=6)
-    longest = conn.execute(
-        """SELECT route_id, gap_rank, direction_id, towards, station_key, station_name,
-                  platform, gap_start, gap_end, gap_seconds, scheduled_headway_seconds
-           FROM analytics.ttc_longest_gaps
-           WHERE service_date = %s AND gap_rank <= 5 ORDER BY route_id::int, gap_rank""",
-        (today,),
+    long_gaps = conn.execute(
+        """SELECT service_date, route_id, direction_id, service_hour, towards, station_key,
+                  station_name, gap_start, gap_end, gap_seconds, scheduled_headway_seconds,
+                  excess_seconds
+           FROM analytics.ttc_long_gaps WHERE service_date BETWEEN %s AND %s""",
+        (week_start, today),
     ).fetchall()
+    by_day: dict = {}
+    for g in long_gaps:
+        by_day.setdefault(g["service_date"], []).append(g)
+    incidents = {day: gap_incidents(gaps) for day, gaps in by_day.items()}
+    longest = []  # The five worst delays per line today, by minutes over schedule.
+    today_incidents = incidents.get(today, [])
+    for route in sorted({i["route_id"] for i in today_incidents}, key=int):
+        ranked = sorted(
+            (i for i in today_incidents if i["route_id"] == route),
+            key=lambda i: -i["excess_seconds"],
+        )
+        longest += ranked[:5]
+    delays: dict = {}  # (route, service hour) -> [incidents today, in the last 7 days]
+    for day, day_incidents in incidents.items():
+        for i in day_incidents:
+            counts = delays.setdefault((i["route_id"], i["service_hour"]), [0, 0])
+            counts[0] += day == today
+            counts[1] += 1
     hourly = conn.execute(
         """SELECT route_id, service_hour,
                   sum(observed_headways) FILTER (WHERE service_date = %(today)s) AS today_n,
@@ -821,10 +875,8 @@ def reliability(conn, now: datetime) -> dict:
                     AS today_regular,
                   sum(compared_headways) FILTER (WHERE service_date = %(today)s)
                     AS today_compared,
-                  sum(long_gaps) FILTER (WHERE service_date = %(today)s) AS today_long,
                   sum(regular_headways) AS week_regular,
                   sum(compared_headways) AS week_compared,
-                  sum(long_gaps) AS week_long,
                   round(avg(median_headway_seconds)) AS week_median,
                   round(avg(scheduled_headway_seconds)) AS week_scheduled
            FROM analytics.ttc_headway_reliability_hourly
@@ -858,10 +910,10 @@ def reliability(conn, now: datetime) -> dict:
             {
                 "hour": r["service_hour"],
                 "today_regular_pct": pct(r["today_regular"], r["today_compared"]),
-                "today_long_gaps": r["today_long"],
+                "today_delays": delays.get((r["route_id"], r["service_hour"]), [0, 0])[0],
                 "today_headways": r["today_n"],
                 "week_regular_pct": pct(r["week_regular"], r["week_compared"]),
-                "week_long_gaps": r["week_long"],
+                "week_delays": delays.get((r["route_id"], r["service_hour"]), [0, 0])[1],
                 "week_median_headway_seconds": r["week_median"],
                 "week_scheduled_headway_seconds": r["week_scheduled"],
             }

@@ -402,6 +402,46 @@ def test_detected_status_only_when_ttc_reports_nothing():
     assert two["status"] == "delays" and two["detected"] is None
 
 
+def gap(route, direction, start_min, end_min, scheduled_min, station, hour=12):
+    start = T0 + timedelta(minutes=start_min)
+    end = T0 + timedelta(minutes=end_min)
+    seconds = (end - start).total_seconds()
+    return {
+        "route_id": route,
+        "direction_id": direction,
+        "service_hour": hour,
+        "towards": "Finch" if direction == 0 else "Vaughan",
+        "station_key": station.lower(),
+        "station_name": station,
+        "gap_start": start,
+        "gap_end": end,
+        "gap_seconds": seconds,
+        "scheduled_headway_seconds": scheduled_min * 60,
+        "excess_seconds": seconds - scheduled_min * 60,
+    }
+
+
+def test_overlapping_gaps_on_a_line_are_one_delay_ranked_by_excess():
+    gaps = [
+        # One disruption seen by three train pairs, in both directions.
+        gap("1", 1, 0, 18, 4, "Wilson"),
+        gap("1", 0, 3, 18, 4, "Lawrence West"),
+        gap("1", 1, 3, 17, 4, "Sheppard West"),
+        # A separate delay later on the same line, and one on another line meanwhile.
+        gap("1", 0, 60, 75, 3, "St Clair"),
+        gap("2", 0, 5, 20, 5, "Kipling"),
+    ]
+    incidents = queries.gap_incidents(gaps)
+    assert [(i["route_id"], i["station_name"], i["gaps"]) for i in incidents] == [
+        ("1", "Wilson", 3),
+        ("1", "St Clair", 1),
+        ("2", "Kipling", 1),
+    ]
+    first = incidents[0]
+    assert first["both_directions"] and first["excess_seconds"] == 14 * 60
+    assert (first["start"], first["end"]) == (T0, T0 + timedelta(minutes=18))
+
+
 def test_pipeline_verdict_is_by_time_since_last_success():
     limit = timedelta(minutes=2)
     assert pipeline.verdict(T0 - timedelta(seconds=30), limit, T0) == "ok"
@@ -441,7 +481,7 @@ def test_pipeline_endpoint_reports_each_part(client):
 @pytest.mark.integration
 def test_reliability_endpoint_reports_analytics_not_built(client, settings):
     with connect(settings.database_url) as conn:
-        conn.execute("DROP TABLE IF EXISTS analytics.ttc_longest_gaps")
+        conn.execute("DROP TABLE IF EXISTS analytics.ttc_long_gaps")
     assert client.get("/api/reliability").json()["available"] is False
 
 
