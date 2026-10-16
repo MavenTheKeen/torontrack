@@ -410,6 +410,18 @@ def test_pipeline_verdict_is_by_time_since_last_success():
     assert pipeline.verdict(None, limit, T0) == "failing"
 
 
+def test_pipeline_checks_completeness_and_data_age_not_only_the_last_run():
+    assert pipeline.completeness(90, 96) == "ok"
+    assert pipeline.completeness(67, 96) == "delayed"  # Ran recently, missed a third.
+    assert pipeline.completeness(40, 96) == "failing"
+    ok, failing = pipeline.WEATHER_DATA_OK, pipeline.WEATHER_DATA_FAILING
+    age = pipeline.data_age_verdict
+    assert age(T0 - timedelta(hours=21), ok, failing, T0) == "ok"
+    assert age(T0 - timedelta(hours=50), ok, failing, T0) == "delayed"
+    assert age(T0 - timedelta(hours=80), ok, failing, T0) == "failing"
+    assert pipeline.worst("ok", "delayed") == "delayed"
+
+
 @pytest.mark.integration
 def test_pipeline_endpoint_reports_each_part(client):
     body = client.get("/api/pipeline").json()
