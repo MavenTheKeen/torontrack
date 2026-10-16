@@ -5,7 +5,8 @@ build-backend = "hatchling.build"
 [project]
 name = "torontrack"
 version = "0.1.0"
-description = "Traceable Toronto Bike Share GBFS collection and reliability monitoring"
+description = "Live map and reliability tracker for Toronto transit"
+license = "MIT"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "httpx==0.28.1",

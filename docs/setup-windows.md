@@ -72,7 +72,7 @@ docker compose run --rm --no-deps collector smoke
 PostgreSQL data persists in a Docker named volume. `docker compose down` stops
 the project and keeps data. Adding `--volumes` deletes that collected history;
 do not use it during ordinary shutdown. To collect on a 15-minute schedule, follow
-the README's "Enable scheduling" section.
+[scheduled jobs](development.md#scheduled-jobs).
 
 ## Diagnose startup problems
 
