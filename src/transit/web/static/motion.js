@@ -41,6 +41,14 @@ const FAR_DEG = 0.005; // About 500 m.
 const HOLD_DEG = 0.0015; // A vehicle up to ~150 m ahead of its estimate waits for it.
 const TURN_DEG_PER_S = 180;
 const OFFSCREEN_MS = 2000; // Not drawn for this long: it was off screen.
+// Zoom from which each kind of moving vehicle is drawn (the map layers' minzoom in app.js).
+// Further out they are hidden and not moved, so a phone does no work for them.
+const SHOWN_FROM_ZOOM = { trains: 11, vehicles: 11, regional: 9.5 };
+// Subway trains are small dots from SHOWN_FROM_ZOOM.trains and full icons from here.
+const TRAIN_ICON_ZOOM = 12.5;
+function shownAt(kind, zoom) {
+  return zoom >= SHOWN_FROM_ZOOM[kind];
+}
 
 // ---- Subway -------------------------------------------------------------------------
 

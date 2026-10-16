@@ -1055,11 +1055,13 @@ function moveVehicles(view) {
     return lon > b.getWest() - padLon && lon < b.getEast() + padLon && lat > b.getSouth() - padLat && lat < b.getNorth() + padLat;
   };
   const place = (id, coord) => (still ? coord : glide(view.glide, id, coord, now));
-  if (view.trains && map.getSource("trains")) {
+  // Layers hidden at this zoom are not moved; a train shown again starts afresh (glide).
+  const zoom = map.getZoom();
+  if (view.trains && map.getSource("trains") && shownAt("trains", zoom)) {
     view.trainFeatures = trainFeatures(view.trains, view.coords, now).map((f) => point(place(f.properties.id, f.geometry.coordinates), f.properties));
     map.getSource("trains").setData(featureCollection(view.trainFeatures));
   }
-  if (view.vehicles && map.getSource("vehicles")) {
+  if (view.vehicles && map.getSource("vehicles") && shownAt("vehicles", zoom)) {
     // Only vehicles near the view are estimated each frame; one coming into view starts
     // afresh (motion.js glide), so it does not catch up on its time off screen.
     const near = (v) => v.lon > b.getWest() - 2 * padLon && v.lon < b.getEast() + 2 * padLon && v.lat > b.getSouth() - 2 * padLat && v.lat < b.getNorth() + 2 * padLat;
@@ -1072,7 +1074,7 @@ function moveVehicles(view) {
     });
     map.getSource("vehicles").setData(featureCollection(view.vehicleFeatures.filter(inView)));
   }
-  if (view.regionalTrains && map.getSource("regional-trains")) {
+  if (view.regionalTrains && map.getSource("regional-trains") && shownAt("regional", zoom)) {
     view.regionalTrainFeatures = view.regionalTrains.trains.map((t) => point(place(`r:${t.id}`, trackPoint(t.track, now) || [t.lon, t.lat]), { id: t.id, line: t.line, colour: t.colour || "#4b5563" }));
     map.getSource("regional-trains").setData(featureCollection(view.regionalTrainFeatures));
   }
@@ -1310,7 +1312,7 @@ function addRegionalLayers(map) {
     "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, ["case", ["get", "major"], 3.5, 2.5], 16, ["case", ["get", "major"], 8, 6.5]],
     "circle-color": c.fill, "circle-stroke-color": ["get", "colour"], "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 8, 1.4, 16, 3],
   } }, "outages");
-  map.addLayer({ id: "regional-trains", type: "symbol", source: "regional-trains", layout: {
+  map.addLayer({ id: "regional-trains", type: "symbol", source: "regional-trains", minzoom: SHOWN_FROM_ZOOM.regional, layout: {
     "icon-image": "regional-pill", "icon-size": ["interpolate", ["linear"], ["zoom"], 8, 0.75, 14, 1.15], "icon-allow-overlap": true, "icon-ignore-placement": true,
     "text-field": ["get", "line"], "text-font": ["Noto Sans Medium"], "text-size": ["interpolate", ["linear"], ["zoom"], 8, 7.5, 14, 11], "text-allow-overlap": true, "text-ignore-placement": true,
   }, paint: { "icon-color": ["get", "colour"], "icon-halo-color": c.casing, "icon-halo-width": 1.5, "text-color": "#ffffff" } }, "trains-halo");
@@ -2282,8 +2284,15 @@ function addOverlayLayers(map, data) {
     "text-anchor": "top", "text-offset": [0, 1.1], "text-optional": true, "text-max-width": 8,
   }, paint: { "text-color": c.label, "text-halo-color": c.halo, "text-halo-width": 1.6, "icon-opacity": ["interpolate", ["linear"], ["zoom"], 15, 0, 15.3, 1] } });
   // A soft shadow under each train badge; later layers are placed relative to it.
-  map.addLayer({ id: "trains-halo", type: "circle", source: "trains", paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 7, 16, 15], "circle-color": "#000000", "circle-opacity": prefersDark() ? 0.35 : 0.12, "circle-blur": 0.6 } });
-  map.addLayer({ id: "trains", type: "symbol", source: "trains", layout: {
+  // Trains: small dots zoomed out, full icons from TRAIN_ICON_ZOOM, nothing further out
+  // (motion.js SHOWN_FROM_ZOOM), as with buses.
+  const trainColour = ["match", ["get", "line"], ...lines.flatMap((l) => [l.id, l.color || "#777"]), "#777"];
+  map.addLayer({ id: "trains-dot", type: "circle", source: "trains", minzoom: SHOWN_FROM_ZOOM.trains, maxzoom: TRAIN_ICON_ZOOM, paint: {
+    "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 3.2, 12.5, 4.5], "circle-color": trainColour,
+    "circle-stroke-color": c.casing, "circle-stroke-width": 1,
+  } });
+  map.addLayer({ id: "trains-halo", type: "circle", source: "trains", minzoom: TRAIN_ICON_ZOOM, paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 7, 16, 15], "circle-color": "#000000", "circle-opacity": prefersDark() ? 0.35 : 0.12, "circle-blur": 0.6 } });
+  map.addLayer({ id: "trains", type: "symbol", source: "trains", minzoom: TRAIN_ICON_ZOOM, layout: {
     "icon-image": ["concat", "badge-train-", ["get", "line"]], "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.55, 13, 0.8, 16, 1.05],
     "icon-allow-overlap": true, "icon-ignore-placement": true,
   } });
@@ -2300,7 +2309,7 @@ function addOverlayLayers(map, data) {
 
 function applyLayerToggles(map) {
   const show = (ids, on) => ids.forEach((id) => map.getLayer(id) && map.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
-  show(["trains", "trains-halo"], mapState.layers.trains);
+  show(["trains", "trains-halo", "trains-dot"], mapState.layers.trains);
   show(["regional-line", "regional-line-casing", "regional-stations", "regional-station-label", "regional-trains"], mapState.layers.regional);
   show(["vehicles", "vehicle-heading", "vehicle-icon", "vehicle-label", "bus-stops", "route-path", "route-path-casing"], mapState.layers.buses);
   show(["docks", "dock-icon"], mapState.layers.bikes);
@@ -2551,7 +2560,7 @@ function pulseMe(view) {
 }
 
 // Redraws moving vehicles on every animation frame (fewer zoomed out, see MOTION_FRAME_MS);
-// with reduced motion, every MOTION_STILL_MS. Hidden pages get no frames.
+// with reduced motion, every MOTION_STILL_MS. Nothing is redrawn while the tab is hidden.
 function animateVehicles(view) {
   if (reduceMotion()) {
     view.timers.push(setInterval(() => { if (document.visibilityState === "visible") moveVehicles(view); }, MOTION_STILL_MS));
@@ -2560,6 +2569,10 @@ function animateVehicles(view) {
   let last = 0;
   const step = (now) => {
     if (activeMap !== view) return;
+    if (document.visibilityState !== "visible") {
+      view.animations.vehicles = requestAnimationFrame(step);
+      return;
+    }
     const zoom = view.map.getZoom();
     const gap = MOTION_FRAME_MS.find(([from]) => zoom >= from)[1];
     // A pan or zoom also redraws, so vehicles entering the view are placed at once.
@@ -3141,7 +3154,7 @@ async function renderMap(focusKey) {
         }
         // A finger-sized box, so small stops and vehicles are easy to hit.
         const box = [[event.point.x - 8, event.point.y - 8], [event.point.x + 8, event.point.y + 8]];
-        const layers = ["trains", "regional-trains", "events", "entrances", "stations", "outages", "parking-entrances", "parking", "bike-parking", "regional-stations", "vehicle-icon", "vehicles", "bus-stops", "dock-icon", "docks", "road-icons", "road-icons-point", "road-work-line", "road-closure-line", "road-closure-point", "lanes", "lanes-trail"].filter((l) => map.getLayer(l) && map.getLayoutProperty(l, "visibility") !== "none");
+        const layers = ["trains", "trains-dot", "regional-trains", "events", "entrances", "stations", "outages", "parking-entrances", "parking", "bike-parking", "regional-stations", "vehicle-icon", "vehicles", "bus-stops", "dock-icon", "docks", "road-icons", "road-icons-point", "road-work-line", "road-closure-line", "road-closure-point", "lanes", "lanes-trail"].filter((l) => map.getLayer(l) && map.getLayoutProperty(l, "visibility") !== "none");
         const hit = map.queryRenderedFeatures(box, { layers });
         if (!hit.length) {
           clearRoute(view);
