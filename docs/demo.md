@@ -87,7 +87,7 @@ relabel fixtures, or repeatedly poll to manufacture a long-looking history.
 
 ## Scheduling and verification
 
-Use the README's Airflow startup commands and open <http://localhost:8080> after
+Use the Airflow commands in [running it locally](development.md#scheduled-jobs) and open <http://localhost:8080> after
 the scheduler is running. Confirm the collection-to-transformation dependency,
 15-minute schedule, disabled catch-up, retries, and actual task logs. Scheduled
 runtime execution must be verified separately from having a DAG file in Git.
@@ -96,7 +96,7 @@ A live collection stores one observation per station in the feed (1,075 stations
 in October 2026). The dbt project builds three views with 45 data tests, and the
 pytest suite covers parsing, HTTP safety, ingestion, dbt and the dashboard. These
 describe the test setup, not an operating scale or uptime guarantee. Run the
-README test commands before a presentation, and point to the GitHub Actions
+test commands in [running it locally](development.md#tests) before a presentation, and point to the GitHub Actions
 history for CI results.
 
 Chromium later rendered the real dashboard, map tiles, station search, and ranking

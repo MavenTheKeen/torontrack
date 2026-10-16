@@ -52,7 +52,7 @@ valet service (6 distinct bodies in 35 fetches). Status bodies are new every tim
 
 ## Collect, retry and replay
 
-With the stack from the [quick start](../README.md#quick-start) running:
+With the stack from [running it locally](development.md#full-setup) running:
 
 ```powershell
 docker compose run --rm collector collect --collection-id first-local-collection

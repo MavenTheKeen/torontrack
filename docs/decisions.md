@@ -1,5 +1,32 @@
 # Engineering decisions
 
+## Transit data and serving
+
+- **The TTC collector is a long-running process, not a scheduled task.** It polls the
+  subway and vehicle feeds every 10 seconds and alerts every 30, around the clock. As
+  scheduled tasks that would be over 20,000 process starts a day, and Airflow is not
+  built for intervals under a minute. Work that runs minutes or hours apart (Bike Share,
+  dbt, daily refreshes) goes through the scheduler instead. See [TTC](ttc.md).
+- **Trains are tracked by vehicle label, not trip ID.** The same physical train receives
+  a different `trip_id` on consecutive polls, so a trip ID cannot follow a train from one
+  station to the next. The vehicle label is stable and unique within each snapshot
+  ([train identity](ttc.md#train-identity-and-arrivals)).
+- **Map tiles are self-hosted.** The basemap is one PMTiles file built from OpenStreetMap
+  and served by the application. It needs no API key or paid plan, sends nothing about
+  visitors to a third party, and lets the site keep a strict Content Security Policy
+  that allows no outside origins ([street map](map.md)).
+- **A small scheduler in production instead of Airflow.** The Airflow DAGs only run
+  `transit` commands on cron schedules, and Airflow used about 1.1 GB of memory on a
+  server that also builds a 5 GB routing graph. `transit.scheduler` runs the same commands
+  on the same schedules with the same retries and idles at about 60 MB. The DAGs remain
+  for local use and are still tested in CI.
+- **Health is judged by data, not only by the job.** A job that succeeded recently can
+  still be missing most of its runs or be loading old data. The pipeline page checks the
+  share of expected runs completed and the age of the newest record as well as the time
+  since the last success ([site and API](site.md)).
+
+## Bike Share collection
+
 - **One system, GBFS 3.0.** Discover station endpoints from the live discovery
   document. Reject unsupported versions explicitly. No second source or migration
   heuristics. Unknown JSON fields survive in raw storage.
@@ -68,8 +95,8 @@
 
 ## Deferred production work
 
-A production configuration exists ([deployment](deploy.md): HTTPS, a read-only
-database login for the public site, daily backups) but is not running publicly yet.
-Still not covered: external alerting, off-server backups, a secrets manager, Bike Share
+The site runs publicly on one server behind an existing reverse proxy
+([deployment](deploy.md)), with a read-only database login for the web app, daily
+backups and phone alerts. Still not covered: external alerting, off-server backups, a secrets manager, Bike Share
 data retention, and authentication for the dashboard and Airflow (they are only
 reachable on localhost or through SSH). These are not claimed for this project.
