@@ -149,12 +149,10 @@ def test_ttc_reliability_models(settings):
         assert line["ewt_seconds"] == round((180**2 + 690**2 - 870 * 3600) / (2 * 870))
         assert [p["period"] for p in summary["periods"]] == ["early"]
         assert summary["stations"] == []  # Fewer measured gaps than a ranking needs.
-        gaps = conn.execute(
-            """SELECT gap_rank, gap_seconds, station_name FROM analytics.ttc_longest_gaps
-               ORDER BY gap_rank"""
-        ).fetchall()
-        assert [(g["gap_rank"], g["gap_seconds"]) for g in gaps] == [(1, 690), (2, 180)]
-        assert gaps[0]["station_name"] == "Wellesley"
+        # Both gaps are well within the hourly schedule, so neither is a long gap.
+        assert (
+            conn.execute("SELECT count(*) AS n FROM analytics.ttc_long_gaps").fetchone()["n"] == 0
+        )
         outage_row = conn.execute("SELECT * FROM analytics.ttc_elevator_outages").fetchone()
         assert (outage_row["station_name"], outage_row["device_type"]) == (
             "Bloor-Yonge",

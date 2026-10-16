@@ -405,7 +405,7 @@ function lineCard(line, body) {
 }
 
 function gapList(gaps) {
-  if (!gaps.length) return el("p", { class: "muted" }, "No measurable gaps yet today.");
+  if (!gaps.length) return el("p", { class: "muted" }, "No delays measured today.");
   return el(
     "ol",
     { class: "gaps" },
@@ -413,13 +413,14 @@ function gapList(gaps) {
       el(
         "li",
         {},
-        el("strong", { class: "mins" }, `${(g.gap_seconds / 60).toFixed(1)} min`),
+        el("strong", { class: "mins" }, `+${Math.round(g.excess_seconds / 60)} min`),
         el(
           "span",
           {},
+          `${Math.round(g.gap_seconds / 60)} min gap at `,
           el("a", { href: `#/station/${g.station_key}` }, g.station_name),
-          ` to ${g.towards}`,
-          el("span", { class: "muted" }, ` · ${timeFmt.format(new Date(g.gap_start))}–${timeFmt.format(new Date(g.gap_end))}`, g.scheduled_headway_seconds ? ` · usually every ${minutesText(g.scheduled_headway_seconds)}` : ""),
+          g.both_directions ? " in both directions" : ` to ${g.towards}`,
+          el("span", { class: "muted" }, ` · ${timeFmt.format(new Date(g.start))}–${timeFmt.format(new Date(g.end))} · usually every ${minutesText(g.scheduled_headway_seconds)}`, g.gaps > 1 ? ` · ${g.gaps} trains delayed` : ""),
         ),
       ),
     ),
@@ -431,12 +432,12 @@ function hourTable(hours) {
   return el(
     "table",
     { class: "hours" },
-    el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Hour"), el("th", { scope: "col" }, "Today"), el("th", { scope: "col" }, "Last 7 days"), el("th", { scope: "col" }, "Long gaps today"))),
+    el("thead", {}, el("tr", {}, el("th", { scope: "col" }, "Hour"), el("th", { scope: "col" }, "Today"), el("th", { scope: "col" }, "Last 7 days"), el("th", { scope: "col" }, "Delays today"))),
     el(
       "tbody",
       {},
       hours.map((h) =>
-        el("tr", {}, el("th", { scope: "row" }, hourLabel(h.hour)), el("td", {}, meter(h.today_regular_pct)), el("td", {}, meter(h.week_regular_pct)), el("td", {}, h.today_long_gaps === null ? "–" : h.today_long_gaps)),
+        el("tr", {}, el("th", { scope: "row" }, hourLabel(h.hour)), el("td", {}, meter(h.today_regular_pct)), el("td", {}, meter(h.week_regular_pct)), el("td", {}, h.today_delays)),
       ),
     ),
   );
@@ -558,7 +559,8 @@ async function renderReliability() {
       `Measured from ${coverage.headways.toLocaleString("en-CA")} gaps between observed train arrivals since ${coverage.first_day}. History starts when collection started. `,
       data.analytics_built_at ? `Analytics updated ${timeFmt.format(new Date(data.analytics_built_at))}` : "",
     ),
-    el("h2", {}, "Longest gaps between trains today"),
+    el("h2", {}, "Worst delays today"),
+    el("p", { class: "muted small" }, "Overlapping long gaps on a line count as one delay, ranked by minutes over the scheduled gap between trains."),
     el("div", { class: "grid" }, lines.map((line) => lineCard(line, gapList(data.longest_gaps_today.filter((g) => g.route_id === line.id))))),
     el("h2", {}, "Headway reliability by hour"),
     el(
