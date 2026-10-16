@@ -17,7 +17,7 @@ LIMITS = {
     "alerts_light_rail": timedelta(minutes=3),
     "bikeshare": timedelta(minutes=35),
     "dbt": timedelta(minutes=35),
-    # Loaded hourly; Environment Canada itself publishes hours several hours late.
+    # Loaded hourly.
     "weather": timedelta(hours=2),
     # Loaded every 10 minutes.
     "roads": timedelta(minutes=30),
@@ -49,6 +49,33 @@ def verdict(last_success: datetime | None, limit: timedelta, now: datetime) -> s
     return "ok" if age <= limit else "delayed" if age <= 4 * limit else "failing"
 
 
+# Environment Canada publishes each local day once, 4 to 14 hours after it ends (observed
+# October 2026), so the newest hour is normally up to about 38 hours old. Older than
+# WEATHER_DATA_OK, the loader may be fine but the data is not.
+WEATHER_DATA_OK = timedelta(hours=42)
+WEATHER_DATA_FAILING = timedelta(hours=72)
+STATUS_ORDER = ("ok", "delayed", "failing")
+
+
+def worst(*statuses: str) -> str:
+    return max(statuses, key=STATUS_ORDER.index)
+
+
+def completeness(done: int, expected: int) -> str:
+    """A job can have succeeded recently and still have missed many of its runs: 'ok' with
+    at least 90% of the expected runs, 'delayed' with at least half, else 'failing'."""
+    share = done / expected if expected else 1
+    return "ok" if share >= 0.9 else "delayed" if share >= 0.5 else "failing"
+
+
+def data_age_verdict(latest: datetime | None, ok: timedelta, failing: timedelta, now) -> str:
+    """By the age of the newest data itself, not of the job that loads it."""
+    if latest is None:
+        return "failing"
+    age = now - latest
+    return "ok" if age <= ok else "delayed" if age <= failing else "failing"
+
+
 def _age(at: datetime | None, now: datetime) -> int | None:
     return None if at is None else max(0, round((now - at).total_seconds()))
 
@@ -68,17 +95,33 @@ def ttc_feeds(conn, now: datetime) -> list[dict]:
             """SELECT feed, count(*) AS polls,
                       count(*) FILTER (WHERE status = 'stored') AS stored,
                       count(*) FILTER (WHERE status = 'unchanged') AS unchanged,
-                      count(*) FILTER (WHERE status = 'failed') AS failed,
-                      coalesce(sum(rejected), 0) AS rejected,
-                      coalesce(sum(flagged), 0) AS flagged
+                      count(*) FILTER (WHERE status = 'failed') AS failed
                FROM ops.ttc_poll_runs WHERE started_at > %s GROUP BY feed""",
             (now - timedelta(hours=1),),
         )
     }
+    # Distinct records, not occurrences: an alert or train that keeps the same problem is
+    # flagged again in every snapshot (every 10 or 30 s), which would count it ~120 times.
+    # A snapshot-level issue (no entity, such as a feed dropout) counts once per snapshot.
+    issues: dict[str, dict] = {}
+    for r in conn.execute(
+        """SELECT i.feed, i.action, i.issue,
+                  count(DISTINCT (coalesce(i.entity_id, '#' || i.snapshot_id),
+                                  coalesce(i.stop_id, ''))) AS records
+           FROM ops.ttc_record_issues i
+           WHERE i.snapshot_id IN (SELECT snapshot_id FROM ops.ttc_poll_runs
+                                   WHERE started_at > %s AND snapshot_id IS NOT NULL)
+           GROUP BY 1, 2, 3 ORDER BY records DESC""",
+        (now - timedelta(hours=1),),
+    ):
+        feed = issues.setdefault(r["feed"], {"rejected": 0, "flagged": 0, "flag_reasons": []})
+        feed[r["action"]] = feed.get(r["action"], 0) + r["records"]
+        if r["action"] == "flagged":
+            feed["flag_reasons"].append({"issue": r["issue"], "records": r["records"]})
     feeds = []
     for feed, label in FEED_LABELS.items():
         success = last.get(feed, {}).get("finished_at")
-        counts = hour.get(feed) or {}
+        counts = {**(hour.get(feed) or {}), **issues.get(feed, {})}
         feeds.append(
             {
                 "feed": feed,
@@ -87,8 +130,11 @@ def ttc_feeds(conn, now: datetime) -> list[dict]:
                 "last_success": success,
                 "age_seconds": _age(success, now),
                 "last_hour": {
-                    k: int(counts.get(k, 0))
-                    for k in ("polls", "stored", "unchanged", "failed", "rejected", "flagged")
+                    **{
+                        k: int(counts.get(k, 0))
+                        for k in ("polls", "stored", "unchanged", "failed", "rejected", "flagged")
+                    },
+                    "flag_reasons": counts.get("flag_reasons", []),
                 },
             }
         )
@@ -134,12 +180,16 @@ def bikeshare(conn, now: datetime) -> dict:
            ORDER BY check_name"""
     ).fetchall()
     success = runs["last_success"]
+    expected = 96  # One collection every 15 minutes.
     return {
-        "status": verdict(success, LIMITS["bikeshare"], now),
+        "status": worst(
+            verdict(success, LIMITS["bikeshare"], now),
+            completeness(runs["succeeded_24h"], expected),
+        ),
         "last_success": success,
         "age_seconds": _age(success, now),
         "succeeded_24h": runs["succeeded_24h"],
-        "expected_24h": 96,
+        "expected_24h": expected,
         "failed_attempts_24h": runs["failed_attempts_24h"],
         "quality_checks": [dict(c) for c in checks],
     }
@@ -175,11 +225,17 @@ def weather(conn, now: datetime) -> dict:
                   max(observed_at) AS latest_observation, count(*) AS hours
            FROM normalized.weather_hourly"""
     ).fetchone()
+    latest = row["latest_observation"]
     return {
-        "status": verdict(row["last_success"], LIMITS["weather"], now),
+        "status": worst(
+            verdict(row["last_success"], LIMITS["weather"], now),
+            data_age_verdict(latest, WEATHER_DATA_OK, WEATHER_DATA_FAILING, now),
+        ),
         "last_success": row["last_success"],
         "age_seconds": _age(row["last_success"], now),
-        "latest_observation": row["latest_observation"],
+        "latest_observation": latest,
+        "data_age_seconds": _age(latest, now),
+        "data_ok_seconds": round(WEATHER_DATA_OK.total_seconds()),
         "hours": row["hours"],
     }
 

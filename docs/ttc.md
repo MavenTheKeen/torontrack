@@ -114,6 +114,14 @@ excluded from reliability metrics.
 | Alert with no English text, or duplicate alert ID | Rejected |
 | Alert `effect` contradicts its text | Flagged (`alert_effect_text_mismatch`) |
 
+Flagged records are kept. The pipeline page counts distinct records per hour, not
+occurrences: a train or alert with the same problem appears in every snapshot (every 10
+or 30 seconds) and would otherwise be counted about 120 times. Most subway flags are
+identical consecutive arrivals, which the feed gives mostly between a train's first two
+listed stations, typically while it waits at a platform; most alert flags are planned
+notices whose effect is `MODIFIED_SERVICE` or `REDUCED_SERVICE` while the text describes
+a closure or delays.
+
 ## Alert status
 
 Alerts have no severity field, and `effect` can contradict the text. For example, one

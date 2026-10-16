@@ -3212,6 +3212,17 @@ function healthPill(status) {
   return statusPill(css, label);
 }
 
+// Validation flags on the pipeline page (docs/ttc.md, Validation). Flagged records are kept.
+const FLAG_LABELS = {
+  identical_consecutive_arrival: "same predicted minute at neighbouring stations",
+  out_of_order_stop_sequence: "stops listed out of order",
+  feed_order_differs_from_line_order: "stops not in line order",
+  arrival_time_decreasing: "later station predicted earlier",
+  alert_effect_text_mismatch: "alert type disagrees with its text",
+  stale_feed_timestamp: "feed clock off",
+  missing_vehicle_label: "no train number",
+};
+
 function ageText(seconds) {
   if (seconds === null || seconds === undefined) return "never";
   if (seconds < 90) return `${seconds} s ago`;
@@ -3261,6 +3272,9 @@ async function renderPipeline() {
           `Last hour: ${numberFmt.format(f.last_hour.polls)} polls, ${f.last_hour.failed} failed · `,
           `${numberFmt.format(f.last_hour.rejected)} ${f.last_hour.rejected === 1 ? "record" : "records"} rejected, ${numberFmt.format(f.last_hour.flagged)} flagged by validation`,
         ),
+        f.last_hour.flag_reasons.length
+          ? el("p", { class: "muted small" }, `Flags: ${f.last_hour.flag_reasons.map((r) => `${FLAG_LABELS[r.issue] || r.issue} (${numberFmt.format(r.records)})`).join(", ")}. Flagged records are kept; see docs/ttc.md.`)
+          : null,
       ),
     ),
     drops.snapshots
@@ -3278,7 +3292,7 @@ async function renderPipeline() {
       el(
         "p",
         { class: "muted small" },
-        `${numberFmt.format(bikes.succeeded_24h)} collections in the last 24 hours (at most ${bikes.expected_24h}), ${bikes.failed_attempts_24h} failed attempts`,
+        `${numberFmt.format(bikes.succeeded_24h)} collections in the last 24 hours of ${bikes.expected_24h} expected (under 90% marks this check delayed), ${bikes.failed_attempts_24h} failed attempts`,
       ),
       el(
         "ul",
@@ -3317,7 +3331,7 @@ async function renderPipeline() {
         "p",
         { class: "muted small" },
         data.weather.latest_observation
-          ? `${numberFmt.format(data.weather.hours)} hours stored, latest observation ${dayFmt.format(new Date(data.weather.latest_observation))} (Environment Canada publishes each hour several hours late)`
+          ? `${numberFmt.format(data.weather.hours)} hours stored. Latest observation ${dayFmt.format(new Date(data.weather.latest_observation))}, ${ageText(data.weather.data_age_seconds)}. Environment Canada publishes each day once, the next morning, so up to ${Math.round(data.weather.data_ok_seconds / 3600)} hours is normal; older marks this check delayed.`
           : "No observations loaded yet",
       ),
     ),
