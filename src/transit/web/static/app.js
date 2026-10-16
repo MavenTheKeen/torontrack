@@ -3572,7 +3572,9 @@ function show(content, { refresh }) {
     for (const node of nodes) if (typeof node.mount === "function") node.mount();
   };
   if (!refresh && document.startViewTransition && !reduceMotion() && !document.body.classList.contains("map-mode")) {
-    document.startViewTransition(swap);
+    // A transition is skipped when another navigation starts first; its `ready` promise
+    // then rejects with an AbortError that is expected and needs no handling.
+    document.startViewTransition(swap).ready.catch(() => {});
   } else {
     swap();
   }
@@ -3592,8 +3594,17 @@ async function route({ refresh = false } = {}) {
   let [, kind, id] = (location.hash || "#/").split("/");
   if (kind === "report") [kind, id] = ["reliability", "report"]; // Old links.
   const seq = ++renderSeq;
-  if (!refresh && kind !== "map") mapCleanup();
+  if (!refresh && kind !== "map") {
+    mapCleanup();
+    document.body.classList.remove("map-mode"); // Also when leaving before the map loaded.
+  }
   const waiting = refresh ? null : setTimeout(() => seq === renderSeq && kind !== "map" && main.replaceChildren(skeleton()), 160);
+  if (!refresh && kind === "map" && !activeMap) {
+    // The map library and data take a few seconds on a phone; an empty map frame replaces
+    // the previous page at once, so that page is not left showing over the map.
+    document.body.classList.add("map-mode");
+    main.replaceChildren(el("div", { class: "map-canvas", "aria-busy": "true" }, el("p", { class: "muted map-loading" }, "Loading map…")));
+  }
   try {
     if (!lines.length) {
       const lineData = await api("/api/lines");
@@ -3621,6 +3632,7 @@ async function route({ refresh = false } = {}) {
   } catch (error) {
     clearTimeout(waiting);
     if (seq !== renderSeq) return;
+    if (!activeMap) document.body.classList.remove("map-mode");
     if (refresh && main.querySelector("h1") && error.message !== "Not found") {
       // Keep the last good data on screen rather than replacing it with an error.
       updated.textContent = `Could not refresh at ${timeFmt.format(new Date())}. Showing earlier data; retrying shortly.`;

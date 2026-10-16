@@ -450,6 +450,7 @@ footer.site a { color: var(--muted); }
 
 /* Map page: full height between the header and the tabs. */
 body.map-mode main { max-width: none; padding: 0; }
+.map-loading { margin: 0; padding: 16px; }
 body.map-mode footer.site, body.map-mode .updated { display: none; }
 .map-page {
   position: relative; height: calc(100dvh - var(--header-h, 57px) - var(--tabs-h)); min-height: 420px; overflow: hidden;
