@@ -146,7 +146,7 @@ def static_zip(extra_stop_times=(), light_rail=False) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
         for name, text in files.items():
-            archive.writestr(name, text)
+            archive.writestr(zipfile.ZipInfo(name, (2026, 1, 1, 0, 0, 0)), text)
     return buffer.getvalue()
 
 
