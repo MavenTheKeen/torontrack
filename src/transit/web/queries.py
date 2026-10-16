@@ -834,7 +834,9 @@ def gap_incidents(gaps: list[dict]) -> list[dict]:
                 "gap_seconds": round(worst["gap_seconds"]),
                 "scheduled_headway_seconds": round(worst["scheduled_headway_seconds"]),
                 "excess_seconds": round(worst["excess_seconds"]),
-                "gaps": len(group),
+                # The train each gap was waited for: a held train can end gaps at several
+                # platforms, so trains are counted, not gaps.
+                "trains_delayed": len({(g["direction_id"], g["train_id"]) for g in group}),
             }
         )
     return incidents
@@ -845,8 +847,8 @@ def reliability(conn, now: datetime) -> dict:
     week_start = today - timedelta(days=6)
     long_gaps = conn.execute(
         """SELECT service_date, route_id, direction_id, service_hour, towards, station_key,
-                  station_name, gap_start, gap_end, gap_seconds, scheduled_headway_seconds,
-                  excess_seconds
+                  station_name, train_id, gap_start, gap_end, gap_seconds,
+                  scheduled_headway_seconds, excess_seconds
            FROM analytics.ttc_long_gaps WHERE service_date BETWEEN %s AND %s""",
         (week_start, today),
     ).fetchall()

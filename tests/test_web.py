@@ -402,7 +402,7 @@ def test_detected_status_only_when_ttc_reports_nothing():
     assert two["status"] == "delays" and two["detected"] is None
 
 
-def gap(route, direction, start_min, end_min, scheduled_min, station, hour=12):
+def gap(route, direction, start_min, end_min, scheduled_min, station, train="T1", hour=12):
     start = T0 + timedelta(minutes=start_min)
     end = T0 + timedelta(minutes=end_min)
     seconds = (end - start).total_seconds()
@@ -413,6 +413,7 @@ def gap(route, direction, start_min, end_min, scheduled_min, station, hour=12):
         "towards": "Finch" if direction == 0 else "Vaughan",
         "station_key": station.lower(),
         "station_name": station,
+        "train_id": train,
         "gap_start": start,
         "gap_end": end,
         "gap_seconds": seconds,
@@ -424,15 +425,17 @@ def gap(route, direction, start_min, end_min, scheduled_min, station, hour=12):
 def test_overlapping_gaps_on_a_line_are_one_delay_ranked_by_excess():
     gaps = [
         # One disruption seen by three train pairs, in both directions.
-        gap("1", 1, 0, 18, 4, "Wilson"),
-        gap("1", 0, 3, 18, 4, "Lawrence West"),
-        gap("1", 1, 3, 17, 4, "Sheppard West"),
+        gap("1", 1, 0, 18, 4, "Wilson", train="A"),
+        gap("1", 0, 3, 18, 4, "Lawrence West", train="B"),
+        gap("1", 1, 3, 17, 4, "Sheppard West", train="C"),
+        # Train A again, ending a gap behind a different train further along: one train.
+        gap("1", 1, 5, 16, 4, "Downsview Park", train="A"),
         # A separate delay later on the same line, and one on another line meanwhile.
         gap("1", 0, 60, 75, 3, "St Clair"),
         gap("2", 0, 5, 20, 5, "Kipling"),
     ]
     incidents = queries.gap_incidents(gaps)
-    assert [(i["route_id"], i["station_name"], i["gaps"]) for i in incidents] == [
+    assert [(i["route_id"], i["station_name"], i["trains_delayed"]) for i in incidents] == [
         ("1", "Wilson", 3),
         ("1", "St Clair", 1),
         ("2", "Kipling", 1),
