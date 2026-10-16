@@ -63,7 +63,7 @@ def go_zip() -> bytes:
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w") as archive:
         for name, body in files.items():
-            archive.writestr(name, body)
+            archive.writestr(zipfile.ZipInfo(name, (2026, 1, 1, 0, 0, 0)), body)
     return out.getvalue()
 
 
@@ -101,7 +101,9 @@ def test_feed_without_trains_is_rejected():
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w") as archive:
         for name in regional.REQUIRED_FILES:
-            archive.writestr(name, "route_id,route_type\n1,3\n")
+            archive.writestr(
+                zipfile.ZipInfo(name, (2026, 1, 1, 0, 0, 0)), "route_id,route_type\n1,3\n"
+            )
     with pytest.raises(regional.FeedValidationError, match="no rail routes"):
         regional.parse(out.getvalue())
 

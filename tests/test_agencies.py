@@ -6,6 +6,7 @@ The feeds are small hand-built ones with the structure of Brampton Transit's and
 real feeds on 2026-10-15.
 """
 
+import functools
 import io
 import zipfile
 from datetime import UTC, datetime, timedelta
@@ -34,6 +35,7 @@ def _csv(header, rows):
     return "\n".join([",".join(header), *(",".join(map(str, r)) for r in rows)]) + "\n"
 
 
+@functools.cache  # Built once: a zip records the time it was written.
 def static_zip() -> bytes:
     trips, stop_times = [], []
     for n, start in enumerate((8 * 3600, 9 * 3600)):
