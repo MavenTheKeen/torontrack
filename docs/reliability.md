@@ -37,7 +37,8 @@ started. They are estimates from predicted arrival times, not official TTC stati
   that ran furthest over its scheduled headway, and incidents are ranked by that excess,
   not by raw length: a 12-minute gap where trains are scheduled every 12 minutes is not a
   delay. The reliability page's "Delays today" column counts incidents by the hour they
-  began.
+  began, and "trains delayed" counts distinct trains (by direction) whose arrival ended
+  one of the incident's long gaps.
 - **Excess wait time (EWT)**: how much longer than the schedule promises a rider who
   arrives at a random moment waits on average. With observed headways h and scheduled
   headways s, the average wait is sum(h²) / (2 sum(h)) and the scheduled wait is

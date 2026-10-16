@@ -37,6 +37,7 @@ select
     station_key,
     station_name,
     platform,
+    train_id,
     previous_arrival_at as gap_start,
     arrived_at as gap_end,
     headway_seconds as gap_seconds,

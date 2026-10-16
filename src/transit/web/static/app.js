@@ -420,7 +420,7 @@ function gapList(gaps) {
           `${Math.round(g.gap_seconds / 60)} min gap at `,
           el("a", { href: `#/station/${g.station_key}` }, g.station_name),
           g.both_directions ? " in both directions" : ` to ${g.towards}`,
-          el("span", { class: "muted" }, ` · ${timeFmt.format(new Date(g.start))}–${timeFmt.format(new Date(g.end))} · usually every ${minutesText(g.scheduled_headway_seconds)}`, g.gaps > 1 ? ` · ${g.gaps} trains delayed` : ""),
+          el("span", { class: "muted" }, ` · ${timeFmt.format(new Date(g.start))}–${timeFmt.format(new Date(g.end))} · usually every ${minutesText(g.scheduled_headway_seconds)}`, g.trains_delayed > 1 ? ` · ${g.trains_delayed} trains delayed` : ""),
         ),
       ),
     ),
