@@ -165,3 +165,12 @@ def test_heading_arrows_turn_instead_of_snapping(page):
         }"""
     )
     assert headings == [350, 35, 80]
+
+
+def test_vehicles_are_hidden_and_not_moved_when_zoomed_out(page):
+    shown = page.evaluate(
+        """() => [10.9, 11, 12.5].map((z) => [shownAt("trains", z), shownAt("vehicles", z)])
+            .concat([[shownAt("regional", 9.4), shownAt("regional", 9.5)]])"""
+    )
+    assert shown == [[False, False], [True, True], [True, True], [False, True]]
+    assert page.evaluate("TRAIN_ICON_ZOOM") == 12.5
