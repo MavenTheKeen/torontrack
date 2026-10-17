@@ -104,6 +104,8 @@ def test_route_numbers_are_shown_as_riders_see_them():
     assert agencies.route_number("107B") == "107B"
     assert agencies.route_number("blue") == "Blue"
     assert agencies.route_number("A") == "A"
+    assert agencies.route_number("purple A") == "Purple A"  # Viva branches.
+    assert agencies.route_number("blue B") == "Blue B"
 
 
 def test_route_names_in_capitals_are_shown_in_normal_case():
@@ -118,11 +120,15 @@ def test_route_names_in_capitals_are_shown_in_normal_case():
 
 
 @pytest.mark.integration
-def test_a_network_and_live_buses_are_served_with_prefixed_ids(settings):
+def test_a_network_and_live_buses_are_served_with_prefixed_ids(settings, monkeypatch):
     first = agencies.refresh(settings.database_url, Client(), [BRAMPTON])
     assert first["br"]["status"] == "loaded" and first["br"]["patterns"] == 1
     again = agencies.refresh(settings.database_url, Client(), [BRAMPTON])
     assert again["br"]["status"] == "unchanged"
+    # Cleaning names differently reloads the same feed, so stored names follow the code.
+    monkeypatch.setattr(agencies, "NAMING_VERSION", agencies.NAMING_VERSION + 1)
+    renamed = agencies.refresh(settings.database_url, Client(), [BRAMPTON])
+    assert renamed["br"]["status"] == "loaded"
 
     # One bus between the first two stops heading east, one already reported an hour ago.
     live = vehicle_feed(

@@ -108,13 +108,16 @@ def towards(headsign: str) -> str:
 
 
 def route_number(short_name: str) -> str:
-    """A route number as riders see it: '001' -> '1', '107B' -> '107B', 'blue' -> 'Blue'."""
+    """A route number as riders see it: '001' -> '1', '107B' -> '107B', 'blue' -> 'Blue',
+    and Viva's 'purple A' -> 'Purple A'."""
     name = short_name.strip()
     if name[:1].isdigit():
         return name.lstrip("0") or "0"
-    return name.title() if name.islower() else name
+    return name[:1].upper() + name[1:] if name[:1].islower() else name
 
 
+# Bump when route_number, route_title or towards change what they return.
+NAMING_VERSION = 2
 KEEP_CAPITALS = {"SS", "GO", "YRT"}  # Secondary school, GO Transit.
 LOWER_WORDS = {"via", "of", "the", "and", "at"}
 
@@ -143,8 +146,10 @@ def route_title(long_name: str) -> str:
 
 
 def load(conn, agency: Agency, feed: surface.SurfaceFeed, sha: str, now: datetime) -> dict:
-    """Store a parsed network as the agency's only version, in one transaction."""
-    version = sha[:16]
+    """Store a parsed network as the agency's only version, in one transaction. The version
+    covers the feed and NAMING_VERSION, so a change in how names are cleaned reloads
+    networks whose feeds have not changed."""
+    version = hashlib.sha256(f"{sha}:{NAMING_VERSION}".encode()).hexdigest()[:16]
     with conn.transaction(), conn.cursor() as cur:
         if conn.execute(
             "SELECT 1 FROM normalized.agency_versions WHERE agency = %s AND feed_version = %s",
