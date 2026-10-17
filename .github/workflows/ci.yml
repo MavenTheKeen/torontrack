@@ -70,10 +70,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Create the secret files
         run: sh deploy/make_secrets.sh
-      - name: Validate and build all images
+      # The public registries rate-limit shared runner addresses now and then ("Rate
+      # exceeded"); retrying after a pause turns that into a slower run, not a red one.
+      - name: Validate, pull and build all images
         run: |
+          retry() { for wait in 20 60 0; do "$@" && return 0; [ "$wait" = 0 ] && return 1; echo "Retrying in ${wait}s"; sleep "$wait"; done; }
           docker compose --profile tools --profile airflow config --quiet
-          docker compose --profile tools --profile airflow build
+          retry docker compose --profile tools --profile airflow pull --ignore-buildable --quiet
+          retry docker compose --profile tools --profile airflow build
       - name: Start PostgreSQL and create schemas
         run: |
           docker compose up -d --wait postgres
