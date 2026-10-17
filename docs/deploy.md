@@ -163,10 +163,14 @@ ssh -L 8080:127.0.0.1:8080 -L 8501:127.0.0.1:8501 ubuntu@<server-ip>
 Deploy a new version:
 
 ```bash
-git pull
-dc --profile tools --profile scheduler build
-dc --profile scheduler up -d --wait
+sh deploy/update.sh
 ```
+
+It pulls, builds, applies migrations and rebuilds the dbt models before restarting
+anything, because the new site can depend on a table or column that only the new models
+create. It reads the Compose files and profiles from `COMPOSE_FILE` and
+`COMPOSE_PROFILES` in `.env` (for example `COMPOSE_FILE=compose.yaml:compose.prod.yaml`
+and `COMPOSE_PROFILES=scheduler,planner`).
 
 Restore a backup:
 
