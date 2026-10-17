@@ -83,11 +83,13 @@
 - **A modest project.** No inferred trips, forecasting, paid services, or availability
   guarantee. Analytical views favor inspectable SQL and immediate consistency over
   premature materialization.
-- **Official images from Amazon's mirror.** CI runs failed before any test because
-  GitHub's runners hit Docker Hub's anonymous pull limit. PostgreSQL, Python and Caddy
-  come from `public.ecr.aws/docker/library`, Amazon's mirror of the Docker official images,
-  pinned to the same digests as on Docker Hub (verified identical), so every environment
-  runs the same bytes. Apache Airflow is not an official image and stays on Docker Hub.
+- **Official images from Google's mirror.** CI runs failed before any test because
+  GitHub's runners hit Docker Hub's anonymous pull limit, and later Amazon's mirror
+  (`public.ecr.aws`) began refusing them with "Data limit exceeded". PostgreSQL, Python
+  and Caddy now come from `mirror.gcr.io/library`, Google's mirror of the Docker official
+  images, pinned to the same digests as on Docker Hub (verified identical), so every
+  environment runs the same bytes. Apache Airflow is not an official image and stays on
+  Docker Hub.
 - **Separate dependency environments.** The app, dbt, and Airflow have independent
   pinned dependency sets. The app and dbt use committed uv lockfiles; Airflow uses a
   digest-pinned official image and its official Python constraints. Docker volumes and

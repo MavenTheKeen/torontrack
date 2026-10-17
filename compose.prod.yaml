@@ -26,7 +26,7 @@ services:
       - --forwarded-allow-ips=*
 
   caddy:
-    image: public.ecr.aws/docker/library/caddy:2.11.4-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    image: mirror.gcr.io/library/caddy:2.11.4-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:?Set SITE_ADDRESS in .env, e.g. 203-0-113-7.sslip.io}
     ports:
@@ -43,7 +43,7 @@ services:
     restart: unless-stopped
 
   backup:
-    image: public.ecr.aws/docker/library/postgres:16.15-bookworm@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
+    image: mirror.gcr.io/library/postgres:16.15-bookworm@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
     entrypoint: ["sh", "/backup.sh"]
     environment:
       PGHOST: postgres
