@@ -15,7 +15,7 @@ x-app: &app
 
 services:
   postgres:
-    image: public.ecr.aws/docker/library/postgres:16.15-bookworm@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
+    image: mirror.gcr.io/library/postgres:16.15-bookworm@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
     environment:
       POSTGRES_USER: transit
       POSTGRES_DB: transit
