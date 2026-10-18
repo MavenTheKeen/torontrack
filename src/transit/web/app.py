@@ -5,13 +5,14 @@ visitors. A small per-IP limit protects the process. Browsers only talk to this
 service; it never calls the TTC.
 """
 
+import ipaddress
 import json
 import logging
 import mimetypes
 import re
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from datetime import UTC, datetime, timedelta
 from importlib.resources import files
 from pathlib import Path
@@ -118,25 +119,45 @@ class TTLCache:
         return value
 
 
+def client_key(host: str) -> str:
+    """The rate limit's key for a client address. An IPv6 home or phone connection is
+    given a whole /64, so one client could otherwise pick a fresh address per request."""
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return host
+    if address.version == 4:
+        return str(address)
+    if address.ipv4_mapped:
+        return str(address.ipv4_mapped)
+    return str(ipaddress.ip_network(f"{address}/64", strict=False))
+
+
 class RateLimiter:
-    """Sliding one-minute window per client address."""
+    """Sliding one-minute window per client (client_key)."""
+
+    # Clients tracked at once; past this, the least recently seen are forgotten, so a
+    # flood of distinct addresses cannot grow memory without bound.
+    MAX_CLIENTS = 20_000
 
     def __init__(self, limit: int, clock=time.monotonic):
         self.limit, self.clock = limit, clock
-        self.hits: dict[str, deque] = {}
+        self.hits: OrderedDict[str, deque] = OrderedDict()
         self.lock = threading.Lock()
 
     def allow(self, client: str) -> bool:
+        key = client_key(client)
         now = self.clock()
         with self.lock:
-            window = self.hits.setdefault(client, deque())
+            window = self.hits.setdefault(key, deque())
+            self.hits.move_to_end(key)
             while window and window[0] <= now - 60:
                 window.popleft()
             if len(window) >= self.limit:
                 return False
             window.append(now)
-            if len(self.hits) > 10_000:
-                self.hits = {k: v for k, v in self.hits.items() if v and v[-1] > now - 60}
+            while len(self.hits) > self.MAX_CLIENTS:
+                self.hits.popitem(last=False)
             return True
 
 

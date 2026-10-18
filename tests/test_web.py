@@ -16,7 +16,7 @@ from transit.config import Settings
 from transit.db import connect, migrations
 from transit.ttc import static_gtfs, store
 from transit.web import pipeline, queries
-from transit.web.app import RateLimiter, TTLCache, create_app
+from transit.web.app import RateLimiter, TTLCache, client_key, create_app
 
 
 class Clock:
@@ -522,3 +522,16 @@ def test_security_headers_and_hsts_only_over_https():
     assert "strict-transport-security" not in page.headers
     secure = TestClient(create_app(Settings("postgresql://unused/db")), base_url="https://t")
     assert secure.get("/").headers["strict-transport-security"] == "max-age=31536000"
+
+
+def test_rate_limit_groups_an_ipv6_connection_and_forgets_oldest_clients():
+    assert client_key("2001:db8:1:2:aaaa::1") == client_key("2001:db8:1:2:bbbb::9")
+    assert client_key("2001:db8:1:2::1") != client_key("2001:db8:1:3::1")
+    assert client_key("::ffff:203.0.113.7") == client_key("203.0.113.7") == "203.0.113.7"
+    assert client_key("unknown") == "unknown"
+    limiter = RateLimiter(1, clock=Clock())
+    assert limiter.allow("2001:db8::1") and not limiter.allow("2001:db8::2")
+    limiter.MAX_CLIENTS = 3
+    for host in ("10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4"):
+        assert limiter.allow(host)
+    assert len(limiter.hits) == 3 and client_key("2001:db8::1") not in limiter.hits
