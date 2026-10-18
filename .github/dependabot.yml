@@ -1,0 +1,23 @@
+# Weekly update pull requests for pinned dependencies; CI runs on each one. Security
+# fixes are proposed as soon as an advisory is published, regardless of this schedule.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: uv
+    directories: [/, /dbt]
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directories: [/, /airflow, /docker]
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
