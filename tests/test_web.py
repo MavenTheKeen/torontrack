@@ -510,3 +510,15 @@ def test_installable_app_files_are_served_and_complete():
         assert app_client.get(path).status_code == 200, path
     font = app_client.get("/static/fonts/atkinson-hyperlegible-next-latin.woff2")
     assert font.headers["content-type"] == "font/woff2"
+
+
+def test_security_headers_and_hsts_only_over_https():
+    plain = TestClient(create_app(Settings("postgresql://unused/db")))
+    page = plain.get("/")
+    assert "frame-ancestors 'none'" in page.headers["content-security-policy"]
+    assert page.headers["permissions-policy"].startswith("geolocation=(self), camera=()")
+    assert page.headers["cross-origin-opener-policy"] == "same-origin"
+    assert page.headers["cross-origin-resource-policy"] == "same-origin"
+    assert "strict-transport-security" not in page.headers
+    secure = TestClient(create_app(Settings("postgresql://unused/db")), base_url="https://t")
+    assert secure.get("/").headers["strict-transport-security"] == "max-age=31536000"
