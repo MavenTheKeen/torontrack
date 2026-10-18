@@ -155,6 +155,8 @@ services:
       - --host=0.0.0.0
       - --port=8000
       - --no-server-header
+      # Visitors' addresses are not recorded (the site promises no tracking).
+      - --no-access-log
     environment:
       <<: *app-environment
       WEB_RATE_LIMIT_PER_MINUTE: ${WEB_RATE_LIMIT_PER_MINUTE:-120}

@@ -22,7 +22,7 @@ Internet ──443──> Caddy ──> web (FastAPI, read-only DB login)
 | Secrets | Passwords, the Ticketmaster key and the alert URLs are files in `./secrets`, mounted into only the containers that use them ([Secrets](#secrets)). They are not in any container's environment, so `docker inspect` and child processes do not see them. |
 | Least privilege | `init-db` creates a `transit_web` login with the password in `secrets/web_db_password`: `SELECT` on `normalized`, `staging`, `analytics` and `ops` (including tables dbt creates later), no access to `raw`, read-only transactions. The site connects with it. |
 | Rate limiting | Behind a proxy every request comes from Caddy. Caddy sets `X-Forwarded-For` to the connecting client (it ignores the header from untrusted clients), and uvicorn runs with `--proxy-headers`, so the per-client limit applies to real visitors. |
-| Privacy | Caddy has no access log, so visitor addresses are not recorded. |
+| Privacy | Neither Caddy nor the site keeps an access log, so visitor addresses are not recorded. |
 | Backups | The `backup` service writes a zstd-compressed `pg_dump` custom-format file to `./backups` daily and keeps `BACKUP_KEEP_DAYS` (7). Raw TTC snapshots (a 3-day replay buffer) and their issue rows are left out, so a dump is 21 MB where a default one is 70 MB (2026-10-13); a restore loses only the ability to replay those 3 days. These sit on the same disk; copy them elsewhere for disaster recovery. |
 | Logs | Docker's json-file logs rotate at 10 MB × 3 per container (set by `deploy/server-setup.sh`). |
 
