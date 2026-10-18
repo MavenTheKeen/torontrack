@@ -76,6 +76,28 @@ REGIONAL_ATTRIBUTION = (
 )
 
 
+PERMISSIONS_POLICY = ", ".join(
+    [
+        "geolocation=(self)",
+        *(
+            f"{feature}=()"
+            for feature in (
+                "camera",
+                "microphone",
+                "payment",
+                "usb",
+                "serial",
+                "bluetooth",
+                "hid",
+                "midi",
+                "display-capture",
+                "browsing-topics",
+            )
+        ),
+    ]
+)
+
+
 class TTLCache:
     def __init__(self, seconds: float, clock=time.monotonic):
         self.seconds, self.clock = seconds, clock
@@ -221,6 +243,15 @@ def create_app(
         )
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
+        # Location is the only device feature the site uses ("near me" and trip guidance).
+        response.headers["Permissions-Policy"] = PERMISSIONS_POLICY
+        # No other site may open this one in a window it can script, or embed its files.
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+        response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+        # Sent only over HTTPS, as the standard requires; behind a proxy the scheme comes
+        # from its X-Forwarded-Proto. The site's own Caddy sends the same header.
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000"
         if request.url.path.startswith("/api/") and response.status_code == 200:
             response.headers["Cache-Control"] = f"public, max-age={CACHE_SECONDS}"
         elif request.url.path.startswith("/data/") and response.status_code == 200:
