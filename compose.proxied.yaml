@@ -16,6 +16,8 @@ services:
       - --host=0.0.0.0
       - --port=8000
       - --no-server-header
+      # Visitors' addresses are not recorded (the site promises no tracking).
+      - --no-access-log
       # The proxy replaces X-Forwarded-For with the connecting client's address. Only its
       # address is trusted to set it, so other machines on the LAN cannot choose the
       # address the rate limit sees.
