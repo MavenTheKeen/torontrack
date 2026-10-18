@@ -5,6 +5,11 @@
 # 3 days, for replay) and the issues logged against them are left out, which halves the
 # dump again; their tables are restored empty and refill from the next poll.
 set -u
+# Dumps hold every table, including the site login's password hash, so only root (the
+# owner) may read them, and existing dumps from before this rule are tightened too.
+umask 077
+chmod 700 /backups
+chmod 600 /backups/transit-*.dump 2>/dev/null
 PGPASSWORD=$(cat /run/secrets/postgres_password)
 export PGPASSWORD
 while true; do

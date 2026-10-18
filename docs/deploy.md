@@ -172,10 +172,12 @@ create. It reads the Compose files and profiles from `COMPOSE_FILE` and
 `COMPOSE_PROFILES` in `.env` (for example `COMPOSE_FILE=compose.yaml:compose.prod.yaml`
 and `COMPOSE_PROFILES=scheduler,planner`).
 
-Restore a backup:
+Restore a backup. The dumps are readable only by root, so they are read through the
+backup container rather than from the host account:
 
 ```bash
-dc exec -T postgres pg_restore -U transit -d transit --clean --if-exists < backups/transit-<stamp>.dump
+dc exec -T backup cat /backups/transit-<stamp>.dump |
+  dc exec -T postgres pg_restore -U transit -d transit --clean --if-exists
 ```
 
 ## Not covered yet
