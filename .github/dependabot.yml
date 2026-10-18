@@ -1,11 +1,16 @@
 # Weekly update pull requests for pinned dependencies; CI runs on each one. Security
 # fixes are proposed as soon as an advisory is published, regardless of this schedule.
+# Major versions are left out: each needs its own review (a PostgreSQL major version
+# needs a data upgrade, and Python's version is pinned in .python-version and the lock).
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: uv
     directories: [/, /dbt]
     schedule:
@@ -13,11 +18,32 @@ updates:
     groups:
       python:
         patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directories: [/, /airflow, /docker]
     schedule:
       interval: weekly
+    groups:
+      images:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # Python 3.12 and PostgreSQL 16 change only by patch release here.
+      - dependency-name: "library/python"
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: "library/postgres"
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: "astral-sh/uv"
+        update-types: ["version-update:semver-minor"]
   - package-ecosystem: docker-compose
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "library/postgres"
+        update-types: ["version-update:semver-minor"]
