@@ -5,7 +5,9 @@
 - HTTP redirects are disabled. Decoded feed responses are capped at 10 MiB.
 - Database queries use parameterized values; dynamic database names use quoted
   SQL identifiers.
-- Docker Compose binds PostgreSQL, Streamlit, Airflow and the site to `127.0.0.1`.
+- Docker Compose binds PostgreSQL, Streamlit, Airflow and the site to `127.0.0.1`. The
+  project's own containers run as an unprivileged user with every Linux capability dropped
+  and privilege escalation disabled; the site's container also has a read-only filesystem.
 - In production ([deployment](docs/deploy.md)) the site connects with a read-only
   database login, sits behind a reverse proxy that terminates HTTPS, applies per-client
   rate limits (an IPv6 client counts as its whole /64, and the number of clients tracked

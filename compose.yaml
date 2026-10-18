@@ -1,6 +1,13 @@
 name: toronto-transit
 
+# Our own images run as an unprivileged user and need no Linux capabilities, so a
+# compromised process cannot gain any, through setuid programs or otherwise.
+x-hardened: &hardened
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+
 x-app: &app
+  <<: *hardened
   image: toronto-transit-app:local
   build:
     context: .
@@ -155,6 +162,9 @@ services:
       MAP_DIR: /srv/map
       # The optional trip planner; the map hides directions while it is not running.
       PLANNER_URL: ${PLANNER_URL:-http://planner:8080}
+    # The public-facing process writes nothing; its files cannot be changed even by itself.
+    read_only: true
+    tmpfs: [/tmp]
     volumes:
       # Open-data files written daily by Airflow's export task; served at /data/.
       - open-data:/srv/open-data:ro
@@ -176,6 +186,7 @@ services:
     restart: unless-stopped
 
   dbt:
+    <<: *hardened
     image: toronto-transit-transform:local
     build:
       context: .
@@ -204,6 +215,7 @@ services:
   # download runs in the Airflow image so it writes as the same user as the daily
   # planner_data DAG, which shares the volume.
   planner-data:
+    <<: *hardened
     image: toronto-transit-airflow:local
     build:
       context: .
@@ -242,6 +254,7 @@ services:
   # schedules in one small process, in place of Airflow (about 1.1 GB less memory).
   # `docker compose --profile scheduler up -d`; use either this or the airflow profile.
   scheduler:
+    <<: *hardened
     image: toronto-transit-airflow:local
     build:
       context: .
@@ -282,6 +295,7 @@ services:
     restart: "no"
 
   airflow:
+    <<: *hardened
     image: toronto-transit-airflow:local
     build:
       context: .
