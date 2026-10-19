@@ -21,7 +21,7 @@ import httpx
 import psycopg
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from transit import events, places, roads
@@ -77,6 +77,7 @@ REGIONAL_ATTRIBUTION = (
 )
 
 
+ROBOTS = "User-agent: *\nDisallow: /api/\nDisallow: /map-data/\n"
 PERMISSIONS_POLICY = ", ".join(
     [
         "geolocation=(self)",
@@ -282,7 +283,8 @@ def create_app(
             response.headers["Cache-Control"] = "public, max-age=86400"
         return response
 
-    @app.get("/health")
+    # HEAD too, as uptime monitors and link previews use it.
+    @app.api_route("/health", methods=["GET", "HEAD"])
     def health():
         try:
             with connect(db_url()) as conn:
@@ -806,9 +808,24 @@ def create_app(
 
         return cache.get("datasets", load)
 
-    @app.get("/", include_in_schema=False)
+    @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
     def index():
         return FileResponse(STATIC.joinpath("index.html"), headers={"Cache-Control": "no-cache"})
+
+    # Crawlers may index the page but not call the API or fetch the street map's tiles,
+    # which would only spend the rate limit.
+    @app.get("/robots.txt", include_in_schema=False)
+    def robots():
+        return PlainTextResponse(ROBOTS, headers={"Cache-Control": "public, max-age=86400"})
+
+    # Browsers and feed readers ask for /favicon.ico whatever the page says; PNG is fine.
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon():
+        return FileResponse(
+            STATIC.joinpath("icon-192.png"),
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
 
     # The service worker must be served from the root to control the whole site, and
     # always revalidated so a new version is picked up on the next visit.
