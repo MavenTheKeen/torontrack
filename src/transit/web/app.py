@@ -814,12 +814,12 @@ def create_app(
 
     # Crawlers may index the page but not call the API or fetch the street map's tiles,
     # which would only spend the rate limit.
-    @app.get("/robots.txt", include_in_schema=False)
+    @app.api_route("/robots.txt", methods=["GET", "HEAD"], include_in_schema=False)
     def robots():
         return PlainTextResponse(ROBOTS, headers={"Cache-Control": "public, max-age=86400"})
 
     # Browsers and feed readers ask for /favicon.ico whatever the page says; PNG is fine.
-    @app.get("/favicon.ico", include_in_schema=False)
+    @app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)
     def favicon():
         return FileResponse(
             STATIC.joinpath("icon-192.png"),

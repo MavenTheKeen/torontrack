@@ -539,7 +539,7 @@ def test_rate_limit_groups_an_ipv6_connection_and_forgets_oldest_clients():
 
 def test_head_robots_and_favicon():
     client = TestClient(create_app(Settings("postgresql://unused/db")))
-    assert client.head("/").status_code == 200
+    assert {client.head(p).status_code for p in ("/", "/robots.txt", "/favicon.ico")} == {200}
     robots = client.get("/robots.txt")
     assert robots.status_code == 200 and "Disallow: /api/" in robots.text
     icon = client.get("/favicon.ico")
