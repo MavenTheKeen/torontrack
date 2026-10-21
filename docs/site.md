@@ -36,7 +36,7 @@ about 2 h 30 min after collection started.
 | `/api/events` | City of Toronto festivals and events from today to 7 days ahead; see [events](events.md). |
 | `/api/agenda` | The Events page: city events and Ticketmaster concerts, games and shows for the next 14 days, each with its category, major-venue flag and nearest station; see [events](events.md#the-events-page). |
 | `/api/roads` | Construction zones and road closures in effect today, with geometry, hours and impact; see [road restrictions](roads.md). |
-| `/api/regional`, `/api/regional/trains`, `/api/regional/stations/{id}` | Regional train lines, timetable positions and scheduled departures; see [regional trains](regional.md). |
+| `/api/regional`, `/api/regional/trains`, `/api/regional/stations/{id}` | Regional train lines, live positions and delays, departures and alerts, for this site only; see [regional trains](regional.md). |
 | `/api/trains` | Every line's estimated train positions for the map: each train's position is a fractional index into the line's station list, as on the line diagrams. |
 | `/api/report` | The reliability report over every measured day: excess wait time, regular and long-gap shares by line and day type, by time of day on weekdays, by weather, by day, and the ten platforms with the most extra wait (at least 150 measured gaps). `available: false` until the first build. |
 | `/api/reliability` | Longest gaps today, regular-headway share by hour (today and 7 days), and elevator/escalator outages, from the dbt models. `available: false` until the first build. |
@@ -90,8 +90,9 @@ map opens. On top of the streets:
   vehicles' estimated arrivals ([how they are estimated](ttc.md#buses-and-streetcars));
   the same estimates are on the stop's own page.
 - **Regional trains** on their own line colours, each marker labelled with its line code,
-  placed by timetable (not live; [regional trains](regional.md)). The map zooms out far
-  enough to show the whole network. Tapping a station lists its scheduled departures.
+  placed from Metrolinx's live reports, or by timetable where a train has none
+  ([regional trains](regional.md)). The map zooms out far
+  enough to show the whole network. Tapping a station lists its next departures, live where reported, and its alerts.
 - **Road restrictions** from street level: construction solid amber, closures dashed
   orange, faded outside their working hours ([road restrictions](roads.md)).
 - **Events** this week from the city's calendar, today's solid, and a station panel's

@@ -12,8 +12,8 @@ runs from Mississauga to Keswick ([neighbouring agencies](agencies.md)).
 
 Lines 5 Eglinton and 6 Finch West are drawn as lines, but the TTC publishes no live data
 for them yet, so their trains are placed by the timetable. Regional trains between
-Kitchener and Oshawa are also placed by the timetable, because Metrolinx's realtime feed
-needs a key this project does not have yet ([regional trains](regional.md)).
+Kitchener and Oshawa are placed from Metrolinx's live GPS reports and show how late each
+one is, with cancellations and service alerts at each station ([regional trains](regional.md)).
 
 Between data refreshes, vehicles keep moving: subway trains run toward their predicted
 arrival at the next station, and buses and streetcars move along their route at that
