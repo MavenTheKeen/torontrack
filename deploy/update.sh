@@ -16,7 +16,12 @@ if ! grep -q '^COMPOSE_FILE=' .env 2>/dev/null; then
   export COMPOSE_FILE=compose.yaml:compose.prod.yaml
 fi
 
-git pull --ff-only
+# The pull can change this script while it runs, and sh reads it as it goes, so the new
+# copy is started from the top.
+if [ -z "${TORONTRACK_UPDATED:-}" ]; then
+  git pull --ff-only
+  TORONTRACK_UPDATED=1 exec sh "$0" "$@"
+fi
 docker compose --profile tools --profile scheduler build --quiet
 docker compose run --rm init-db
 
