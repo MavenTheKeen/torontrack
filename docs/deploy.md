@@ -100,6 +100,7 @@ reads it through a `NAME_FILE` variable holding that path (`transit.config`):
 | `postgres_password` | PostgreSQL, the collectors, Airflow, the dashboard, backups | Owner login `transit` |
 | `web_db_password` | `init-db`, the site (production) | Read-only login `transit_web`; the site has no other |
 | `ticketmaster_api_key` | Airflow | Optional ([events](events.md)) |
+| `metrolinx_api_key` | `agencies-collector` | Optional; live regional trains ([regional trains](regional.md#live-trains)) |
 | `ntfy_url`, `heartbeat_url` | `alerts` | Optional ([alerts](alerts.md)) |
 
 `deploy/make_secrets.sh` creates the missing files: a value still in `.env` (an

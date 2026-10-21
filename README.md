@@ -46,6 +46,10 @@ Problems found in the source data, and how each is handled:
 - **Alert types contradict their text.** A planned closure can be marked
   `REDUCED_SERVICE` while the text says there is no service, so each alert's status is
   derived from both and the mismatch is flagged.
+- **Metrolinx's live feeds mix buses and trains, and its GPS fixes beat its delays.**
+  Only trips on the loaded rail lines are kept. Placing a train by its reported delay
+  alone is off by a median of 229 m from its GPS fix, so the fix is projected onto the
+  track instead ([live trains](docs/regional.md#live-trains)).
 - **Neighbouring agencies disagree on time zones.** MiWay's schedule says
   `America/New_York`, the others `America/Toronto`; OpenTripPlanner refuses to build
   until one zone is set for the whole graph ([trip planner](docs/planner.md)).
@@ -75,7 +79,7 @@ other choices is in [engineering decisions](docs/decisions.md).
 flowchart LR
     subgraph Live["Live feeds"]
         TTCRT[TTC GTFS-Realtime<br/>trains, vehicles, alerts]
-        Agencies[Brampton, MiWay, YRT<br/>GTFS-Realtime]
+        Agencies[Brampton, MiWay, YRT,<br/>Metrolinx GTFS-Realtime]
         GBFS[Bike Share GBFS]
     end
     subgraph Daily["Daily and hourly sources"]
