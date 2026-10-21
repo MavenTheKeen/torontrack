@@ -27,6 +27,8 @@ class Settings:
     discovery_url: str = DISCOVERY_URL
     web_db_password: str | None = field(default=None, repr=False)
     ticketmaster_api_key: str | None = field(default=None, repr=False)
+    # Live regional trains (docs/regional.md#live-trains); optional.
+    metrolinx_api_key: str | None = field(default=None, repr=False)
     ntfy_url: str | None = field(default=None, repr=False)
     heartbeat_url: str | None = field(default=None, repr=False)
     # TTC collector (docs/ttc.md).
@@ -84,6 +86,7 @@ class Settings:
             discovery_url=text("GBFS_DISCOVERY_URL") or DISCOVERY_URL,
             web_db_password=secret("WEB_DB_PASSWORD"),
             ticketmaster_api_key=secret("TICKETMASTER_API_KEY"),
+            metrolinx_api_key=secret("METROLINX_API_KEY"),
             ntfy_url=secret("NTFY_URL"),
             heartbeat_url=secret("HEARTBEAT_URL"),
             ttc_poll_seconds=number("TTC_POLL_SECONDS", float),

@@ -1277,7 +1277,8 @@ async function loadStopSheet(view, id) {
 }
 
 // Regional trains. Their own line colours, always with the line code in the marker,
-// since Kitchener green and Line 2 green are close. Positions come from the timetable.
+// since Kitchener green and Line 2 green are close. Positions are live where Metrolinx
+// reports the train (docs/regional.md#live-trains) and follow the timetable otherwise.
 function regionalPill(code, colour, { small = false } = {}) {
   return el("span", { class: `code-pill${small ? " small" : ""}`, style: { background: colour || "#4b5563" } }, code);
 }
@@ -1324,14 +1325,32 @@ function addRegionalLayers(map) {
   }, paint: { "text-color": c.label, "text-halo-color": c.halo, "text-halo-width": 2, "text-opacity": 0.85 } });
 }
 
+// "3 min late", "On time" or "1 min early" for a live train or departure.
+function regionalDelay(minutes) {
+  if (minutes === null || minutes === undefined) return null;
+  if (minutes >= 1) return el("span", { class: "warn" }, `${minutes} min late`);
+  return minutes <= -1 ? `${-minutes} min early` : "On time";
+}
+
+function regionalAlerts(alerts) {
+  return alerts && alerts.length
+    ? el("ul", { class: "sheet-list" }, alerts.map((a) => el("li", {}, el("strong", {}, a.header), a.description ? el("p", { class: "muted small" }, a.description) : null)))
+    : null;
+}
+
 function regionalTrainSheet(view, id) {
-  const t = ((view.regionalTrains || {}).trains || []).find((x) => x.id === id);
+  const data = view.regionalTrains || {};
+  const t = (data.trains || []).find((x) => x.id === id);
   if (!t) return null;
+  const alerts = (data.alerts || []).filter((a) => a.lines.includes(t.line));
   return [
     el("p", { class: "sheet-kicker" }, "Regional train"),
     el("h2", { class: "with-badge" }, regionalPill(t.line, t.colour), `${t.line_name} towards ${t.destination}`),
-    el("p", {}, t.at_station ? `At ${t.at_station}` : t.next_station ? `Next: ${t.next_station}` : "Arriving", t.next_arrival && !t.at_station ? el("span", { class: "muted" }, ` · scheduled ${timeFmt.format(new Date(t.next_arrival))}`) : ""),
-    el("p", { class: "muted small" }, "Placed by the published timetable, not a live position: live regional train data needs a Metrolinx API key this site does not have yet. Delays will not show."),
+    el("p", {}, t.at_station ? `At ${t.at_station}` : t.next_station ? `Next: ${t.next_station}` : "Arriving", t.next_arrival && !t.at_station ? el("span", { class: "muted" }, ` · ${t.live ? "expected" : "scheduled"} ${timeFmt.format(new Date(t.next_arrival))}`) : ""),
+    t.live ? el("p", {}, el("span", { class: "live-dot", "aria-hidden": "true" }), "Live", t.delay_minutes !== null ? [" · ", regionalDelay(t.delay_minutes)] : "") : null,
+    alerts.length ? el("p", { class: "sheet-label" }, "Service alerts") : null,
+    regionalAlerts(alerts),
+    el("p", { class: "muted small" }, t.live ? "Position from Metrolinx's live report, moved along the track by the timetable between reports." : "No live report for this train right now, so it is placed by the published timetable."),
   ];
 }
 
@@ -1344,11 +1363,15 @@ function regionalStationSheet(view, id, data) {
     el("p", { class: "sheet-kicker" }, "Regional rail station"),
     el("h2", {}, data.station.name),
     el("p", { class: "route-pills" }, data.station.lines.map((l) => el("span", { class: "with-badge small" }, regionalPill(l.code, l.colour, { small: true }), l.name))),
-    el("p", { class: "sheet-label" }, "Scheduled departures"),
+    data.alerts && data.alerts.length ? el("p", { class: "sheet-label" }, "Service alerts") : null,
+    regionalAlerts(data.alerts),
+    el("p", { class: "sheet-label" }, "Departures"),
     data.departures.length
-      ? el("ul", { class: "sheet-list" }, data.departures.map((d) => el("li", { class: "arrival-row" }, el("span", { class: "with-badge" }, regionalPill(d.line, d.colour, { small: true }), el("span", {}, d.destination)), el("span", { class: "mins" }, d.minutes < 1 ? "Now" : d.minutes < 60 ? `${d.minutes} min` : timeFmt.format(new Date(d.departs))))))
+      ? el("ul", { class: "sheet-list" }, data.departures.map((d) => el("li", { class: "arrival-row" },
+        el("span", { class: "with-badge" }, regionalPill(d.line, d.colour, { small: true }), el("span", {}, d.destination, d.cancelled ? el("span", { class: "warn" }, " · Cancelled") : d.delay_minutes ? [" · ", regionalDelay(d.delay_minutes)] : "")),
+        el("span", { class: "mins" }, d.live && !d.cancelled ? el("span", { class: "live-dot", "aria-hidden": "true" }) : null, d.minutes < 1 ? "Now" : d.minutes < 60 ? `${d.minutes} min` : timeFmt.format(new Date(d.departs))))))
       : el("p", { class: "muted" }, "No departures in the next three hours."),
-    el("p", { class: "muted small" }, "From the published timetable; delays and cancellations are not shown."),
+    el("p", { class: "muted small" }, data.source === "live" ? "Times marked live are Metrolinx's predictions; the rest follow the published timetable." : "From the published timetable: no live reports for these trains right now."),
     s ? planHere(view, [s.lon, s.lat], s.name) : null,
   ];
 }
@@ -2664,7 +2687,7 @@ async function refreshNetwork(view) {
 // Each switchable layer, in the order the panel lists them.
 const MAP_LAYERS = [
   { key: "trains", label: "Subway", note: "Estimated train positions", icon: () => badgeEl("subway", lineColour("1"), textOn(lineColour("1"))) },
-  { key: "regional", label: "Regional trains", note: "Placed by timetable", icon: () => badgeEl("regional", "#4b5563", "#ffffff") },
+  { key: "regional", label: "Regional trains", note: "Live where reported", icon: () => badgeEl("regional", "#4b5563", "#ffffff") },
   { key: "buses", label: "Buses and streetcars", note: "Live positions and stops", icon: () => badgeEl("bus", SURFACE_COLOURS.bus, "#ffffff") },
   { key: "bikes", label: "Bike Share", note: "Live bikes or open docks", icon: () => badgeEl("bike", DOCK_COLOURS.ok, "#ffffff") },
   { key: "access", label: "Elevator outages", note: "Stations with an elevator or escalator out", icon: () => badgeEl("elevator", OUTAGE_COLOUR, "#111418") },
@@ -2693,11 +2716,11 @@ function mapLegend() {
     el("ul", { class: "legend-list" },
       lines.map((l) => legendRow(badgeEl("subway", l.color || "#777", textOn(l.color || "#777777"), { size: 22 }), `Line ${l.id} train (${l.timetable ? "placed by timetable" : "estimated position"})`)),
       surface.map(([mode, label]) => legendRow(badgeEl(surfaceGlyph(mode), SURFACE_COLOURS[mode], "#ffffff", { size: 22 }), `${label}, with the pointer showing its heading`)),
-      legendRow(el("span", { class: "swatch-pill" }, "LW"), "Regional train, placed by timetable"),
+      legendRow(el("span", { class: "swatch-pill" }, "LW"), "Regional train, live where Metrolinx reports it, else by timetable"),
       legendRow(el("span", { class: "swatch-station", "aria-hidden": "true" }), "Station"),
       legendRow(badgeEl("elevator", OUTAGE_COLOUR, "#111418", { size: 20 }), "Elevator or escalator out of service"),
     ),
-    el("p", { class: "muted small" }, "Between updates, trains, buses and streetcars move along their routes by estimate: subway trains to TTC's predicted arrival, buses at their route's usual pace from their last report, regional trains by timetable. A faded bus or streetcar has not reported for over two and a half minutes."),
+    el("p", { class: "muted small" }, "Between updates, trains, buses and streetcars move along their routes by estimate: subway trains to TTC's predicted arrival, buses at their route's usual pace from their last report, regional trains along their timetable from their last live report. A faded bus or streetcar has not reported for over two and a half minutes."),
     el("p", { class: "panel-subheading" }, "Entrances and parking"),
     el("ul", { class: "legend-list compact" },
       legendRow(badgeEl("entrance", ENTRANCE_COLOUR, "#ffffff", { size: 20 }), "Station entrance"),
@@ -3345,6 +3368,17 @@ async function renderPipeline() {
             data.roads.status,
             el("p", {}, `Last load ${ageText(data.roads.age_seconds)} · runs every 10 minutes`),
             el("p", { class: "muted small" }, `${numberFmt.format(data.roads.in_effect)} restrictions in effect today`),
+          ),
+        ]
+      : null,
+    data.regional
+      ? [
+          el("h2", {}, "Regional trains"),
+          healthCard(
+            "Metrolinx live positions, delays and alerts",
+            data.regional.status,
+            el("p", {}, `Last successful poll ${ageText((data.regional.feeds.vehicles || {}).age_seconds)} · runs every 30 seconds`),
+            el("p", { class: "muted small" }, `${numberFmt.format(data.regional.live_trains)} trains reporting now. Alerts last loaded ${ageText((data.regional.feeds.alerts || {}).age_seconds)}, every 2 minutes.`),
           ),
         ]
       : null,

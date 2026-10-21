@@ -30,6 +30,10 @@ def settings():
             "ops.ttc_vehicle_progress"
         )
         conn.execute("TRUNCATE normalized.regional_versions, ops.regional_refreshes CASCADE")
+        conn.execute(
+            """TRUNCATE normalized.regional_live_trains, normalized.regional_live_stops,
+               normalized.regional_alerts, ops.regional_polls"""
+        )
         conn.execute("TRUNCATE normalized.city_events, ops.city_event_refreshes CASCADE")
         conn.execute("TRUNCATE normalized.ticketed_events, ops.ticketed_event_refreshes")
         conn.execute(

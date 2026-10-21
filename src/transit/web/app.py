@@ -638,7 +638,9 @@ def create_app(
     def regional_trains():
         def build(conn, now):
             idx = regional_index(conn, now)
-            return regional.trains(idx, now) if idx else {"source": "timetable", "trains": []}
+            if not idx:
+                return {"source": "timetable", "trains": [], "alerts": []}
+            return regional.trains(idx, now, regional.live(conn, now))
 
         return cached("regional-trains", build, REGIONAL_ATTRIBUTION, store=live)
 
@@ -649,7 +651,7 @@ def create_app(
 
         def build(conn, now):
             idx = regional_index(conn, now)
-            data = regional.station(idx, station_id, now) if idx else None
+            data = regional.station(idx, station_id, now, regional.live(conn, now)) if idx else None
             if data is None:
                 raise queries.NotFound(f"Unknown station {station_id}")
             return data

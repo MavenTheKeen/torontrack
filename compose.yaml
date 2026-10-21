@@ -115,6 +115,11 @@ services:
   agencies-collector:
     <<: *app
     command: ["agencies-collect"]
+    # Also polls live regional trains when the Metrolinx key file is not empty.
+    environment:
+      <<: *app-environment
+      METROLINX_API_KEY_FILE: /run/secrets/metrolinx_api_key
+    secrets: [postgres_password, metrolinx_api_key]
     depends_on:
       postgres:
         condition: service_healthy
@@ -356,6 +361,8 @@ secrets:
     file: ./secrets/postgres_password
   ticketmaster_api_key:
     file: ./secrets/ticketmaster_api_key
+  metrolinx_api_key:
+    file: ./secrets/metrolinx_api_key
   ntfy_url:
     file: ./secrets/ntfy_url
   heartbeat_url:

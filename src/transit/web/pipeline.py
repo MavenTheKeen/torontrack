@@ -21,6 +21,10 @@ LIMITS = {
     "weather": timedelta(hours=2),
     # Loaded every 10 minutes.
     "roads": timedelta(minutes=30),
+    # Live regional trains: positions and delays every 30 s, alerts every 2 minutes.
+    "regional vehicles": timedelta(minutes=2),
+    "regional trips": timedelta(minutes=2),
+    "regional alerts": timedelta(minutes=10),
 }
 FEED_LABELS = {
     "trips_subway": "Subway train predictions",
@@ -257,6 +261,35 @@ def roads(conn, now: datetime) -> dict:
     }
 
 
+def regional(conn, now: datetime) -> dict | None:
+    """Metrolinx's live feeds (transit.regional_live); None where no key is set and they
+    have never been polled."""
+    rows = conn.execute(
+        "SELECT feed, succeeded_at, rows, error FROM ops.regional_polls ORDER BY feed"
+    ).fetchall()
+    if not rows:
+        return None
+    feeds = {
+        r["feed"]: {
+            "status": verdict(r["succeeded_at"], LIMITS[f"regional {r['feed']}"], now),
+            "age_seconds": _age(r["succeeded_at"], now),
+            "rows": r["rows"],
+            "error": r["error"],
+        }
+        for r in rows
+    }
+    live = conn.execute(
+        """SELECT count(*) AS trains FROM normalized.regional_live_trains
+           WHERE NOT cancelled AND (reported_at > %(since)s OR delay_at > %(since)s)""",
+        {"since": now - timedelta(minutes=3)},
+    ).fetchone()
+    return {
+        "status": worst(*(f["status"] for f in feeds.values())),
+        "feeds": feeds,
+        "live_trains": live["trains"],
+    }
+
+
 def official_delays(conn) -> dict | None:
     """The latest check of TTC's own delay log, and how far that log reaches."""
     if conn.execute("SELECT to_regclass('ops.ttc_delay_refreshes') AS r").fetchone()["r"] is None:
@@ -301,6 +334,9 @@ def pipeline_status(conn, now: datetime) -> dict:
         "weather": weather(conn, now),
         "roads": roads(conn, now),
     }
+    regional_part = regional(conn, now)
+    if regional_part:
+        parts["regional"] = regional_part
     statuses = [f["status"] for f in feeds] + [p["status"] for p in parts.values()]
     overall = "failing" if "failing" in statuses else "delayed" if "delayed" in statuses else "ok"
     return {

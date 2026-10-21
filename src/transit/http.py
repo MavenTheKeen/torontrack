@@ -66,6 +66,7 @@ class FeedClient:
         host: str = BIKESHARE_HOST,
         max_bytes: int = 10 * 1024 * 1024,
         sink=None,
+        headers: dict | None = None,
     ) -> bytes:
         """GET one official source URL; only `host` over HTTPS is ever contacted. With
         `sink` (a binary file), the body is written there instead of held in memory, and
@@ -88,7 +89,9 @@ class FeedClient:
         for attempt in range(self.attempts):
             delay = float(2**attempt)
             try:
-                with self.client.stream("GET", url, follow_redirects=False) as response:
+                with self.client.stream(
+                    "GET", url, headers=headers, follow_redirects=False
+                ) as response:
                     body = bytearray()
                     size = 0
                     if sink is not None:
