@@ -33,7 +33,10 @@ for attempt in 1 2 3 4 5; do
 done
 
 # Everything is restarted, but only the site is waited for: the trip planner can take
-# several minutes to rebuild its graph when its inputs changed.
-docker compose up -d
+# several minutes to rebuild its graph when its inputs changed. planner-data downloads
+# those inputs from outside sources; when one is down (the OpenStreetMap extract server
+# timed out on 2026-10-21) the planner keeps serving its current graph, so that alone
+# does not fail the deploy. The status below shows what did not start.
+docker compose up -d || echo "Not every service started; see the status below" >&2
 docker compose up -d --wait web
 docker compose ps --format '{{.Service}}: {{.Status}}'
