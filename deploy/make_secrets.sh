@@ -19,7 +19,8 @@ random() {
 }
 
 for pair in postgres_password:POSTGRES_PASSWORD web_db_password:WEB_DB_PASSWORD \
-  ticketmaster_api_key:TICKETMASTER_API_KEY ntfy_url:NTFY_URL heartbeat_url:HEARTBEAT_URL; do
+  ticketmaster_api_key:TICKETMASTER_API_KEY metrolinx_api_key:METROLINX_API_KEY \
+  ntfy_url:NTFY_URL heartbeat_url:HEARTBEAT_URL; do
   file="secrets/${pair%%:*}"
   name="${pair#*:}"
   if [ -e "$file" ]; then
@@ -36,5 +37,5 @@ for pair in postgres_password:POSTGRES_PASSWORD web_db_password:WEB_DB_PASSWORD 
   chmod 644 "$file"
   if [ -n "$value" ]; then echo "wrote     $file"; else echo "empty     $file"; fi
 done
-echo "Now remove POSTGRES_PASSWORD, WEB_DB_PASSWORD, TICKETMASTER_API_KEY, NTFY_URL and"
-echo "HEARTBEAT_URL from .env, if present."
+echo "Now remove POSTGRES_PASSWORD, WEB_DB_PASSWORD, TICKETMASTER_API_KEY,"
+echo "METROLINX_API_KEY, NTFY_URL and HEARTBEAT_URL from .env, if present."

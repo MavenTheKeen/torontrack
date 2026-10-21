@@ -24,7 +24,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from transit import locks
+from transit import locks, regional_live
 from transit.bikeshare.parsing import FeedValidationError
 from transit.db import connect
 from transit.http import FeedClient, FetchError
@@ -77,6 +77,9 @@ STATIC_MAX_BYTES = 80 << 20
 POLL_SECONDS = 15
 # Trip updates (each agency's own arrival predictions) are polled every other round.
 PREDICTION_ROUNDS = 2
+# Live regional trains every 30 s, their alerts every 2 minutes (transit.regional_live).
+REGIONAL_ROUNDS = 2
+REGIONAL_ALERT_ROUNDS = 8
 PREDICTION_HORIZON = timedelta(minutes=90)
 # A bus's last report is kept this long after it stops reporting.
 KEEP_REPORTS = timedelta(hours=1)
@@ -384,9 +387,15 @@ class CollectorBusy(RuntimeError):
     pass
 
 
-def run_forever(database_url: str, client: FeedClient | None = None, stop=None) -> None:
-    """Poll every agency every POLL_SECONDS until stopped. The static networks are loaded
-    first if missing, so matching works from the first poll."""
+def run_forever(
+    database_url: str,
+    client: FeedClient | None = None,
+    stop=None,
+    metrolinx_api_key: str | None = None,
+) -> None:
+    """Poll every agency every POLL_SECONDS until stopped, and live regional trains when
+    a Metrolinx key is set. The static networks are loaded first if missing, so matching
+    works from the first poll."""
     stop = stop or threading.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
@@ -423,6 +432,16 @@ def run_forever(database_url: str, client: FeedClient | None = None, stop=None) 
                         result = poll_predictions(conn, client, agency, datetime.now(UTC))
                         if result["status"] == "failed":
                             _log({"event": "predictions_failed", **result})
+                if metrolinx_api_key and rounds % REGIONAL_ROUNDS == 0:
+                    alerts = rounds % REGIONAL_ALERT_ROUNDS == 0
+                    feeds = regional_live.poll(
+                        conn, client, metrolinx_api_key, datetime.now(UTC), alerts
+                    )
+                    for feed, result in feeds.items():
+                        counts = summary.setdefault(f"regional {feed}", {"ok": 0, "failed": 0})
+                        counts[result["status"]] += 1
+                        if result["status"] == "failed":
+                            _log({"event": "poll_failed", "regional": feed, **result})
             rounds += 1
             if started - last_log >= LOG_EVERY_SECONDS:
                 _log({"event": "hourly", "polls": summary})

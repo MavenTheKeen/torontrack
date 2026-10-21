@@ -14,6 +14,7 @@ from transit import (
     maptiles,
     planner,
     regional,
+    regional_live,
     roads,
     scheduler,
     ticketmaster,
@@ -256,11 +257,15 @@ def main():
                     print(json.dumps(result, default=str))
                     raise FetchError(f"Agency schedule refresh failed for {', '.join(failed)}")
             elif args.command == "agencies-collect":
-                agencies.run_forever(settings.database_url)
+                agencies.run_forever(
+                    settings.database_url, metrolinx_api_key=settings.metrolinx_api_key
+                )
                 result = {"collector": "stopped"}
             elif args.command == "agencies-health":
                 with connect(settings.database_url) as conn:
                     late = agencies.healthy(conn, datetime.now(UTC))
+                    if settings.metrolinx_api_key:
+                        late += regional_live.healthy(conn, datetime.now(UTC))
                 if late:
                     raise ValueError(f"No successful recent poll for {', '.join(late)}")
                 result = {"agencies_collector": "healthy"}
