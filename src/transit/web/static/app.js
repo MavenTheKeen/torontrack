@@ -837,11 +837,20 @@ const MAP_FOCUS_ZOOM = 15;
 // Falls to Barrie. Streets outside Toronto are in the map at regional detail only.
 const MAP_BOUNDS = [[-81.2, 42.95], [-78.45, 44.55]];
 const TRAIN_REFRESH_MS = 10000; // The collector polls trains and vehicles every 10 s.
-// Trains and vehicles move between refreshes (motion.js), redrawn every animation frame
-// when zoomed in. Zoomed out, a frame's movement is under a pixel, so they are redrawn
-// less often.
-const MOTION_FRAME_MS = [[13, 0], [11, 33], [0, 100]]; // [from zoom, minimum ms between redraws]
+// Trains and vehicles move between refreshes (motion.js). Each redraw sends them all to
+// the map's worker, which re-indexes them, so they are redrawn only as often as the
+// fastest of them (about 90 km/h) can move one pixel: every 70 ms at zoom 15, 280 ms at
+// zoom 13. Redrawing on every frame repeated the same picture up to 60 times a second.
+const MOTION_SPEED_MPS = 25;
+const MOTION_MIN_MS = 16;
+const MOTION_MAX_MS = 1000;
+// While the map is being dragged, vehicles already sit on it; redraws only add those
+// coming into view, so this often is enough.
+const MOTION_PANNING_MS = 200;
 const MOTION_STILL_MS = 5000; // With reduced motion.
+// Sources of fixed points (stops, stations, docks) are cut into tiles up to this zoom and
+// scaled up beyond it, which places a point exactly; finer tiles only used memory.
+const POINTS_MAXZOOM = 14;
 const BIKES_REFRESH_MS = 120000; // Bike Share data changes every 15 minutes.
 const WALK_METRES_PER_MIN = 80;
 const TRAIN_OFFSET_M = 28; // Each direction sits a little to its own side of the line.
@@ -1050,8 +1059,9 @@ function moveVehicles(view) {
   const now = Date.now();
   const still = reduceMotion();
   const b = map.getBounds();
-  const padLon = (b.getEast() - b.getWest()) * 0.2;
-  const padLat = (b.getNorth() - b.getSouth()) * 0.2;
+  // Vehicles a little beyond the edges are drawn too, so a short pan finds them there.
+  const padLon = (b.getEast() - b.getWest()) * 0.5;
+  const padLat = (b.getNorth() - b.getSouth()) * 0.5;
   const inView = (f) => {
     const [lon, lat] = f.geometry.coordinates;
     return lon > b.getWest() - padLon && lon < b.getEast() + padLon && lat > b.getSouth() - padLat && lat < b.getNorth() + padLat;
@@ -1059,27 +1069,33 @@ function moveVehicles(view) {
   const place = (id, coord) => (still ? coord : glide(view.glide, id, coord, now));
   // Layers hidden at this zoom are not moved; a train shown again starts afresh (glide).
   const zoom = map.getZoom();
-  if (view.trains && map.getSource("trains") && shownAt("trains", zoom)) {
-    view.trainFeatures = trainFeatures(view.trains, view.coords, now).map((f) => point(place(f.properties.id, f.geometry.coordinates), f.properties));
-    map.getSource("trains").setData(featureCollection(view.trainFeatures));
+  const source = map.getSource("moving");
+  if (!source) return;
+  const moving = [];
+  if (view.trains && shownAt("trains", zoom)) {
+    view.trainFeatures = trainFeatures(view.trains, view.coords, now).map((f) => point(place(f.properties.id, f.geometry.coordinates), { ...f.properties, moving: "train" }));
+    moving.push(...view.trainFeatures);
   }
-  if (view.vehicles && map.getSource("vehicles") && shownAt("vehicles", zoom)) {
+  if (view.vehicles && shownAt("vehicles", zoom)) {
     // Only vehicles near the view are estimated each frame; one coming into view starts
     // afresh (motion.js glide), so it does not catch up on its time off screen.
-    const near = (v) => v.lon > b.getWest() - 2 * padLon && v.lon < b.getEast() + 2 * padLon && v.lat > b.getSouth() - 2 * padLat && v.lat < b.getNorth() + 2 * padLat;
+    const near = (v) => v.lon > b.getWest() - 1.5 * padLon && v.lon < b.getEast() + 1.5 * padLon && v.lat > b.getSouth() - 1.5 * padLat && v.lat < b.getNorth() + 1.5 * padLat;
     view.vehicleFeatures = view.vehicles.filter(near).map((v) => {
       const at = vehiclePlace(v, view.patterns && view.patterns.get(v.pattern), now);
       const heading = at.bearing !== null && at.bearing !== undefined;
       const coord = place(`v:${v.id}`, at.coord);
       const bearing = heading && !still ? turn(view.glide, `v:${v.id}`, at.bearing, now) : at.bearing;
-      return point(coord, { id: v.id, route: v.route, label: routeName(view, v.route), mode: v.mode, bearing: heading ? bearing : 0, heading, towards: v.towards, occupancy: v.occupancy, fade: at.fade });
+      // Only what the map's layers draw; the vehicle panel reads the rest from view.vehicles.
+      return point(coord, { id: v.id, route: v.route, label: routeName(view, v.route), mode: v.mode, bearing: heading ? bearing : 0, heading, fade: at.fade, moving: "vehicle" });
     });
-    map.getSource("vehicles").setData(featureCollection(view.vehicleFeatures.filter(inView)));
+    moving.push(...view.vehicleFeatures.filter(inView));
   }
-  if (view.regionalTrains && map.getSource("regional-trains") && shownAt("regional", zoom)) {
-    view.regionalTrainFeatures = view.regionalTrains.trains.map((t) => point(place(`r:${t.id}`, trackPoint(t.track, now) || [t.lon, t.lat]), { id: t.id, line: t.line, colour: t.colour || "#4b5563" }));
-    map.getSource("regional-trains").setData(featureCollection(view.regionalTrainFeatures));
+  if (view.regionalTrains && shownAt("regional", zoom)) {
+    view.regionalTrainFeatures = view.regionalTrains.trains.map((t) => point(place(`r:${t.id}`, trackPoint(t.track, now) || [t.lon, t.lat]), { id: t.id, line: t.line, colour: t.colour || "#4b5563", moving: "regional" }));
+    moving.push(...view.regionalTrainFeatures);
   }
+  // One update for all three: separate sources each made the map render once more.
+  source.setData(featureCollection(moving));
   if (!still) pruneGlide(view.glide, now);
 }
 
@@ -1130,8 +1146,7 @@ function addSurfaceLayers(map) {
   const c = prefersDark() ? { stop: "#151515", stopStroke: "#8c8c8c", halo: "#0a0a0a", casing: "#0a0a0a" } : { stop: "#ffffff", stopStroke: "#64748b", halo: "#ffffff", casing: "#ffffff" };
   const modeColour = ["match", ["get", "mode"], ...Object.entries(SURFACE_COLOURS).filter(([m]) => m !== "bus").flat(), SURFACE_COLOURS.bus];
   map.addSource("route-path", { type: "geojson", data: featureCollection([]) });
-  map.addSource("bus-stops", { type: "geojson", data: featureCollection([]) });
-  map.addSource("vehicles", { type: "geojson", data: featureCollection([]) });
+  map.addSource("bus-stops", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM });
   const before = "line-casing";
   map.addLayer({ id: "route-path-casing", type: "line", source: "route-path", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": c.casing, "line-width": ["interpolate", ["linear"], ["zoom"], 10, 5, 16, 11] } }, before);
   map.addLayer({ id: "route-path", type: "line", source: "route-path", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": ["get", "colour"], "line-width": ["interpolate", ["linear"], ["zoom"], 10, 3, 16, 7], "line-opacity": 0.9 } }, before);
@@ -1139,21 +1154,21 @@ function addSurfaceLayers(map) {
     "circle-radius": ["interpolate", ["linear"], ["zoom"], 15, 2.5, 18, 6], "circle-color": c.stop, "circle-stroke-color": c.stopStroke, "circle-stroke-width": 1.4,
     "circle-opacity": ["interpolate", ["linear"], ["zoom"], 15, 0, 15.4, 1], "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 15, 0, 15.4, 1],
   } }, "outages");
-  map.addLayer({ id: "vehicles", type: "circle", source: "vehicles", minzoom: 11, maxzoom: 14, paint: {
+  map.addLayer({ id: "vehicles", type: "circle", source: "moving", filter: ["==", ["get", "moving"], "vehicle"], minzoom: 11, maxzoom: 14, paint: {
     "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 1.6, 14, 4], "circle-color": modeColour,
     "circle-stroke-color": c.casing, "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 11, 0.4, 14, 1.2],
     "circle-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0, 11.5, ["get", "fade"]], "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0, 11.5, ["get", "fade"]],
   } }, "outages");
   const iconSize = ["interpolate", ["linear"], ["zoom"], 14, 0.75, 17, 1.05];
-  map.addLayer({ id: "vehicle-heading", type: "symbol", source: "vehicles", minzoom: 14, filter: ["get", "heading"], layout: {
+  map.addLayer({ id: "vehicle-heading", type: "symbol", source: "moving", minzoom: 14, filter: ["all", ["==", ["get", "moving"], "vehicle"], ["get", "heading"]], layout: {
     "icon-image": "heading", "icon-size": iconSize, "icon-rotate": ["get", "bearing"], "icon-rotation-alignment": "map",
     "icon-allow-overlap": true, "icon-ignore-placement": true,
   }, paint: { "icon-color": modeColour } }, "outages");
-  map.addLayer({ id: "vehicle-icon", type: "symbol", source: "vehicles", minzoom: 14, layout: {
+  map.addLayer({ id: "vehicle-icon", type: "symbol", source: "moving", filter: ["==", ["get", "moving"], "vehicle"], minzoom: 14, layout: {
     "icon-image": ["concat", "badge-", ["get", "mode"]], "icon-size": iconSize,
     "icon-allow-overlap": true, "icon-ignore-placement": true,
   }, paint: { "icon-opacity": ["interpolate", ["linear"], ["zoom"], 14, 0, 14.3, ["get", "fade"]] } }, "outages");
-  map.addLayer({ id: "vehicle-label", type: "symbol", source: "vehicles", minzoom: 15, layout: {
+  map.addLayer({ id: "vehicle-label", type: "symbol", source: "moving", filter: ["==", ["get", "moving"], "vehicle"], minzoom: 15, layout: {
     "text-field": ["get", "label"], "text-font": ["Noto Sans Medium"], "text-size": 11, "text-anchor": "left", "text-offset": [1.3, 0],
     "text-allow-overlap": false, "text-optional": true,
   }, paint: { "text-color": modeColour, "text-halo-color": c.halo, "text-halo-width": 1.8 } });
@@ -1305,8 +1320,7 @@ function addRegionalPill(map) {
 function addRegionalLayers(map) {
   const c = prefersDark() ? { casing: "#0a0a0a", fill: "#151515", label: "#f0f0f0", halo: "#0a0a0a" } : { casing: "#ffffff", fill: "#ffffff", label: "#111418", halo: "#ffffff" };
   map.addSource("regional-lines", { type: "geojson", data: featureCollection([]) });
-  map.addSource("regional-stations", { type: "geojson", data: featureCollection([]) });
-  map.addSource("regional-trains", { type: "geojson", data: featureCollection([]) });
+  map.addSource("regional-stations", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM });
   addRegionalPill(map);
   const below = "route-path-casing";
   map.addLayer({ id: "regional-line-casing", type: "line", source: "regional-lines", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": c.casing, "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.5, 16, 8] } }, below);
@@ -1315,7 +1329,7 @@ function addRegionalLayers(map) {
     "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, ["case", ["get", "major"], 3.5, 2.5], 16, ["case", ["get", "major"], 8, 6.5]],
     "circle-color": c.fill, "circle-stroke-color": ["get", "colour"], "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 8, 1.4, 16, 3],
   } }, "outages");
-  map.addLayer({ id: "regional-trains", type: "symbol", source: "regional-trains", minzoom: SHOWN_FROM_ZOOM.regional, layout: {
+  map.addLayer({ id: "regional-trains", type: "symbol", source: "moving", filter: ["==", ["get", "moving"], "regional"], minzoom: SHOWN_FROM_ZOOM.regional, layout: {
     "icon-image": "regional-pill", "icon-size": ["interpolate", ["linear"], ["zoom"], 8, 0.75, 14, 1.15], "icon-allow-overlap": true, "icon-ignore-placement": true,
     "text-field": ["get", "line"], "text-font": ["Noto Sans Medium"], "text-size": ["interpolate", ["linear"], ["zoom"], 8, 7.5, 14, 11], "text-allow-overlap": true, "text-ignore-placement": true,
   }, paint: { "icon-color": ["get", "colour"], "icon-halo-color": c.casing, "icon-halo-width": 1.5, "text-color": "#ffffff" } }, "trains-halo");
@@ -1489,8 +1503,8 @@ const OSM_SOURCES = { parking: ["parking", "parking.geojson", "Parking"], bikePa
 function addOsmLayers(view) {
   const map = view.map;
   const c = prefersDark() ? { label: "#f0f0f0", halo: "#0a0a0a" } : { label: "#111418", halo: "#ffffff" };
-  map.addSource("parking", { type: "geojson", data: featureCollection([]) });
-  map.addSource("bike-parking", { type: "geojson", data: featureCollection([]) });
+  map.addSource("parking", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM });
+  map.addSource("bike-parking", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM });
   map.addLayer({ id: "bike-parking", type: "symbol", source: "bike-parking", minzoom: 14.5, layout: {
     "icon-image": "badge-rack", "icon-size": ["interpolate", ["linear"], ["zoom"], 14.5, 0.6, 18, 1], "icon-allow-overlap": ["step", ["zoom"], false, 16.5, true],
   } }, "outages");
@@ -1693,7 +1707,7 @@ function eventFeatures(data) {
 
 function addEventLayers(view) {
   const map = view.map;
-  map.addSource("events", { type: "geojson", data: featureCollection([]) });
+  map.addSource("events", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM });
   map.addLayer({ id: "events", type: "symbol", source: "events", minzoom: 12, layout: {
     "icon-image": ["case", ["get", "today"], "badge-event-today", "badge-event-week"],
     "icon-size": ["interpolate", ["linear"], ["zoom"], 12, ["case", ["get", "featured"], 0.75, 0.6], 16, ["case", ["get", "featured"], 1.1, 0.95]],
@@ -2272,9 +2286,11 @@ function addOverlayLayers(map, data) {
   const { lines: lineFc, stations, entrances } = networkFeatures(data);
   const c = prefersDark() ? { casing: "#0a0a0a", stationFill: "#151515", stationStroke: "#f0f0f0", label: "#f0f0f0", halo: "#0a0a0a", trainStroke: "#ffffff" } : { casing: "#ffffff", stationFill: "#ffffff", stationStroke: "#111418", label: "#111418", halo: "#ffffff", trainStroke: "#111418" };
   map.addSource("lines", { type: "geojson", data: lineFc });
-  map.addSource("stations", { type: "geojson", data: stations });
-  map.addSource("docks", { type: "geojson", data: dockFeatures(data, mapState.mode) });
-  map.addSource("trains", { type: "geojson", data: featureCollection([]) });
+  map.addSource("stations", { type: "geojson", data: stations, maxzoom: POINTS_MAXZOOM });
+  map.addSource("docks", { type: "geojson", data: dockFeatures(data, mapState.mode), maxzoom: POINTS_MAXZOOM });
+  // Subway trains, buses and streetcars, and regional trains (moveVehicles), told apart by
+  // each feature's `moving`.
+  map.addSource("moving", { type: "geojson", data: featureCollection([]) });
   map.addSource("me", { type: "geojson", data: featureCollection([]) });
   map.addSource("selected", { type: "geojson", data: featureCollection([]) });
   addMapIcons(map);
@@ -2302,7 +2318,7 @@ function addOverlayLayers(map, data) {
     "circle-color": c.stationFill, "circle-stroke-color": c.stationStroke, "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 16, 2.5],
   } });
   // Station entrances appear close up, step-free ones in their own colour.
-  map.addSource("entrances", { type: "geojson", data: entrances });
+  map.addSource("entrances", { type: "geojson", data: entrances, maxzoom: POINTS_MAXZOOM });
   map.addLayer({ id: "entrances", type: "symbol", source: "entrances", minzoom: 15, layout: {
     "icon-image": ["case", ["get", "step_free"], "badge-entrance-free", "badge-entrance"], "icon-size": ["interpolate", ["linear"], ["zoom"], 15, 0.7, 18, 1],
     "icon-allow-overlap": true, "text-field": ["step", ["zoom"], "", 16.5, ["get", "name"]], "text-font": ["Noto Sans Medium"], "text-size": 11,
@@ -2312,12 +2328,12 @@ function addOverlayLayers(map, data) {
   // Trains: small dots zoomed out, full icons from TRAIN_ICON_ZOOM, nothing further out
   // (motion.js SHOWN_FROM_ZOOM), as with buses.
   const trainColour = ["match", ["get", "line"], ...lines.flatMap((l) => [l.id, l.color || "#777"]), "#777"];
-  map.addLayer({ id: "trains-dot", type: "circle", source: "trains", minzoom: SHOWN_FROM_ZOOM.trains, maxzoom: TRAIN_ICON_ZOOM, paint: {
+  map.addLayer({ id: "trains-dot", type: "circle", source: "moving", filter: ["==", ["get", "moving"], "train"], minzoom: SHOWN_FROM_ZOOM.trains, maxzoom: TRAIN_ICON_ZOOM, paint: {
     "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 3.2, 12.5, 4.5], "circle-color": trainColour,
     "circle-stroke-color": c.casing, "circle-stroke-width": 1,
   } });
-  map.addLayer({ id: "trains-halo", type: "circle", source: "trains", minzoom: TRAIN_ICON_ZOOM, paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 7, 16, 15], "circle-color": "#000000", "circle-opacity": prefersDark() ? 0.35 : 0.12, "circle-blur": 0.6 } });
-  map.addLayer({ id: "trains", type: "symbol", source: "trains", minzoom: TRAIN_ICON_ZOOM, layout: {
+  map.addLayer({ id: "trains-halo", type: "circle", source: "moving", filter: ["==", ["get", "moving"], "train"], minzoom: TRAIN_ICON_ZOOM, paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 7, 16, 15], "circle-color": "#000000", "circle-opacity": prefersDark() ? 0.35 : 0.12, "circle-blur": 0.6 } });
+  map.addLayer({ id: "trains", type: "symbol", source: "moving", filter: ["==", ["get", "moving"], "train"], minzoom: TRAIN_ICON_ZOOM, layout: {
     "icon-image": ["concat", "badge-train-", ["get", "line"]], "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.55, 13, 0.8, 16, 1.05],
     "icon-allow-overlap": true, "icon-ignore-placement": true,
   } });
@@ -2584,8 +2600,15 @@ function pulseMe(view) {
   view.pulse = requestAnimationFrame(step);
 }
 
-// Redraws moving vehicles on every animation frame (fewer zoomed out, see MOTION_FRAME_MS);
-// with reduced motion, every MOTION_STILL_MS. Nothing is redrawn while the tab is hidden.
+// The time the fastest vehicle takes to move a pixel at this zoom and latitude.
+function motionGap(map) {
+  const metresPerPixel = (40075016.7 * Math.cos((map.getCenter().lat * Math.PI) / 180)) / (512 * 2 ** map.getZoom());
+  return Math.min(MOTION_MAX_MS, Math.max(MOTION_MIN_MS, (metresPerPixel / MOTION_SPEED_MPS) * 1000));
+}
+
+// Redraws moving vehicles once they can have moved a pixel (motionGap), and at most every
+// MOTION_PANNING_MS while the map moves; with reduced motion, every MOTION_STILL_MS.
+// Nothing is redrawn while the tab is hidden.
 function animateVehicles(view) {
   if (reduceMotion()) {
     view.timers.push(setInterval(() => { if (document.visibilityState === "visible") moveVehicles(view); }, MOTION_STILL_MS));
@@ -2598,10 +2621,8 @@ function animateVehicles(view) {
       view.animations.vehicles = requestAnimationFrame(step);
       return;
     }
-    const zoom = view.map.getZoom();
-    const gap = MOTION_FRAME_MS.find(([from]) => zoom >= from)[1];
-    // A pan or zoom also redraws, so vehicles entering the view are placed at once.
-    if (now - last >= gap || view.map.isMoving()) {
+    const gap = view.map.isMoving() ? Math.max(MOTION_PANNING_MS, motionGap(view.map)) : motionGap(view.map);
+    if (now - last >= gap) {
       last = now;
       moveVehicles(view);
     }
@@ -2840,7 +2861,7 @@ async function renderMap(focusKey) {
   const layersPanel = el("aside", { class: "map-panel", id: "map-layers", "aria-label": "Layers and legend", hidden: "hidden" });
   const safetyButton = el("button", { type: "button", class: "map-tool", "aria-label": "Safety", "aria-expanded": "false", "aria-controls": "map-safety", title: "Safety" }, iconSvg("shield", { size: 22 }));
   const safetyPanelEl = el("aside", { class: "map-panel safety", id: "map-safety", "aria-label": "Safety", hidden: "hidden" });
-  const search = el("input", { type: "search", class: "map-search", placeholder: "Search stations, stops or routes", "aria-label": "Search stations, stops or routes", autocomplete: "off", enterkeyhint: "go" });
+  const search = el("input", { type: "search", id: "map-search", name: "q", class: "map-search", placeholder: "Search stations, stops or routes", "aria-label": "Search stations, stops or routes", autocomplete: "off", enterkeyhint: "go" });
   const results = el("ul", { class: "map-results" });
   const modeGroup = el("span", { class: "chip-group", role: "group", "aria-label": "Show Bike Share" });
   const toolbar = el("div", { class: "map-toolbar" }, el("div", { class: "map-search-row" }, el("div", { class: "map-search-wrap" }, search, results), layersButton, safetyButton), status);
@@ -3099,7 +3120,13 @@ async function renderMap(focusKey) {
     const start = mapState.view || MAP_HOME;
     const map = new lib.Map({
       container, style: mapStyle(hasBasemap), center: start.center, zoom: start.zoom, minZoom: 8, maxZoom: 18.5,
-      maxBounds: MAP_BOUNDS, attributionControl: false, dragRotate: false, pitchWithRotate: false, fadeDuration: reduceMotion() ? 0 : 200,
+      maxBounds: MAP_BOUNDS, attributionControl: false, dragRotate: false, pitchWithRotate: false,
+      // Labels appear without a fade: the fade kept the map repainting for 200 ms after
+      // every vehicle redraw, which with moving vehicles meant without pause.
+      fadeDuration: 0,
+      // Tiles are kept for 3 zoom levels around the current one rather than 5: every
+      // source keeps its own, and the map's memory went past 700 MB on a large screen.
+      maxTileCacheZoomLevels: 3,
     });
     map.touchZoomRotate.disableRotation();
     map.addControl(new lib.NavigationControl({ showCompass: false }), "bottom-right");
