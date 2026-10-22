@@ -638,6 +638,8 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
 .stat b { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
 .stat span { font-size: 0.78rem; color: var(--muted); }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; flex: none; }
+/* A line led by the live dot: the dot centred on the text, with a gap after it. */
+.with-dot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .maplibregl-ctrl-group { border-radius: var(--radius) !important; box-shadow: var(--control-shadow) !important; border: 1px solid var(--control-edge); overflow: hidden; }
 .maplibregl-ctrl-group button { width: 40px !important; height: 40px !important; }
 .maplibregl-ctrl-bottom-right { bottom: 8px; }

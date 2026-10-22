@@ -1347,7 +1347,7 @@ function regionalTrainSheet(view, id) {
     el("p", { class: "sheet-kicker" }, "Regional train"),
     el("h2", { class: "with-badge" }, regionalPill(t.line, t.colour), `${t.line_name} towards ${t.destination}`),
     el("p", {}, t.at_station ? `At ${t.at_station}` : t.next_station ? `Next: ${t.next_station}` : "Arriving", t.next_arrival && !t.at_station ? el("span", { class: "muted" }, ` · ${t.live ? "expected" : "scheduled"} ${timeFmt.format(new Date(t.next_arrival))}`) : ""),
-    t.live ? el("p", {}, el("span", { class: "live-dot", "aria-hidden": "true" }), "Live", t.delay_minutes !== null ? [" · ", regionalDelay(t.delay_minutes)] : "") : null,
+    t.live ? el("p", { class: "with-dot" }, el("span", { class: "live-dot", "aria-hidden": "true" }), el("span", {}, "Live", t.delay_minutes !== null ? [" · ", regionalDelay(t.delay_minutes)] : "")) : null,
     alerts.length ? el("p", { class: "sheet-label" }, "Service alerts") : null,
     regionalAlerts(alerts),
     el("p", { class: "muted small" }, t.live ? "Position from Metrolinx's live report, moved along the track by the timetable between reports." : "No live report for this train right now, so it is placed by the published timetable."),
@@ -1369,7 +1369,7 @@ function regionalStationSheet(view, id, data) {
     data.departures.length
       ? el("ul", { class: "sheet-list" }, data.departures.map((d) => el("li", { class: "arrival-row" },
         el("span", { class: "with-badge" }, regionalPill(d.line, d.colour, { small: true }), el("span", {}, d.destination, d.cancelled ? el("span", { class: "warn" }, " · Cancelled") : d.delay_minutes ? [" · ", regionalDelay(d.delay_minutes)] : "")),
-        el("span", { class: "mins" }, d.live && !d.cancelled ? el("span", { class: "live-dot", "aria-hidden": "true" }) : null, d.minutes < 1 ? "Now" : d.minutes < 60 ? `${d.minutes} min` : timeFmt.format(new Date(d.departs))))))
+        el("span", { class: "mins with-dot" }, d.live && !d.cancelled ? el("span", { class: "live-dot", "aria-hidden": "true" }) : null, d.minutes < 1 ? "Now" : d.minutes < 60 ? `${d.minutes} min` : timeFmt.format(new Date(d.departs))))))
       : el("p", { class: "muted" }, "No departures in the next three hours."),
     el("p", { class: "muted small" }, data.source === "live" ? "Times marked live are Metrolinx's predictions; the rest follow the published timetable." : "From the published timetable: no live reports for these trains right now."),
     s ? planHere(view, [s.lon, s.lat], s.name) : null,
