@@ -849,7 +849,9 @@ const MOTION_MAX_MS = 1000;
 const MOTION_PANNING_MS = 200;
 const MOTION_STILL_MS = 5000; // With reduced motion.
 // Sources of fixed points (stops, stations, docks) are cut into tiles up to this zoom and
-// scaled up beyond it, which places a point exactly; finer tiles only used memory.
+// scaled up beyond it, which places a point exactly; finer tiles only used memory. Point
+// sources also have no tile buffer: a point lies in one tile, so copies of those near an
+// edge in the neighbouring tiles were never drawn.
 const POINTS_MAXZOOM = 14;
 const BIKES_REFRESH_MS = 120000; // Bike Share data changes every 15 minutes.
 const WALK_METRES_PER_MIN = 80;
@@ -1146,7 +1148,7 @@ function addSurfaceLayers(map) {
   const c = prefersDark() ? { stop: "#151515", stopStroke: "#8c8c8c", halo: "#0a0a0a", casing: "#0a0a0a" } : { stop: "#ffffff", stopStroke: "#64748b", halo: "#ffffff", casing: "#ffffff" };
   const modeColour = ["match", ["get", "mode"], ...Object.entries(SURFACE_COLOURS).filter(([m]) => m !== "bus").flat(), SURFACE_COLOURS.bus];
   map.addSource("route-path", { type: "geojson", data: featureCollection([]) });
-  map.addSource("bus-stops", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM });
+  map.addSource("bus-stops", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM, buffer: 0 });
   const before = "line-casing";
   map.addLayer({ id: "route-path-casing", type: "line", source: "route-path", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": c.casing, "line-width": ["interpolate", ["linear"], ["zoom"], 10, 5, 16, 11] } }, before);
   map.addLayer({ id: "route-path", type: "line", source: "route-path", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": ["get", "colour"], "line-width": ["interpolate", ["linear"], ["zoom"], 10, 3, 16, 7], "line-opacity": 0.9 } }, before);
@@ -1320,7 +1322,7 @@ function addRegionalPill(map) {
 function addRegionalLayers(map) {
   const c = prefersDark() ? { casing: "#0a0a0a", fill: "#151515", label: "#f0f0f0", halo: "#0a0a0a" } : { casing: "#ffffff", fill: "#ffffff", label: "#111418", halo: "#ffffff" };
   map.addSource("regional-lines", { type: "geojson", data: featureCollection([]) });
-  map.addSource("regional-stations", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM });
+  map.addSource("regional-stations", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM, buffer: 0 });
   addRegionalPill(map);
   const below = "route-path-casing";
   map.addLayer({ id: "regional-line-casing", type: "line", source: "regional-lines", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": c.casing, "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.5, 16, 8] } }, below);
@@ -1503,8 +1505,8 @@ const OSM_SOURCES = { parking: ["parking", "parking.geojson", "Parking"], bikePa
 function addOsmLayers(view) {
   const map = view.map;
   const c = prefersDark() ? { label: "#f0f0f0", halo: "#0a0a0a" } : { label: "#111418", halo: "#ffffff" };
-  map.addSource("parking", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM });
-  map.addSource("bike-parking", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM });
+  map.addSource("parking", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM, buffer: 0 });
+  map.addSource("bike-parking", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM, buffer: 0 });
   map.addLayer({ id: "bike-parking", type: "symbol", source: "bike-parking", minzoom: 14.5, layout: {
     "icon-image": "badge-rack", "icon-size": ["interpolate", ["linear"], ["zoom"], 14.5, 0.6, 18, 1], "icon-allow-overlap": ["step", ["zoom"], false, 16.5, true],
   } }, "outages");
@@ -1707,7 +1709,7 @@ function eventFeatures(data) {
 
 function addEventLayers(view) {
   const map = view.map;
-  map.addSource("events", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM });
+  map.addSource("events", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM, buffer: 0 });
   map.addLayer({ id: "events", type: "symbol", source: "events", minzoom: 12, layout: {
     "icon-image": ["case", ["get", "today"], "badge-event-today", "badge-event-week"],
     "icon-size": ["interpolate", ["linear"], ["zoom"], 12, ["case", ["get", "featured"], 0.75, 0.6], 16, ["case", ["get", "featured"], 1.1, 0.95]],
@@ -2286,11 +2288,11 @@ function addOverlayLayers(map, data) {
   const { lines: lineFc, stations, entrances } = networkFeatures(data);
   const c = prefersDark() ? { casing: "#0a0a0a", stationFill: "#151515", stationStroke: "#f0f0f0", label: "#f0f0f0", halo: "#0a0a0a", trainStroke: "#ffffff" } : { casing: "#ffffff", stationFill: "#ffffff", stationStroke: "#111418", label: "#111418", halo: "#ffffff", trainStroke: "#111418" };
   map.addSource("lines", { type: "geojson", data: lineFc });
-  map.addSource("stations", { type: "geojson", data: stations, maxzoom: POINTS_MAXZOOM });
-  map.addSource("docks", { type: "geojson", data: dockFeatures(data, mapState.mode), maxzoom: POINTS_MAXZOOM });
+  map.addSource("stations", { type: "geojson", data: stations, maxzoom: POINTS_MAXZOOM, buffer: 0 });
+  map.addSource("docks", { type: "geojson", data: dockFeatures(data, mapState.mode), maxzoom: POINTS_MAXZOOM, buffer: 0 });
   // Subway trains, buses and streetcars, and regional trains (moveVehicles), told apart by
   // each feature's `moving`.
-  map.addSource("moving", { type: "geojson", data: featureCollection([]) });
+  map.addSource("moving", { type: "geojson", data: featureCollection([]), buffer: 0 });
   map.addSource("me", { type: "geojson", data: featureCollection([]) });
   map.addSource("selected", { type: "geojson", data: featureCollection([]) });
   addMapIcons(map);
@@ -2318,7 +2320,7 @@ function addOverlayLayers(map, data) {
     "circle-color": c.stationFill, "circle-stroke-color": c.stationStroke, "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 16, 2.5],
   } });
   // Station entrances appear close up, step-free ones in their own colour.
-  map.addSource("entrances", { type: "geojson", data: entrances, maxzoom: POINTS_MAXZOOM });
+  map.addSource("entrances", { type: "geojson", data: entrances, maxzoom: POINTS_MAXZOOM, buffer: 0 });
   map.addLayer({ id: "entrances", type: "symbol", source: "entrances", minzoom: 15, layout: {
     "icon-image": ["case", ["get", "step_free"], "badge-entrance-free", "badge-entrance"], "icon-size": ["interpolate", ["linear"], ["zoom"], 15, 0.7, 18, 1],
     "icon-allow-overlap": true, "text-field": ["step", ["zoom"], "", 16.5, ["get", "name"]], "text-font": ["Noto Sans Medium"], "text-size": 11,
@@ -3127,6 +3129,9 @@ async function renderMap(focusKey) {
       // Tiles are kept for 3 zoom levels around the current one rather than 5: every
       // source keeps its own, and the map's memory went past 700 MB on a large screen.
       maxTileCacheZoomLevels: 3,
+      // The canvas and its buffers grow with the square of the pixel ratio; past 2 (most
+      // phones are 3) the extra sharpness is hard to see but uses 2.25 times the memory.
+      pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
     });
     map.touchZoomRotate.disableRotation();
     map.addControl(new lib.NavigationControl({ showCompass: false }), "bottom-right");
