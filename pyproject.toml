@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling==1.27.0"]
+requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [project]
@@ -10,26 +10,26 @@ license = "MIT"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "httpx==0.28.1",
-  "psycopg[binary]==3.2.10",
+  "psycopg[binary]==3.3.6",
   "streamlit==1.66.1",
   "pillow==13.0.0", # Security fixes for Streamlit's image dependency.
   "pandas==2.3.3",
-  "tzdata==2025.2",
+  "tzdata==2025.3",
   "gtfs-realtime-bindings==2.2.0",
-  "fastapi==0.141.1",
-  "uvicorn==0.53.0",
+  "fastapi==0.158.2",
+  "uvicorn==0.54.0",
   "pyarrow==26.0.0", # Open-data Parquet and CSV files (already locked via Streamlit).
   "pmtiles==3.8.1",
-  "ijson==3.3.0", # Streams the 225 MB city events feed instead of loading it whole.
-  "osmium==4.3.1", # Reads the OpenStreetMap extract for station entrances and parking.
+  "ijson==3.6.0", # Streams the 225 MB city events feed instead of loading it whole.
+  "osmium==4.3.2", # Reads the OpenStreetMap extract for station entrances and parking.
 ]
 
 [project.scripts]
 transit = "transit.cli:main"
 
 [dependency-groups]
-dev = ["pytest==9.0.3", "ruff==0.14.2"]
-browser = ["playwright==1.56.0"]
+dev = ["pytest==9.1.1", "ruff==0.17.1"]
+browser = ["playwright==1.64.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/transit"]
