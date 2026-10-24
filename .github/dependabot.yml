@@ -1,7 +1,8 @@
 # Weekly update pull requests for pinned dependencies; CI runs on each one. Security
 # fixes are proposed as soon as an advisory is published, regardless of this schedule.
 # Major versions are left out: each needs its own review (a PostgreSQL major version
-# needs a data upgrade, and Python's version is pinned in .python-version and the lock).
+# needs a data upgrade, and Python stays on 3.12 through .python-version). dbt minor
+# versions are left out too: dbt_project.yml accepts one minor version at a time.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -21,6 +22,10 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "dbt-core"
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: "dbt-postgres"
+        update-types: ["version-update:semver-minor"]
   - package-ecosystem: docker
     directories: [/, /airflow, /docker]
     schedule:
