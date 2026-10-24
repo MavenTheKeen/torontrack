@@ -45,7 +45,7 @@ services:
     restart: unless-stopped
 
   backup:
-    image: mirror.gcr.io/library/postgres:16.15-bookworm@sha256:0ea6700a3b4f0ae6ce746519073558aed4d88a79d8d07622a9a644946c7319c4
+    image: mirror.gcr.io/library/postgres:16.15-bookworm@sha256:d81f7b51697014367236d07ec58b54153fc28f828b72bf247fe5c7487520bcb0
     entrypoint: ["sh", "/backup.sh"]
     environment:
       PGHOST: postgres
