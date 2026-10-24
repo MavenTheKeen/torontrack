@@ -500,13 +500,14 @@ def create_app(
     def matched(conn, now):
         """Vehicles matched to their route patterns, the TTC's then other agencies',
         shared by the vehicle and stop endpoints for one cache period."""
-        return live.get(
-            "matched",
-            lambda: ttc_part(
+
+        def build():
+            ttc = ttc_part(
                 lambda: surface.matched_vehicles(conn, queries.feed_version(conn), now), []
             )
-            + agencies.matched_vehicles(conn, now),
-        )
+            return ttc + agencies.matched_vehicles(conn, now)
+
+        return live.get("matched", build)
 
     @app.get("/api/vehicles")
     def vehicles():
