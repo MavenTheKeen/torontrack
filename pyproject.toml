@@ -16,7 +16,7 @@ dependencies = [
   "pandas==2.3.3",
   "tzdata==2025.3",
   "gtfs-realtime-bindings==2.2.0",
-  "fastapi==0.158.2",
+  "fastapi==0.161.0",
   "uvicorn==0.54.0",
   "pyarrow==26.0.0", # Open-data Parquet and CSV files (already locked via Streamlit).
   "pmtiles==3.8.1",
@@ -28,8 +28,8 @@ dependencies = [
 transit = "transit.cli:main"
 
 [dependency-groups]
-dev = ["pytest==9.1.1", "ruff==0.17.1"]
-browser = ["playwright==1.64.0"]
+dev = ["pytest==9.1.1", "ruff==0.17.2"]
+browser = ["playwright==1.64.1"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/transit"]
