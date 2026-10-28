@@ -1,6 +1,9 @@
 """Public API: pure helpers offline, endpoints against a seeded *_test database."""
 
 import re
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import timedelta
 
@@ -35,6 +38,26 @@ def test_cache_expires_after_ttl():
     assert cache.get("k", lambda: "b") == "a"
     clock.now = 15.1
     assert cache.get("k", lambda: "c") == "c"
+
+
+def test_cache_computes_once_for_simultaneous_misses():
+    cache, calls, started = TTLCache(15), [], threading.Event()
+
+    def slow():
+        calls.append(1)
+        started.set()
+        time.sleep(0.2)
+        return "a"
+
+    with ThreadPoolExecutor(4) as pool:
+        first = pool.submit(cache.get, "k", slow)
+        started.wait()
+        rest = [pool.submit(cache.get, "k", slow) for _ in range(3)]
+        assert {f.result() for f in [first, *rest]} == {"a"}
+    assert len(calls) == 1
+    with pytest.raises(ValueError):
+        cache.get("bad", lambda: int("x"))
+    assert cache.get("bad", lambda: "ok") == "ok"  # A failure is not kept.
 
 
 def test_rate_limit_is_per_client_sliding_minute():
