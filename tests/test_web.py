@@ -567,3 +567,13 @@ def test_head_robots_and_favicon():
     assert robots.status_code == 200 and "Disallow: /api/" in robots.text
     icon = client.get("/favicon.ico")
     assert icon.status_code == 200 and icon.headers["content-type"] == "image/png"
+
+
+def test_static_files_revalidate_and_libraries_are_cached():
+    client = TestClient(create_app(Settings("postgresql://unused/db")))
+    own = client.get("/static/app.js")
+    assert own.headers["cache-control"] == "no-cache"
+    again = client.get("/static/app.js", headers={"If-None-Match": own.headers["etag"]})
+    assert again.status_code == 304
+    library = client.get("/static/vendor/pmtiles/pmtiles.js")
+    assert library.headers["cache-control"] == "public, max-age=86400"

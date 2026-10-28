@@ -368,6 +368,14 @@ def create_app(
         elif request.url.path.startswith("/map-data/") and response.status_code in (200, 206):
             # Rebuilt rarely; the map reads it in ranges, which browsers cache too.
             response.headers["Cache-Control"] = "public, max-age=86400"
+        elif request.url.path.startswith(("/static/vendor/", "/static/fonts/")):
+            # The map library (1.1 MB) and the font change only with an upgrade.
+            response.headers["Cache-Control"] = "public, max-age=86400"
+        elif request.url.path.startswith("/static/"):
+            # The site's own files are checked on every load (a 304 while unchanged), so a
+            # deploy reaches visitors at once rather than after a browser's guessed
+            # freshness, which could pair an old app.js with a new API.
+            response.headers["Cache-Control"] = "no-cache"
         return response
 
     # HEAD too, as uptime monitors and link previews use it.
