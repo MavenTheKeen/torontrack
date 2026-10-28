@@ -122,22 +122,41 @@ class Encoded:
 
 
 class TTLCache:
+    """Values kept for `seconds`. Requests that miss the same key at the same time wait for
+    one computation rather than each running it: when the live vehicles expire, every
+    open map asks for them within the same few seconds."""
+
     def __init__(self, seconds: float, clock=time.monotonic):
         self.seconds, self.clock = seconds, clock
         self.items: dict = {}
+        self.building: dict = {}
         self.lock = threading.Lock()
 
+    def _fresh(self, key):
+        hit = self.items.get(key)
+        return hit if hit and hit[0] > self.clock() else None
+
     def get(self, key, compute):
-        now = self.clock()
         with self.lock:
-            hit = self.items.get(key)
-            if hit and hit[0] > now:
+            if hit := self._fresh(key):
                 return hit[1]
-        value = compute()
-        with self.lock:
-            self.items[key] = (now + self.seconds, value)
-            if len(self.items) > 500:  # Unknown station keys cannot grow memory unbounded.
-                self.items = {k: v for k, v in self.items.items() if v[0] > now}
+            building = self.building.setdefault(key, threading.Lock())
+        with building:
+            with self.lock:
+                if hit := self._fresh(key):
+                    return hit[1]
+            now = self.clock()
+            try:
+                value = compute()
+            except BaseException:
+                with self.lock:
+                    self.building.pop(key, None)
+                raise
+            with self.lock:
+                self.items[key] = (now + self.seconds, value)
+                self.building.pop(key, None)
+                if len(self.items) > 500:  # Unknown station keys cannot grow memory unbounded.
+                    self.items = {k: v for k, v in self.items.items() if v[0] > now}
         return value
 
 
