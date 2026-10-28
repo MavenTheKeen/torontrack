@@ -8,11 +8,12 @@ your location is never needed. Up to four trips are
 listed, earliest arrival first. The chosen trip is drawn on the map, with its steps listed
 below it. Trips can leave now, leave at a time, or arrive by a time, up to 60 days ahead.
 
-Plans use live times where the agencies publish them: the planner reads the TTC's and the
-neighbouring agencies' live trip updates every minute, so a late bus moves the plan, and
-each ride says how late or early it is. Trips without live data, and those later in the
-day, use the timetable. GO and UP Express plans use the timetable: Metrolinx's feed address
-carries the API key, and OpenTripPlanner writes each feed's address to its log.
+Brampton Transit, MiWay and YRT rides use live times: the planner reads those agencies'
+live trip updates every minute, so a late bus moves the plan, and the ride says how late or
+early it is. TTC, GO and UP Express plans use the timetable. The TTC's live trip IDs are not
+its timetable's, so the planner cannot match them; Metrolinx's feed address carries the API
+key, and OpenTripPlanner writes each feed's address to its log. The station and stop panels
+show live times for all of them.
 
 Trip plans: [OpenTripPlanner](https://www.opentripplanner.org/) 2.10 (LGPL), self-hosted,
 with:

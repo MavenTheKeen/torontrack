@@ -23,7 +23,7 @@ from pathlib import Path
 
 from transit import agencies, maptiles, regional
 from transit.http import FeedClient, FetchError
-from transit.ttc.sources import REALTIME_FEEDS, STATIC_GTFS_URL, STATIC_HOST
+from transit.ttc.sources import STATIC_GTFS_URL, STATIC_HOST
 
 OSM_HOST = "download.openstreetmap.fr"
 OSM_URL = f"https://{OSM_HOST}/extracts/north-america/canada/ontario/golden_horseshoe.osm.pbf"
@@ -86,10 +86,10 @@ ROUTER_CONFIG = {
             "frequency": "1m",
             "network": "bike_share_toronto",
         },
-        # Live trip updates, so plans use the times vehicles are expected rather than the
-        # timetable's: the TTC's and the three neighbouring agencies'. Not Metrolinx's: its
-        # URL carries the API key, and OpenTripPlanner logs each updater's URL.
-        *(_trip_updates("ttc", REALTIME_FEEDS[feed]) for feed in ("trips_surface", "trips_subway")),
+        # Live trip updates from the three neighbouring agencies, so their buses are planned
+        # at the times they are expected. Not the TTC's: its live trip IDs are not its
+        # timetable's, so none match. Not Metrolinx's: its URL carries the API key, and
+        # OpenTripPlanner logs each updater's URL.
         *(_trip_updates(key, a.trips_url) for key, a in agencies.AGENCIES.items()),
     ],
 }
