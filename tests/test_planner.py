@@ -357,10 +357,8 @@ def test_live_times_replace_the_timetable_where_a_feed_gives_them():
     assert web_planner._leg(leg("WALK", "09:00", "09:05"))["delay_minutes"] is None
 
 
-def test_planner_reads_every_live_trip_feed_without_the_metrolinx_key():
+def test_planner_reads_live_trip_feeds_that_need_no_key():
+    # The planner logs each feed's URL, so Metrolinx's, which carries its key, is left out.
     updaters = [u for u in planner.ROUTER_CONFIG["updaters"] if u["type"] == "stop-time-updater"]
-    feeds = {u["feedId"] for u in updaters}
-    assert {"ttc", "go"} | set(planner.agencies.AGENCIES) == feeds
-    [go] = [u for u in updaters if u["feedId"] == "go"]
-    assert go["url"].endswith("?key=${METROLINX_API_KEY}")
-    assert go["headers"] == {"Accept": "application/x-protobuf"}
+    assert {u["feedId"] for u in updaters} == {"ttc"} | set(planner.agencies.AGENCIES)
+    assert not any("key" in u["url"] for u in updaters)

@@ -244,7 +244,6 @@ services:
     volumes:
       - planner-data:/var/opentripplanner
       - ./docker/planner.sh:/planner.sh:ro
-    secrets: [metrolinx_api_key]
     depends_on:
       planner-data:
         condition: service_completed_successfully
