@@ -332,7 +332,9 @@ def create_app(
             return read(conn)
 
     # The map response lists every Bike Share dock (~200 KB); compressed it is a fraction.
-    app.add_middleware(GZipMiddleware, minimum_size=1000)
+    # Level 6 rather than 9: half the CPU on the live vehicles (7 ms instead of 15 ms per
+    # response) for a body 2% larger.
+    app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 
     @app.middleware("http")
     async def protect(request: Request, call_next):
