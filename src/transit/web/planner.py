@@ -31,12 +31,14 @@ query Plan($origin: PlanLabeledLocationInput!, $destination: PlanLabeledLocation
       start end numberOfTransfers walkDistance
       legs {
         mode duration distance headsign rentedBike
-        start { scheduledTime } end { scheduledTime }
+        start { scheduledTime estimated { time } } end { scheduledTime estimated { time } }
         from { name lat lon stop { gtfsId } vehicleRentalStation { name } }
         to { name lat lon stop { gtfsId } vehicleRentalStation { name } }
         route { gtfsId shortName longName color }
         legGeometry { points }
-        intermediatePlaces { name lat lon stop { gtfsId } arrival { scheduledTime } }
+        intermediatePlaces {
+          name lat lon stop { gtfsId } arrival { scheduledTime estimated { time } }
+        }
         steps { distance relativeDirection streetName bogusName lat lon }
       }
     } }
@@ -142,6 +144,24 @@ def _headsign(headsign: str | None, network: str | None) -> str | None:
     return headsign.split(" towards ", 1)[-1]
 
 
+def _time(at: dict | None) -> str | None:
+    """The live estimate where the agency's feed gives one, else the timetable's time."""
+    if not at:
+        return None
+    return (at.get("estimated") or {}).get("time") or at["scheduledTime"]
+
+
+def _delay_minutes(at: dict) -> int | None:
+    """Minutes late (negative: early) at boarding from the live feed; None if not live."""
+    estimated = (at.get("estimated") or {}).get("time")
+    if not estimated:
+        return None
+    seconds = (
+        datetime.fromisoformat(estimated) - datetime.fromisoformat(at["scheduledTime"])
+    ).total_seconds()
+    return round(seconds / 60)
+
+
 def _leg(leg: dict) -> dict:
     route = leg.get("route") or {}
     transit = leg["mode"] in TRANSIT_MODES
@@ -174,8 +194,11 @@ def _leg(leg: dict) -> dict:
         "to_point": [round(leg["to"]["lon"], 6), round(leg["to"]["lat"], 6)],
         "from_stop_id": _stop_id(leg["from"]) if transit else None,
         "to_stop_id": _stop_id(leg["to"]) if transit else None,
-        "start": leg["start"]["scheduledTime"],
-        "end": leg["end"]["scheduledTime"],
+        "start": _time(leg["start"]),
+        "end": _time(leg["end"]),
+        # From the live trip feeds the planner reads (docs/planner.md); None when the
+        # times are the timetable's.
+        "delay_minutes": _delay_minutes(leg["start"]) if transit else None,
         "seconds": round(leg["duration"]),
         "metres": round(leg["distance"]),
         "path": decode_polyline((leg.get("legGeometry") or {}).get("points") or ""),
@@ -184,7 +207,7 @@ def _leg(leg: dict) -> dict:
             {
                 "name": _place(p) or p["name"],
                 "point": [round(p["lon"], 6), round(p["lat"], 6)],
-                "arrival": (p.get("arrival") or {}).get("scheduledTime"),
+                "arrival": _time(p.get("arrival")),
             }
             for p in leg.get("intermediatePlaces") or []
         ]

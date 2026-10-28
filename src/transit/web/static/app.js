@@ -2007,6 +2007,7 @@ function planSteps(trip, stepFree = false) {
         leg.entrance === null && stepFree ? door("stepfree", "No step-free entrance is mapped here; check before you go") : null,
         el("strong", {}, `${timeFmt.format(new Date(leg.start))} `), `${PLAN_MODES[leg.mode] || "Transit"} from ${leg.from}`,
         leg.headsign ? el("span", { class: "muted" }, ` towards ${leg.headsign}`) : null,
+        leg.delay_minutes !== null && leg.delay_minutes !== undefined ? [" · ", regionalDelay(leg.delay_minutes)] : null,
         el("br"),
         el("strong", {}, `${timeFmt.format(new Date(leg.end))} `), `Get off at ${leg.to}`,
         leg.exit ? door(leg.exit.step_free ? "stepfree" : "entrance", `Exit by ${doorText(leg.exit)}`) : null,

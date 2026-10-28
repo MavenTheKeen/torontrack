@@ -8,8 +8,15 @@ your location is never needed. Up to four trips are
 listed, earliest arrival first. The chosen trip is drawn on the map, with its steps listed
 below it. Trips can leave now, leave at a time, or arrive by a time, up to 60 days ahead.
 
-Plans come from published timetables, not live predictions. The station and stop panels
-still show live times.
+Plans use live times where the agencies publish them: the planner reads the TTC's, the
+neighbouring agencies' and Metrolinx's live trip updates every minute, so a late bus or
+train moves the plan, and each ride says how late or early it is. Trips without live data,
+and those later in the day, use the timetable.
+
+The Metrolinx key is not stored in the planner's configuration: `router-config.json` names
+`${METROLINX_API_KEY}`, which `docker/planner.sh` sets from the `metrolinx_api_key` secret.
+Without the key, only the GO and UP Express updates fail to load. Metrolinx's licence allows
+this use; the planner does not pass the feed on.
 
 Trip plans: [OpenTripPlanner](https://www.opentripplanner.org/) 2.10 (LGPL), self-hosted,
 with:
