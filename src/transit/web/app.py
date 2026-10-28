@@ -176,7 +176,7 @@ def create_app(
     osm = access.Layers(map_dir)
     cache = TTLCache(CACHE_SECONDS)
     live = TTLCache(LIVE_SECONDS)
-    # The routes' usual pace by hour changes slowly; recomputed hourly.
+    # The routes' usual pace by hour changes slowly; read from its dbt table hourly.
     slow = TTLCache(3600)
     limiter = RateLimiter(settings.web_rate_limit_per_minute)
     # Each trip plan is a routing search, far costlier than a cached read.
@@ -514,7 +514,7 @@ def create_app(
         def build(conn, now):
             try:
                 version = queries.feed_version(conn)
-                pace = slow.get(f"pace:{version}", lambda: surface.typical_pace(conn, version, now))
+                pace = slow.get(f"pace:{version}", lambda: surface.typical_pace(conn, version))
             except (psycopg.Error, queries.NotFound):
                 pace = {}  # Without a usual pace, vehicles move at the timetable's.
             return surface.vehicles(matched(conn, now), now, pace)

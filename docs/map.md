@@ -116,8 +116,10 @@ second instead of snapping at each corner of the route.
 
 A route's usual pace is the timetable seconds its vehicles cover per real second at that
 hour, measured from consecutive stop passages of the same vehicle over the last 28 days
-(`surface.typical_pace`, recomputed hourly; about 5,000 route, direction and hour
-combinations). The 504 King streetcar, for example, runs at 0.75 to 0.8 of its timetable
+(the dbt model `analytics.ttc_surface_pace`, rebuilt with the other models every 15
+minutes and read by the site hourly; about 5,500 route, direction and hour combinations).
+Over 28 days of passages the calculation takes several seconds, so it is not run while a
+visitor waits. The 504 King streetcar, for example, runs at 0.75 to 0.8 of its timetable
 pace in the rush hours and faster than it overnight. Without passages, the timetable's pace
 is used.
 

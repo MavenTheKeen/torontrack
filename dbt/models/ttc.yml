@@ -225,6 +225,14 @@ models:
       - name: headway_seconds
         data_tests:
           - not_null
+  - name: ttc_surface_pace
+    description: >-
+      Seconds of timetable a route's vehicles cover per real second, by route, direction
+      and hour, over the last 28 days; the map moves buses at this pace between reports.
+    columns:
+      - name: pace
+        data_tests:
+          - not_null
   - name: ttc_surface_reliability_daily
     description: >-
       Bus and streetcar headways per route, direction and day on frequent service:
