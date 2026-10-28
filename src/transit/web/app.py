@@ -20,8 +20,9 @@ from pathlib import Path
 import httpx
 import psycopg
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from transit import events, places, roads
@@ -98,6 +99,24 @@ PERMISSIONS_POLICY = ", ".join(
         ),
     ]
 )
+
+
+class Encoded:
+    """A cached response body, encoded to JSON the first time it is served and kept that
+    way, rather than on every request: encoding the 1.7 MB stop list took 0.2 s."""
+
+    def __init__(self, data):
+        self.data, self.body = data, None
+
+    def response(self) -> Response:
+        if self.body is None:
+            self.body = json.dumps(
+                jsonable_encoder(self.data),
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+            ).encode()
+        return Response(self.body, media_type="application/json")
 
 
 class TTLCache:
@@ -236,17 +255,21 @@ def create_app(
         statuses = queries.line_statuses(static["lines"], alerts, alerts_fresh, detected)
         return static, state, alerts, statuses
 
-    def cached(key, build, attribution=ATTRIBUTION, store=None):
+    def cached(key, build, attribution=ATTRIBUTION, store=None, data=False):
+        """The endpoint's response, built at most once per cache period; with `data`, the
+        body itself, for use inside another endpoint."""
+
         def compute():
             now = clock()
             with connect(db_url()) as conn:
                 body = build(conn, now)
-            return {"generated_at": now, "attribution": attribution, **body}
+            return Encoded({"generated_at": now, "attribution": attribution, **body})
 
         try:
-            return (store or cache).get(key, compute)
+            entry = (store or cache).get(key, compute)
         except queries.NotFound as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return entry.data if data else entry.response()
 
     # The map response lists every Bike Share dock (~200 KB); compressed it is a fraction.
     app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -739,7 +762,7 @@ def create_app(
         except planner.PlannerError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         try:
-            context = cached("plan-context", plan_context)
+            context = cached("plan-context", plan_context, data=True)
         except (psycopg.Error, RuntimeError, HTTPException):
             # Without the database, plans still work; they just lack entrances and outages.
             logger.warning("Trip plan annotations unavailable", exc_info=True)
