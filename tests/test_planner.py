@@ -332,3 +332,35 @@ def test_neighbouring_agency_legs_are_named_in_normal_case():
     [ride] = trip["legs"]
     assert (ride["network"], ride["route"], ride["route_name"]) == ("yr", "98", "Yonge")
     assert ride["from"] == "Yonge / 16th Avenue" and ride["from_stop_id"] == "1234"
+
+
+def test_live_times_replace_the_timetable_where_a_feed_gives_them():
+    live = leg(
+        "BUS",
+        "09:00",
+        "09:10",
+        route={"gtfsId": "ttc:7", "shortName": "7", "longName": "Bathurst", "color": None},
+    )
+    live["start"]["estimated"] = {"time": "2026-10-14T09:04:00-04:00"}
+    live["end"]["estimated"] = {"time": "2026-10-14T09:13:00-04:00"}
+    timetable = leg(
+        "BUS",
+        "09:20",
+        "09:30",
+        route={"gtfsId": "ttc:29", "shortName": "29", "longName": "Dufferin", "color": None},
+    )
+    timetable["start"]["estimated"] = None
+    late, scheduled = web_planner._leg(live), web_planner._leg(timetable)
+    assert late["start"] == "2026-10-14T09:04:00-04:00" and late["delay_minutes"] == 4
+    assert late["end"] == "2026-10-14T09:13:00-04:00"
+    assert scheduled["start"] == "2026-10-14T09:20:00-04:00" and scheduled["delay_minutes"] is None
+    assert web_planner._leg(leg("WALK", "09:00", "09:05"))["delay_minutes"] is None
+
+
+def test_planner_reads_every_live_trip_feed_without_the_metrolinx_key():
+    updaters = [u for u in planner.ROUTER_CONFIG["updaters"] if u["type"] == "stop-time-updater"]
+    feeds = {u["feedId"] for u in updaters}
+    assert {"ttc", "go"} | set(planner.agencies.AGENCIES) == feeds
+    [go] = [u for u in updaters if u["feedId"] == "go"]
+    assert go["url"].endswith("?key=${METROLINX_API_KEY}")
+    assert go["headers"] == {"Accept": "application/x-protobuf"}

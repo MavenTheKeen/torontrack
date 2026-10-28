@@ -4,6 +4,11 @@
 # again. The server is stopped while building, so peak memory is the build alone.
 set -u
 cd /var/opentripplanner
+# router-config.json names ${METROLINX_API_KEY} for the live GO feed; OpenTripPlanner fills
+# it in from the environment, so the key stays in the secret file. Without the key, the GO
+# feed alone fails to load and plans use its timetable.
+METROLINX_API_KEY="$(cat /run/secrets/metrolinx_api_key 2>/dev/null || true)"
+export METROLINX_API_KEY
 otp() { java $1 -cp @/app/jib-classpath-file @/app/jib-main-class-file /var/opentripplanner/ "${@:2}"; }
 while true; do
   until [ -f manifest.json ]; do echo "Waiting for planner-data"; sleep 60; done

@@ -21,9 +21,9 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-from transit import agencies, maptiles, regional
+from transit import agencies, maptiles, regional, regional_live
 from transit.http import FeedClient, FetchError
-from transit.ttc.sources import STATIC_GTFS_URL, STATIC_HOST
+from transit.ttc.sources import REALTIME_FEEDS, STATIC_GTFS_URL, STATIC_HOST
 
 OSM_HOST = "download.openstreetmap.fr"
 OSM_URL = f"https://{OSM_HOST}/extracts/north-america/canada/ontario/golden_horseshoe.osm.pbf"
@@ -62,6 +62,19 @@ BUILD_CONFIG = {
     "transitServiceStart": "-P7D",
     "transitServiceEnd": "P60D",
 }
+
+
+def _trip_updates(feed_id: str, url: str, headers: dict | None = None) -> dict:
+    return {
+        "type": "stop-time-updater",
+        "feedId": feed_id,
+        "url": url,
+        "frequency": "1m",
+        "backwardsDelayPropagationType": "REQUIRED_NO_DATA",
+        **({"headers": headers} if headers else {}),
+    }
+
+
 ROUTER_CONFIG = {
     "server": {"apiProcessingTimeout": "8s"},
     # Bike Share stations and their bikes and docks, read by the planner every minute, for
@@ -73,7 +86,19 @@ ROUTER_CONFIG = {
             "url": BIKE_SHARE_GBFS,
             "frequency": "1m",
             "network": "bike_share_toronto",
-        }
+        },
+        # Live trip updates, so plans use the times vehicles are expected rather than the
+        # timetable's: the TTC's, the three neighbouring agencies' and Metrolinx's. The
+        # Metrolinx key is not written here: OpenTripPlanner reads it from the environment
+        # (docker/planner.sh), and its licence allows this use but not passing the feed on.
+        *(_trip_updates("ttc", REALTIME_FEEDS[feed]) for feed in ("trips_surface", "trips_subway")),
+        *(_trip_updates(key, a.trips_url) for key, a in agencies.AGENCIES.items()),
+        _trip_updates(
+            "go",
+            f"https://{regional_live.HOST}/OpenDataAPI/api/V1/Gtfs/Feed/"
+            f"{regional_live.FEEDS['trips']}?key=${{METROLINX_API_KEY}}",
+            headers={"Accept": "application/x-protobuf"},
+        ),
     ],
 }
 # OpenTripPlanner turns this self-check on by default and logs that production should not.
