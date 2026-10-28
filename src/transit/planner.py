@@ -21,7 +21,7 @@ import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
-from transit import agencies, maptiles, regional, regional_live
+from transit import agencies, maptiles, regional
 from transit.http import FeedClient, FetchError
 from transit.ttc.sources import REALTIME_FEEDS, STATIC_GTFS_URL, STATIC_HOST
 
@@ -64,14 +64,13 @@ BUILD_CONFIG = {
 }
 
 
-def _trip_updates(feed_id: str, url: str, headers: dict | None = None) -> dict:
+def _trip_updates(feed_id: str, url: str) -> dict:
     return {
         "type": "stop-time-updater",
         "feedId": feed_id,
         "url": url,
         "frequency": "1m",
         "backwardsDelayPropagationType": "REQUIRED_NO_DATA",
-        **({"headers": headers} if headers else {}),
     }
 
 
@@ -88,17 +87,10 @@ ROUTER_CONFIG = {
             "network": "bike_share_toronto",
         },
         # Live trip updates, so plans use the times vehicles are expected rather than the
-        # timetable's: the TTC's, the three neighbouring agencies' and Metrolinx's. The
-        # Metrolinx key is not written here: OpenTripPlanner reads it from the environment
-        # (docker/planner.sh), and its licence allows this use but not passing the feed on.
+        # timetable's: the TTC's and the three neighbouring agencies'. Not Metrolinx's: its
+        # URL carries the API key, and OpenTripPlanner logs each updater's URL.
         *(_trip_updates("ttc", REALTIME_FEEDS[feed]) for feed in ("trips_surface", "trips_subway")),
         *(_trip_updates(key, a.trips_url) for key, a in agencies.AGENCIES.items()),
-        _trip_updates(
-            "go",
-            f"https://{regional_live.HOST}/OpenDataAPI/api/V1/Gtfs/Feed/"
-            f"{regional_live.FEEDS['trips']}?key=${{METROLINX_API_KEY}}",
-            headers={"Accept": "application/x-protobuf"},
-        ),
     ],
 }
 # OpenTripPlanner turns this self-check on by default and logs that production should not.

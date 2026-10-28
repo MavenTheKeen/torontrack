@@ -41,8 +41,8 @@ browser makes no requests to a third-party map service.
 Directions combine subway, streetcar, bus, regional train, Bike Share and walking across
 Toronto, Brampton, Mississauga and York Region. Routing comes from a self-hosted
 OpenTripPlanner built from five schedules (TTC, GO and UP Express, Brampton Transit,
-MiWay, YRT) and an OpenStreetMap extract of the Golden Horseshoe. Plans use the agencies'
-live trip updates where they publish them, and timetables otherwise
+MiWay, YRT) and an OpenStreetMap extract of the Golden Horseshoe. Plans use the TTC's and
+the neighbouring agencies' live trip updates, and timetables otherwise
 ([trip planner](planner.md)).
 
 The start and end can be typed as an address, a place, an intersection, a station or a
