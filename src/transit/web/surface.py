@@ -24,9 +24,8 @@ ARRIVALS_SHOWN = 10
 # their direction, so branches show but one-off detours do not.
 PATTERN_SHARE = 0.1
 PATTERNS_PER_DIRECTION = 3
-# Recent days of stop passages a route's usual pace is measured over, and the range a pace
-# is kept within (seconds of timetable per real second).
-PACE_DAYS = 28
+# The range a route's usual pace (analytics.ttc_surface_pace) is kept within, in seconds
+# of timetable per real second.
 PACE_LIMITS = (0.2, 2.0)
 PREDICTIONS_STALE = timedelta(minutes=3)
 
@@ -90,40 +89,15 @@ def _offset_at(pattern: dict, position: float) -> float:
     return offsets[i] + (position - i) * (offsets[j] - offsets[i])
 
 
-def typical_pace(conn, version: str, now: datetime) -> dict[tuple, float]:
+def typical_pace(conn, version: str) -> dict[tuple, float]:
     """{(route, direction, hour): pace}: how many seconds of timetable a route's vehicles
-    cover per real second at that hour (Toronto time), from consecutive stop passages of
-    the same vehicle on the same pattern over the last PACE_DAYS. Legs under a minute of
-    timetable, and those taking over four times it (a layover or a detour), are left out.
-    """
+    cover per real second at that hour (Toronto time), from the dbt model
+    analytics.ttc_surface_pace, which the scheduled transform rebuilds. Empty until it has
+    been built for this schedule version; vehicles then move at the timetable's pace."""
     rows = conn.execute(
-        """WITH p AS (
-             SELECT route_id, direction_id, pattern_id, stop_id, passed_at,
-                    lag(stop_id) OVER w AS prev_stop, lag(passed_at) OVER w AS prev_at,
-                    lag(pattern_id) OVER w AS prev_pattern
-             FROM normalized.ttc_surface_passages
-             WHERE passed_at > %(since)s
-             WINDOW w AS (PARTITION BY vehicle_id ORDER BY passed_at)
-           ), legs AS (
-             SELECT p.route_id, p.direction_id,
-                    extract(hour FROM p.passed_at AT TIME ZONE 'America/Toronto')::int AS hour,
-                    extract(epoch FROM p.passed_at - p.prev_at) AS actual,
-                    b.offset_seconds - a.offset_seconds AS scheduled
-             FROM p
-             JOIN normalized.ttc_surface_pattern_stops a
-               ON a.feed_version = %(v)s AND a.pattern_id = p.pattern_id
-              AND a.stop_id = p.prev_stop
-             JOIN normalized.ttc_surface_pattern_stops b
-               ON b.feed_version = %(v)s AND b.pattern_id = p.pattern_id
-              AND b.stop_id = p.stop_id
-             WHERE p.prev_pattern = p.pattern_id
-           )
-           SELECT route_id, direction_id, hour, sum(scheduled) / sum(actual) AS pace
-           FROM legs
-           WHERE scheduled > 60 AND actual > 0 AND actual < scheduled * 4
-           GROUP BY route_id, direction_id, hour
-           HAVING sum(actual) > 600""",
-        {"since": now - timedelta(days=PACE_DAYS), "v": version},
+        """SELECT route_id, direction_id, hour, pace FROM analytics.ttc_surface_pace
+           WHERE feed_version = %s""",
+        (version,),
     ).fetchall()
     return {(r["route_id"], r["direction_id"], r["hour"]): float(r["pace"]) for r in rows}
 
