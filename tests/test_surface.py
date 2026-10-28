@@ -129,6 +129,13 @@ def test_surface_endpoints_place_vehicles_and_estimate_arrivals(client):
     patterns = client.get("/api/patterns").json()["patterns"]
     lon, lat, offset = patterns[str(row["pattern"])][0]
     assert offset == 0 and -80 < lon < -79 and 43 < lat < 44
+    # Built once per schedule version: a browser holding it gets a 304, not the body.
+    first = client.get("/api/patterns", headers={"Accept-Encoding": "gzip"})
+    assert first.headers["content-encoding"] == "gzip"
+    assert first.headers["cache-control"] == "no-cache"
+    again = client.get("/api/patterns", headers={"If-None-Match": first.headers["etag"]})
+    assert again.status_code == 304 and again.content == b""
+    assert client.get("/api/surface").headers["etag"] != first.headers["etag"]
 
     # Halfway between stops 0 and 1 (90 s along); Brimley is at 360 s; the report is 30 s
     # old by the clock (20 s at T0, plus 10 s).

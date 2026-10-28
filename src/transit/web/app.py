@@ -5,6 +5,8 @@ visitors. A small per-IP limit protects the process. Browsers only talk to this
 service; it never calls the TTC.
 """
 
+import gzip
+import hashlib
 import ipaddress
 import json
 import logging
@@ -271,6 +273,45 @@ def create_app(
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return entry.data if data else entry.response()
 
+    # Responses that change only with a schedule: (key) -> (tag, body, gzipped body).
+    by_schedule_store: dict[str, tuple] = {}
+
+    def schedule_tag(conn) -> str:
+        """Identifies the TTC's and the neighbouring agencies' loaded schedule versions."""
+        try:
+            ttc = queries.feed_version(conn)
+        except queries.NotFound:
+            ttc = None
+        versions = json.dumps([ttc, agencies.versions(conn)], sort_keys=True)
+        return hashlib.sha256(versions.encode()).hexdigest()[:16]
+
+    def by_schedule(request: Request, key, build, attribution=ATTRIBUTION):
+        """A response that changes only with a new schedule: built, encoded and compressed
+        once per schedule version, and sent with an ETag so a browser that has it already
+        gets a 304 instead of the whole body again (together about 800 KB compressed)."""
+        tag = cache.get("schedule-tag", lambda: with_conn(schedule_tag))
+        etag = f'"{key}-{tag}"'
+        headers = {"ETag": etag, "Cache-Control": "no-cache", "Vary": "Accept-Encoding"}
+        sent = request.headers.get("if-none-match", "")
+        if etag in (t.strip().removeprefix("W/") for t in sent.split(",")):
+            return Response(status_code=304, headers=headers)
+        stored = by_schedule_store.get(key)
+        if stored is None or stored[0] != tag:
+            body = cached(f"{key}:{tag}", build, attribution).body
+            stored = (tag, body, gzip.compress(body, 9))
+            by_schedule_store[key] = stored
+        if "gzip" in request.headers.get("accept-encoding", ""):
+            return Response(
+                stored[2],
+                media_type="application/json",
+                headers={**headers, "Content-Encoding": "gzip"},
+            )
+        return Response(stored[1], media_type="application/json", headers=headers)
+
+    def with_conn(read):
+        with connect(db_url()) as conn:
+            return read(conn)
+
     # The map response lists every Bike Share dock (~200 KB); compressed it is a fraction.
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
@@ -297,7 +338,9 @@ def create_app(
         # from its X-Forwarded-Proto. The site's own Caddy sends the same header.
         if request.url.scheme == "https":
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
-        if request.url.path.startswith("/api/") and response.status_code == 200:
+        if "cache-control" in response.headers:
+            pass  # The endpoint chose its own.
+        elif request.url.path.startswith("/api/") and response.status_code == 200:
             response.headers["Cache-Control"] = f"public, max-age={CACHE_SECONDS}"
         elif request.url.path.startswith("/data/") and response.status_code == 200:
             response.headers["Cache-Control"] = "public, max-age=3600"
@@ -505,7 +548,7 @@ def create_app(
             return empty
 
     @app.get("/api/surface")
-    def surface_stops():
+    def surface_stops(request: Request):
         """Every bus and streetcar route and stop, the TTC's and neighbouring agencies';
         changes only with a new schedule."""
 
@@ -518,7 +561,7 @@ def create_app(
                 "stops": ttc["stops"] + others["stops"],
             }
 
-        return cached("surface", build, attribution=SURFACE_ATTRIBUTION)
+        return by_schedule(request, "surface", build, SURFACE_ATTRIBUTION)
 
     def matched(conn, now):
         """Vehicles matched to their route patterns, the TTC's then other agencies',
@@ -545,7 +588,7 @@ def create_app(
         return cached("vehicles", build, attribution=SURFACE_ATTRIBUTION, store=live)
 
     @app.get("/api/patterns")
-    def surface_patterns():
+    def surface_patterns(request: Request):
         """Every bus and streetcar pattern's stops with timetable times, for moving vehicles
         between reports; changes only with a new schedule."""
 
@@ -553,7 +596,7 @@ def create_app(
             ttc = ttc_part(lambda: surface.patterns(conn, queries.feed_version(conn)), {})
             return {"patterns": {**ttc.get("patterns", {}), **agencies.patterns(conn)}}
 
-        return cached("patterns", build)
+        return by_schedule(request, "patterns", build)
 
     @app.get("/api/stops/{stop_id}")
     def bus_stop(stop_id: str):

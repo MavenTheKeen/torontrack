@@ -145,6 +145,9 @@ appears. "Near me" also lists the closest stops.
 
 - Responses are cached in memory for 15 seconds (train and vehicle positions for 5), so
   PostgreSQL load does not grow with visitors. Schedule-derived data is cached until a new static GTFS version loads.
+- The bus and streetcar network (`/api/surface`, `/api/patterns`, about 800 KB
+  compressed together) is built, encoded and compressed once per schedule version and
+  sent with an ETag, so a browser that already has it receives a 304 and no body.
 - Responses over 1 KB are gzip-compressed (the map's dock list shrinks from about
   200 KB to 35 KB).
 - `/api/` allows `WEB_RATE_LIMIT_PER_MINUTE` (default 120) requests per client address
