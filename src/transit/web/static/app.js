@@ -173,7 +173,9 @@ function stationSearch(stations) {
 
 function networkSummary(lineData, alertData) {
   const statuses = lineData.lines.map((l) => l.status);
-  const affected = statuses.filter((s) => s.status !== "normal" || s.detected);
+  // A line whose status TTC does not report is not counted as affected; it is named below.
+  const unknown = statuses.filter((s) => s.status === "unknown" && !s.detected).length;
+  const affected = statuses.filter((s) => !["normal", "unknown"].includes(s.status) || s.detected);
   const ok = !affected.length;
   return el(
     "section",
@@ -182,14 +184,27 @@ function networkSummary(lineData, alertData) {
       "h1",
       {},
       el("span", { class: "state-icon", "aria-hidden": "true" }, ok ? "✓" : "!"),
-      ok ? "Subway: all lines running normally" : `Subway: ${affected.length} of ${statuses.length} lines affected`,
+      ok
+        ? unknown ? "Subway: no problems reported" : "Subway: all lines running normally"
+        : `Subway: ${affected.length} of ${statuses.length} lines affected`,
     ),
     el(
       "p",
       { class: "muted" },
-      `${plural(alertData.active.length, "active alert", "active alerts")} · ${plural(alertData.accessibility.length, "elevator or escalator", "elevators or escalators")} out of service`,
+      `${plural(alertData.active.length, "active alert", "active alerts")} · ${plural(alertData.accessibility.length, "elevator or escalator", "elevators or escalators")} out of service`
+        + (unknown ? ` · ${plural(unknown, "line", "lines")} without a current status` : ""),
     ),
   );
+}
+
+// Active alerts, less those already shown word for word as a line's status above.
+function activeAlerts(active, lines) {
+  if (!active.length) return el("p", { class: "muted" }, "No active subway or light rail alerts.");
+  const shown = new Set(lines.map((l) => l.status.summary).filter(Boolean));
+  const rest = active.filter((a) => !shown.has(a.header));
+  return rest.length
+    ? rest.map(alertCard)
+    : el("p", { class: "muted" }, active.length === 1 ? "The active alert is shown with its line above." : "The active alerts are shown with their lines above.");
 }
 
 async function renderHome() {
@@ -202,7 +217,7 @@ async function renderHome() {
     el("ul", { class: "status-list" }, lineData.lines.map((l) => statusRow(l.status))),
     stationSearch(lineData.stations),
     el("h2", {}, "Active alerts"),
-    alertData.active.length ? alertData.active.map(alertCard) : el("p", { class: "muted" }, "No active subway or light rail alerts."),
+    activeAlerts(alertData.active, lineData.lines),
     el("h2", {}, "Planned closures and notices"),
     alertData.upcoming.length
       ? [
@@ -2864,7 +2879,7 @@ async function renderMap(focusKey) {
   const layersPanel = el("aside", { class: "map-panel", id: "map-layers", "aria-label": "Layers and legend", hidden: "hidden" });
   const safetyButton = el("button", { type: "button", class: "map-tool", "aria-label": "Safety", "aria-expanded": "false", "aria-controls": "map-safety", title: "Safety" }, iconSvg("shield", { size: 22 }));
   const safetyPanelEl = el("aside", { class: "map-panel safety", id: "map-safety", "aria-label": "Safety", hidden: "hidden" });
-  const search = el("input", { type: "search", id: "map-search", name: "q", class: "map-search", placeholder: "Search stations, stops or routes", "aria-label": "Search stations, stops or routes", autocomplete: "off", enterkeyhint: "go" });
+  const search = el("input", { type: "search", id: "map-search", name: "q", class: "map-search", placeholder: "Stations, stops, routes", "aria-label": "Search stations, stops or routes", autocomplete: "off", enterkeyhint: "go" });
   const results = el("ul", { class: "map-results" });
   const modeGroup = el("span", { class: "chip-group", role: "group", "aria-label": "Show Bike Share" });
   const toolbar = el("div", { class: "map-toolbar" }, el("div", { class: "map-search-row" }, el("div", { class: "map-search-wrap" }, search, results), layersButton, safetyButton), status);

@@ -131,7 +131,8 @@
   }
 }
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+/* Keyboard focus and in-page jumps stop above the phone tab bar (WCAG 2.4.11). */
+html { -webkit-text-size-adjust: 100%; scroll-padding-bottom: var(--tabs-h); }
 body {
   margin: 0;
   background: var(--bg);
@@ -207,6 +208,7 @@ nav.primary a[aria-current="page"] { color: var(--sign-text); border-bottom-colo
 .day:hover { border-color: var(--text); }
 .day[aria-current="date"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .day-name { font-size: 0.78rem; font-weight: 600; opacity: 0.8; }
+.day[aria-current="date"] .day-name { opacity: 1; }
 .day-num { font-size: 1.25rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .day-dots { display: flex; gap: 3px; height: 6px; }
 .day-dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.45; }
@@ -315,6 +317,8 @@ button.button { border: 0; cursor: pointer; font-family: inherit; }
 .notice { background: var(--warn-bg); color: var(--text); border: 1px solid var(--warn); padding: 10px 14px; border-radius: var(--radius); }
 
 /* Alerts */
+/* Alerts read as ruled rows, like the line list, not as boxes. */
+.card.alert { background: none; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; padding: 12px 0; margin: 0; }
 .alert-head { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .alert-head .source { margin-left: 4px; }
 details summary { cursor: pointer; font-weight: 600; padding: 2px 0; list-style-position: inside; }
@@ -496,7 +500,7 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
   box-shadow: var(--shadow-md);
 }
 .chip[aria-pressed="true"], .chip[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
-.view-switch { margin: 0 0 16px; }
+.view-switch { margin: 0 0 16px; box-shadow: none; border: 1px solid var(--border); }
 .view-switch .chip { text-decoration: none; display: inline-flex; align-items: center; }
 .chip.small { box-shadow: none; padding: 5px 11px; min-height: 30px; }
 .map-status {
