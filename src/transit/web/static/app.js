@@ -480,6 +480,52 @@ function sizeText(bytes) {
   return bytes >= 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1e3))} KB`;
 }
 
+const fileMonthFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "long", year: "numeric" });
+const fileRangeFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
+
+function downloadRow(f) {
+  return el(
+    "li",
+    {},
+    el("span", {}, f.day ? fileDayFmt.format(new Date(`${f.day}T00:00:00Z`)) : "All to date", f.partial ? " (partial day)" : ""),
+    el("span", { class: "muted small" }, `${numberFmt.format(f.rows)} rows`),
+    el(
+      "span",
+      { class: "links" },
+      el("a", { href: `/data/${f.files.parquet.path}`, download: "" }, `Parquet, ${sizeText(f.files.parquet.bytes)}`),
+      el("a", { href: `/data/${f.files.csv.path}`, download: "" }, `CSV, ${sizeText(f.files.csv.bytes)}`),
+    ),
+  );
+}
+
+// "22 days, 9 Oct to 30 Oct 2026 · 1,034,215 rows" for a dataset of daily files.
+function coverageText(files) {
+  const days = files.filter((f) => f.day).map((f) => f.day).sort();
+  const rows = numberFmt.format(files.reduce((sum, f) => sum + f.rows, 0));
+  if (!days.length) return `${rows} rows`;
+  const at = (day) => fileRangeFmt.format(new Date(`${day}T00:00:00Z`));
+  return `${plural(days.length, "day", "days")}, ${at(days[0])} to ${at(days[days.length - 1])} · ${rows} rows`;
+}
+
+// Files older than the first week, one collapsed list per month, newest month first, so
+// the list stays short however long collection runs.
+function earlierFiles(name, files) {
+  const months = new Map();
+  for (const f of files) {
+    const key = f.day.slice(0, 7);
+    if (!months.has(key)) months.set(key, []);
+    months.get(key).push(f);
+  }
+  return [...months].map(([key, list]) =>
+    el(
+      "details",
+      { class: "month", "data-key": `files-${name}-${key}` },
+      el("summary", {}, `${fileMonthFmt.format(new Date(`${key}-01T00:00:00Z`))} · ${plural(list.length, "file", "files")}`),
+      el("ul", { class: "downloads" }, list.map(downloadRow)),
+    ),
+  );
+}
+
 function downloadSection(sets) {
   if (!sets.available) return null;
   const shown = 7;
@@ -496,30 +542,12 @@ function downloadSection(sets) {
       .map((d) =>
         el(
           "section",
-          { class: "card" },
+          { class: "dataset" },
           el("h3", {}, d.title),
+          el("p", { class: "dataset-coverage" }, coverageText(d.files)),
           el("p", { class: "muted small" }, d.description, d.day ? ` One file per day (${d.day}).` : ""),
-          el(
-            "ul",
-            { class: "downloads" },
-            d.files.slice(0, shown).map((f) =>
-              el(
-                "li",
-                {},
-                el("span", {}, f.day ? fileDayFmt.format(new Date(`${f.day}T00:00:00Z`)) : "All to date", f.partial ? " (partial day)" : ""),
-                el("span", { class: "muted small" }, `${numberFmt.format(f.rows)} rows`),
-                el(
-                  "span",
-                  { class: "links" },
-                  el("a", { href: `/data/${f.files.parquet.path}`, download: "" }, `Parquet, ${sizeText(f.files.parquet.bytes)}`),
-                  el("a", { href: `/data/${f.files.csv.path}`, download: "" }, `CSV, ${sizeText(f.files.csv.bytes)}`),
-                ),
-              ),
-            ),
-          ),
-          d.files.length > shown
-            ? el("p", { class: "muted small" }, `${d.files.length - shown} earlier files are listed in `, el("a", { href: "/data/index.json" }, "index.json"), ".")
-            : null,
+          el("ul", { class: "downloads" }, d.files.slice(0, shown).map(downloadRow)),
+          d.files.length > shown ? earlierFiles(d.name, d.files.slice(shown)) : null,
           el(
             "details",
             { "data-key": `columns-${d.name}` },

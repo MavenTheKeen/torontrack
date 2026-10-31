@@ -746,3 +746,10 @@ main > .eyebrow:first-child { margin-top: 26px; }
 .plan-pill.bike { background: #16a34a; color: #fff; display: inline-flex; align-items: center; justify-content: center; }
 .plan-step.bike { color: var(--text); }
 .icon-chip { padding: 5px 8px; display: inline-flex; align-items: center; justify-content: center; }
+
+/* Open-data downloads: one ruled section per dataset; older days collapse by month. */
+.dataset { padding: 16px 0 8px; border-bottom: 1px solid var(--border); }
+.dataset h3 { margin: 0 0 2px; }
+.dataset-coverage { margin: 0 0 6px; font-weight: 600; font-variant-numeric: tabular-nums; }
+details.month > summary { padding: 8px 0; color: var(--link); cursor: pointer; }
+details.month[open] > summary { color: var(--text); }
