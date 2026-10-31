@@ -63,6 +63,16 @@ Problems found in the source data, and how each is handled:
 More findings (road restriction JSON with unescaped backslashes, an events feed that
 repeats each event once per date) are in the source documents.
 
+## Open data
+
+The collection is published daily as Parquet and gzipped CSV, free to reuse with
+attribution: every observed subway headway, Bike Share dock availability every 15 minutes,
+and every elevator and escalator outage TTC has reported, from 9 October 2026 onward. Files
+are listed on the site's [Reliability page](https://torontrack.skynetlab.duckdns.org/#/reliability),
+with row counts and SHA-256 checksums in
+[index.json](https://torontrack.skynetlab.duckdns.org/data/index.json)
+([dataset documentation](docs/datasets.md)).
+
 ## Decisions and tradeoffs
 
 The TTC collector is a long-running process rather than a scheduled task, because it

@@ -45,3 +45,9 @@ done
 docker compose up -d || echo "Not every service started; see the status below" >&2
 docker compose up -d --wait web
 docker compose ps --format '{{.Service}}: {{.Status}}'
+
+# Each build leaves layers in Docker's build cache; on 2026-10-31 it had grown to 64 GB of
+# the server's 99 GB disk. Layers unused for three days are dropped, so the next build
+# still reuses recent ones.
+docker builder prune -f --filter until=72h > /dev/null
+docker image prune -f > /dev/null
