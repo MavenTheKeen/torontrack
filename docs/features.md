@@ -72,6 +72,12 @@ Saved items head the status page with their next arrivals or line status. They a
 in the browser's local storage (key `torontrack-saved`, up to 12 items) and are never
 sent to the server.
 
+With a weak or no connection (underground, for example), the status, line, station, stop,
+reliability and events pages open from the copy saved on the last visit, marked with the
+time it was saved and that its times are not live. The service worker waits up to 8
+seconds for the network before using the copy. Moving vehicles, the map's data and trip
+plans are never shown from a saved copy.
+
 ## Reliability
 
 The reliability page shows today's worst delays on each line. Long gaps between trains
