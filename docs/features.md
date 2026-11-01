@@ -67,6 +67,11 @@ estimated train positions, and arrivals at every station. When trains stop appea
 consecutive platforms for much longer than the scheduled interval, the line is marked as
 a possible delay, labelled as not confirmed by the TTC.
 
+Stations, stops and lines can be saved with the Save button on their page or map panel.
+Saved items head the status page with their next arrivals or line status. They are kept
+in the browser's local storage (key `torontrack-saved`, up to 12 items) and are never
+sent to the server.
+
 ## Reliability
 
 The reliability page shows today's worst delays on each line. Long gaps between trains
