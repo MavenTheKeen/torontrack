@@ -39,8 +39,13 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+// The oldest stored copy (sw.js) a page was built from, when the network failed.
+let savedCopyAt = null;
+
 async function api(path) {
   const response = await fetch(path, { headers: { Accept: "application/json" } });
+  const saved = response.headers.get("X-Torontrack-Saved-At");
+  if (saved && (!savedCopyAt || saved < savedCopyAt)) savedCopyAt = saved;
   if (response.status === 404) throw new Error("Not found");
   if (!response.ok) throw new Error(`The data service returned ${response.status}`);
   return response.json();
@@ -3810,6 +3815,7 @@ async function route({ refresh = false } = {}) {
     document.body.classList.add("map-mode");
     main.replaceChildren(el("div", { class: "map-canvas", "aria-busy": "true" }, el("p", { class: "muted map-loading" }, "Loading map…")));
   }
+  savedCopyAt = null;
   try {
     if (!lines.length) {
       const lineData = await api("/api/lines");
@@ -3828,12 +3834,20 @@ async function route({ refresh = false } = {}) {
     else content = await renderHome();
     clearTimeout(waiting);
     if (seq !== renderSeq) return; // A newer navigation or refresh finished first.
+    const at = savedCopyAt && timeFmt.format(new Date(savedCopyAt));
+    // Built from copies saved on an earlier visit (sw.js): said at the top, and retried.
+    if (at && kind !== "map") content = [el("p", { class: "notice offline-notice", role: "status" }, `No connection. Showing data saved at ${at}; times and arrivals are not live.`), content];
     const state = refresh ? captureState() : null;
     show(content, { refresh });
     if (state) restoreState(state);
     markCurrentNav(kind, id);
-    updated.textContent = `Updated ${timeFmt.format(new Date())}`;
-    updated.classList.remove("warn");
+    if (at) {
+      updated.textContent = `Offline · data from ${at}`;
+      updated.classList.add("warn");
+    } else {
+      updated.textContent = `Updated ${timeFmt.format(new Date())}`;
+      updated.classList.remove("warn");
+    }
   } catch (error) {
     clearTimeout(waiting);
     if (seq !== renderSeq) return;
@@ -3844,7 +3858,12 @@ async function route({ refresh = false } = {}) {
       updated.classList.add("warn");
       return;
     }
-    main.replaceChildren(el("h1", {}, "Unavailable"), el("p", {}, error.message === "Not found" ? "That line or station does not exist." : "Live data is unavailable right now. Retrying shortly."));
+    const why = error.message === "Not found"
+      ? "That line or station does not exist."
+      : navigator.onLine === false
+        ? "No connection, and this page was not saved on an earlier visit. Pages you have opened before still work offline."
+        : "Live data is unavailable right now. Retrying shortly.";
+    main.replaceChildren(el("h1", {}, "Unavailable"), el("p", {}, why));
   }
 }
 
