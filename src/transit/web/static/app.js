@@ -207,12 +207,105 @@ function activeAlerts(active, lines) {
     : el("p", { class: "muted" }, active.length === 1 ? "The active alert is shown with its line above." : "The active alerts are shown with their lines above.");
 }
 
+// Saved stations, stops and lines, kept only in this browser: no account, nothing sent.
+const SAVED_KEY = "torontrack-saved";
+const SAVED_MAX = 12;
+
+function savedItems() {
+  try {
+    const items = JSON.parse(localStorage.getItem(SAVED_KEY) || "[]");
+    return Array.isArray(items) ? items.filter((i) => i && ["station", "stop", "line"].includes(i.kind) && i.id) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setSavedItems(items) {
+  try {
+    localStorage.setItem(SAVED_KEY, JSON.stringify(items.slice(0, SAVED_MAX)));
+  } catch {
+    /* Storage off (private window): saving silently does nothing. */
+  }
+}
+
+const isSaved = (kind, id) => savedItems().some((i) => i.kind === kind && i.id === String(id));
+
+// "Save" / "Saved" toggle for a station, stop or line page or panel.
+function saveButton(kind, id, name) {
+  const button = el("button", { type: "button", class: "save-button" });
+  const show = () => {
+    const saved = isSaved(kind, id);
+    button.setAttribute("aria-pressed", String(saved));
+    button.textContent = saved ? "Saved ✓" : "Save";
+    button.title = saved ? "Remove from the Status page" : "Show on the Status page";
+  };
+  button.addEventListener("click", () => {
+    const rest = savedItems().filter((i) => !(i.kind === kind && i.id === String(id)));
+    setSavedItems(isSaved(kind, id) ? rest : [...rest, { kind, id: String(id), name }]);
+    show();
+  });
+  show();
+  return button;
+}
+
+const titleRow = (heading, kind, id, name) => el("div", { class: "title-row" }, heading, saveButton(kind, id, name));
+
+// The next two trains each way at a saved station.
+async function savedStation(item) {
+  const data = await api(`/api/stations/${encodeURIComponent(item.id)}`);
+  return [
+    el("a", { class: "name", href: `#/station/${item.id}` }, data.station.name),
+    data.station.directions.map((d) =>
+      el(
+        "p",
+        { class: "saved-times" },
+        badge(d.line, { link: false, small: true }),
+        el("span", { class: "muted" }, ` to ${d.towards} `),
+        d.arrivals.length ? d.arrivals.slice(0, 2).map((a) => (a.minutes === 0 ? "Due" : `${a.minutes} min`)).join(", ") : el("span", { class: "muted" }, "none listed"),
+      ),
+    ),
+  ];
+}
+
+// The next three vehicles at a saved stop.
+async function savedStop(item) {
+  const data = await api(`/api/stops/${encodeURIComponent(item.id)}`);
+  return [
+    el("a", { class: "name", href: `#/stop/${encodeURIComponent(item.id)}` }, data.stop.name),
+    data.arrivals.length
+      ? el("p", { class: "saved-times" }, data.arrivals.slice(0, 3).map((a, k) => [k ? " · " : "", el("span", { class: `route-pill ${a.mode || "bus"}` }, a.short_name), ` ${a.seconds < 60 ? "Due" : `${Math.round(a.seconds / 60)} min`}`]))
+      : el("p", { class: "muted saved-times" }, "No vehicles in the next hour."),
+  ];
+}
+
+async function savedRow(item, lines) {
+  try {
+    if (item.kind === "line") {
+      const line = lines.find((l) => l.status.line === item.id);
+      if (!line) return null;
+      return el("li", { class: "saved-row" }, el("div", {}, el("a", { class: "name", href: `#/line/${item.id}` }, line.status.name), el("p", { class: "status-line" }, statusPill(line.status.status, line.status.label))));
+    }
+    return el("li", { class: "saved-row" }, el("div", {}, await (item.kind === "station" ? savedStation(item) : savedStop(item))));
+  } catch {
+    return el("li", { class: "saved-row" }, el("div", {}, el("span", { class: "name" }, item.name || item.id), el("p", { class: "muted" }, "Not available right now.")));
+  }
+}
+
+async function savedSection(lineData) {
+  const items = savedItems();
+  if (!items.length) return null;
+  const rows = await Promise.all(items.map((i) => savedRow(i, lineData.lines)));
+  return [el("h2", {}, "Saved"), el("ul", { class: "status-list saved-list" }, rows)];
+}
+
 async function renderHome() {
   const [lineData, alertData] = await Promise.all([api("/api/lines"), api("/api/alerts")]);
   const accessibility = alertData.accessibility;
+  const saved = await savedSection(lineData);
   return [
     networkSummary(lineData, alertData),
     staleNotice(alertData.alerts_as_of, "TTC alerts"),
+    saved,
     el("h2", {}, "Lines"),
     el("ul", { class: "status-list" }, lineData.lines.map((l) => statusRow(l.status))),
     stationSearch(lineData.stations),
@@ -319,7 +412,7 @@ async function renderLine(id) {
   const data = await api(`/api/lines/${encodeURIComponent(id)}`);
   const [dir0, dir1] = [0, 1].map((d) => data.line.directions.find((x) => x.direction_id === d));
   return [
-    el("h1", { class: "with-badge" }, badge(data.line.id, { link: false }), data.line.name),
+    titleRow(el("h1", { class: "with-badge" }, badge(data.line.id, { link: false }), data.line.name), "line", data.line.id, data.line.name),
     el("div", { class: "card" }, statusDetails(data.status)),
     data.line.timetable ? el("p", { class: "notice", role: "status" }, TIMETABLE_NOTE) : staleNotice(data.predictions_as_of, "Train predictions"),
     el(
@@ -381,7 +474,7 @@ async function renderStation(key) {
   const station = data.station;
   const bikes = data.bike_share;
   return [
-    el("h1", { class: "with-badge" }, station.name, station.lines.map((l) => badge(l))),
+    titleRow(el("h1", { class: "with-badge" }, station.name, station.lines.map((l) => badge(l))), "station", station.key, station.name),
     data.line_status.map((s) => el("div", { class: "card status-row" }, badge(s.line, { link: false }), el("div", {}, statusDetails(s)))),
     staleNotice(data.predictions_as_of, "Train predictions"),
     el("h2", {}, "Next trains"),
@@ -1318,6 +1411,7 @@ function stopSheet(view, id, data) {
   return [
     el("p", { class: "sheet-kicker" }, stopKicker(data.stop)),
     el("h2", {}, data.stop.name),
+    saveButton("stop", id, data.stop.name),
     el("p", { class: "route-pills" }, routes.map((r) => routePill(view, r))),
     el("p", { class: "sheet-label" }, "Next vehicles (estimated)"),
     stopArrivals(data),
@@ -2420,6 +2514,7 @@ function stationSheet(view, key) {
   return [
     el("p", { class: "sheet-kicker" }, "Subway station"),
     el("h2", { class: "with-badge" }, s.name, el("span", { class: "badges" }, s.lines.map((l) => badge(l, { small: true })))),
+    saveButton("station", s.key, s.name),
     statuses.map((st) => {
       // A disruption on another part of the line (say Eglinton to Lawrence, seen from
       // Union) is shown as elsewhere, not as this station's status.
@@ -2875,7 +2970,7 @@ async function renderStop(id) {
   }
   return [
     el("p", { class: "eyebrow" }, stopKicker(data.stop)),
-    el("h1", {}, data.stop.name),
+    titleRow(el("h1", {}, data.stop.name), "stop", id, data.stop.name),
     el("h2", {}, "Next vehicles (estimated)"),
     el("div", { class: "card" }, stopArrivals(data)),
     el("p", { class: "muted small" }, `${estimateNote(id)} They assume the vehicle keeps the schedule's pace.`),
