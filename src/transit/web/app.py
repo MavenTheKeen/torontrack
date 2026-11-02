@@ -875,6 +875,10 @@ def create_app(
     def pipeline_health():
         return cached("pipeline", lambda conn, now: pipeline.pipeline_status(conn, now))
 
+    @app.get("/api/stats")
+    def project_stats():
+        return cached("stats", pipeline.project_stats, store=slow)
+
     @app.get("/api/reliability")
     def reliability():
         def build(conn, now):

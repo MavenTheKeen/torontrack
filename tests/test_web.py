@@ -488,6 +488,21 @@ def test_pipeline_checks_completeness_and_data_age_not_only_the_last_run():
     assert pipeline.worst("ok", "delayed") == "delayed"
 
 
+def test_published_counts_round_down():
+    assert pipeline.compact(21_535_437) == "21.5M+"
+    assert pipeline.compact(2_000_000) == "2M+"
+    assert pipeline.compact(970_741) == "970K+"
+    assert pipeline.compact(999) == "999"
+
+
+@pytest.mark.integration
+def test_stats_endpoint_reports_running_totals(client):
+    body = client.get("/api/stats").json()
+    assert set(body["counts"]) == {*pipeline.STATS_TABLES, "bikeshare_trips"}
+    assert set(body["display"]) == set(body["counts"])
+    assert body["days_collecting"] >= 0
+
+
 @pytest.mark.integration
 def test_pipeline_endpoint_reports_each_part(client):
     body = client.get("/api/pipeline").json()
