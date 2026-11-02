@@ -8,6 +8,12 @@ wants to know how reliable the service really is.
 [![Verify pipeline](https://github.com/MavenTheKeen/torontrack/actions/workflows/ci.yml/badge.svg)](https://github.com/MavenTheKeen/torontrack/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+[![Days collecting](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.days_collecting&label=days%20collecting&color=e8441f)](https://torontrack.skynetlab.duckdns.org/#/pipeline)
+[![Feed polls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.feed_polls&label=TTC%20feed%20polls&color=e8441f)](https://torontrack.skynetlab.duckdns.org/#/pipeline)
+[![Train gaps measured](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.train_gaps&label=train%20gaps%20measured&color=e8441f)](https://torontrack.skynetlab.duckdns.org/#/reliability)
+[![Bus and streetcar gaps measured](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.surface_gaps&label=bus%20and%20streetcar%20gaps&color=e8441f)](https://torontrack.skynetlab.duckdns.org/#/reliability)
+[![Bike Share trips](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.bikeshare_trips&label=Bike%20Share%20trips&color=e8441f)](docs/bikeshare.md)
+
 ![Trains and buses moving on the map, the Bloor-Yonge station panel, then the reliability page](docs/screenshots/demo.gif)
 
 ## Engineering highlights
@@ -21,7 +27,7 @@ wants to know how reliable the service really is.
 - **Health checks that look at the data.** A job that ran five minutes ago can still be
   loading day-old data or missing a third of its runs. Each check combines time since the
   last success, the share of expected runs completed, and the age of the newest record.
-- **Tested against real responses.** About 370 tests run on recorded TTC, Bike Share and
+- **Tested against real responses.** More than 370 tests run on recorded TTC, Bike Share and
   city responses, including PostgreSQL integration tests and a full dbt build, in GitHub
   Actions on every push.
 

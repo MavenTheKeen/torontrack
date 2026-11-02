@@ -41,6 +41,12 @@ VOLUME_TABLES = {
     "bikeshare_observations": "normalized.observations",
     "bikeshare_station_versions": "normalized.station_versions",
 }
+STATS_TABLES = {
+    "train_gaps": "analytics.ttc_headways",
+    "surface_gaps": "analytics.ttc_surface_headways",
+    "feed_polls": "ops.ttc_poll_runs",
+    "bikeshare_readings": "normalized.observations",
+}
 
 
 def verdict(last_success: datetime | None, limit: timedelta, now: datetime) -> str:
@@ -305,10 +311,10 @@ def official_delays(conn) -> dict | None:
     return dict(row) if row else None
 
 
-def data_volume(conn) -> dict:
-    counts = {
+def _row_estimates(conn, tables: dict) -> dict:
+    return {
         name: r["rows"]
-        for name, table in VOLUME_TABLES.items()
+        for name, table in tables.items()
         for r in conn.execute(
             """SELECT CASE WHEN to_regclass(%(t)s) IS NULL THEN NULL
                            ELSE greatest((SELECT reltuples FROM pg_class
@@ -317,6 +323,36 @@ def data_volume(conn) -> dict:
             {"t": table},
         )
     }
+
+
+def compact(count: int) -> str:
+    """Rounded down, so a published figure stays true as the count grows."""
+    if count >= 1_000_000:
+        return f"{count // 100_000 / 10:g}M+"
+    if count >= 1_000:
+        return f"{count // 1_000}K+"
+    return str(count)
+
+
+def project_stats(conn, now: datetime) -> dict:
+    """The running totals quoted outside the site, such as the README badges."""
+    counts = {name: rows or 0 for name, rows in _row_estimates(conn, STATS_TABLES).items()}
+    row = conn.execute(
+        """SELECT (SELECT coalesce(sum(trips), 0)::bigint
+                   FROM normalized.bikeshare_trip_files) AS trips,
+                  (SELECT min(first_seen_at) FROM normalized.ttc_train_stop_events) AS since"""
+    ).fetchone()
+    counts["bikeshare_trips"] = row["trips"]
+    return {
+        "collecting_since": row["since"],
+        "days_collecting": (now - row["since"]).days if row["since"] else 0,
+        "counts": counts,
+        "display": {name: compact(count) for name, count in counts.items()},
+    }
+
+
+def data_volume(conn) -> dict:
+    counts = _row_estimates(conn, VOLUME_TABLES)
     since = conn.execute(
         """SELECT (SELECT min(first_seen_at) FROM normalized.ttc_train_stop_events) AS ttc_since,
                   (SELECT min(collected_at) FROM normalized.collections) AS bikeshare_since,
