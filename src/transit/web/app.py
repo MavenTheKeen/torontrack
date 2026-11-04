@@ -42,6 +42,7 @@ from transit.web import (
     queries,
     regional,
     report,
+    report_card,
     surface,
 )
 
@@ -912,6 +913,27 @@ def create_app(
                 return {"available": False}
 
         return cached("report", build)
+
+    @app.get("/api/report-card")
+    def report_card_months():
+        def build(conn, now):
+            try:
+                return {"months": report_card.months(conn, now)}
+            except psycopg.errors.UndefinedTable:
+                return {"months": []}
+
+        return cached("report-card", build)
+
+    @app.get("/api/report-card/{month}")
+    def report_card_month(month: str):
+        def build(conn, now):
+            if month not in report_card.months(conn, now):
+                raise queries.NotFound(f"No report card for {month}")
+            return report_card.card(conn, month)
+
+        if not report_card.MONTH.fullmatch(month):
+            raise HTTPException(status_code=404, detail="Unknown month")
+        return cached(f"report-card:{month}", build, store=slow)
 
     @app.get("/api/datasets")
     def datasets():

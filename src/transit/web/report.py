@@ -8,7 +8,18 @@ models store sums, so EWT is combined here over any grouping as
 (sum(h^2) - sum(h * s)) / (2 sum(h)).
 """
 
+from zoneinfo import ZoneInfo
+
 from transit.web import bikes
+
+TORONTO = ZoneInfo("America/Toronto")
+# Lines 5 and 6 have no live arrivals; the few recorded leave gaps of many hours.
+SUBWAY_ONLY = "route_id IN ('1', '2', '4')"
+# Names and modes from the newest schedule; a route since dropped keeps its number.
+ROUTE_NAMES = """LEFT JOIN normalized.ttc_surface_routes r
+              ON r.route_id = d.route_id AND r.feed_version = (
+                  SELECT feed_version FROM normalized.ttc_gtfs_versions
+                  ORDER BY loaded_at DESC LIMIT 1)"""
 
 # Hours of the service day (24+ is after midnight) grouped as riders think of the day.
 PERIODS = [
@@ -106,10 +117,6 @@ def delivery(conn) -> dict | None:
                                     - interval '4 hours')::date
           ) - %(days)s
     )"""
-    names = """LEFT JOIN normalized.ttc_surface_routes r
-              ON r.route_id = d.route_id AND r.feed_version = (
-                  SELECT feed_version FROM normalized.ttc_gtfs_versions
-                  ORDER BY loaded_at DESC LIMIT 1)"""
     overall = conn.execute(
         f"""WITH {recent}
             SELECT min(service_date) AS first_day, max(service_date) AS last_day,
@@ -130,7 +137,7 @@ def delivery(conn) -> dict | None:
                    round(sum((1 - d.delivered) * d.scheduled_trips)
                          / count(DISTINCT d.service_date))::int AS missing_per_day,
                    sum(d.empty_hours)::int AS empty_hours
-            FROM recent d {names}
+            FROM recent d {ROUTE_NAMES}
             GROUP BY 1, 2, 3, 4
             HAVING count(DISTINCT d.service_date) >= %(min_days)s
                AND sum(d.scheduled_trips) >= %(min_trips)s
@@ -152,7 +159,7 @@ def delivery(conn) -> dict | None:
             SELECT d.service_date, d.route_id, r.short_name, r.long_name,
                    coalesce(r.mode, 'bus') AS mode,
                    round(100 * d.share)::int AS seen_pct, round(100 * u.share)::int AS usual_pct
-            FROM by_day d JOIN usual u USING (route_id) {names}
+            FROM by_day d JOIN usual u USING (route_id) {ROUTE_NAMES}
             WHERE u.share - d.share >= %(drop)s
             ORDER BY (u.share - d.share) * d.scheduled DESC, d.service_date, d.route_id
             LIMIT %(shown)s""",
@@ -198,15 +205,11 @@ def surface(conn) -> dict | None:
             "long_pct": _pct(r["long_gaps"], r["headways"], 1),
         }
 
-    # Names and modes from the newest schedule; a route since dropped keeps its number.
     ranked = conn.execute(
         f"""SELECT d.route_id, r.short_name, r.long_name, coalesce(r.mode, 'bus') AS mode,
                    {sums}
             FROM {table} d
-            LEFT JOIN normalized.ttc_surface_routes r
-              ON r.route_id = d.route_id AND r.feed_version = (
-                  SELECT feed_version FROM normalized.ttc_gtfs_versions
-                  ORDER BY loaded_at DESC LIMIT 1)
+            {ROUTE_NAMES}
             GROUP BY 1, 2, 3, 4 HAVING sum(headways) >= %(min)s
             ORDER BY ewt_seconds DESC NULLS LAST LIMIT %(shown)s""",
         {"min": ROUTE_MIN_HEADWAYS, "shown": ROUTES_SHOWN},
@@ -267,32 +270,32 @@ def report(conn) -> dict:
         conn,
         f"""SELECT route_id, CASE WHEN day_type = 'weekday' THEN 'weekday' ELSE 'weekend'
                    END AS days, {MEASURES}
-            FROM {hourly} WHERE compared_headways > 0
+            FROM {hourly} WHERE compared_headways > 0 AND {SUBWAY_ONLY}
             GROUP BY 1, 2 ORDER BY route_id::int, 2""",
     )
     periods = _rows(
         conn,
         f"""SELECT route_id, {PERIOD_SQL} AS period, {MEASURES}
-            FROM {hourly} WHERE day_type = 'weekday' AND compared_headways > 0
+            FROM {hourly} WHERE day_type = 'weekday' AND compared_headways > 0 AND {SUBWAY_ONLY}
             GROUP BY 1, 2 ORDER BY route_id::int, 2""",
     )
     weather = _rows(
         conn,
         f"""SELECT route_id, conditions,
                    count(DISTINCT (service_date, service_hour)) AS hours, {MEASURES}
-            FROM {hourly} WHERE conditions IS NOT NULL AND compared_headways > 0
+            FROM {hourly} WHERE conditions IS NOT NULL AND compared_headways > 0 AND {SUBWAY_ONLY}
             GROUP BY 1, 2 ORDER BY route_id::int, 2""",
     )
     daily = _rows(
         conn,
         f"""SELECT service_date, min(day_type) AS day_type, route_id, {MEASURES}
-            FROM {hourly} WHERE compared_headways > 0
+            FROM {hourly} WHERE compared_headways > 0 AND {SUBWAY_ONLY}
             GROUP BY 1, 3 ORDER BY 1, route_id::int""",
     )
     stations = _rows(
         conn,
         f"""SELECT route_id, station_key, station_name, platform, towards, {MEASURES}
-            FROM analytics.ttc_station_reliability
+            FROM analytics.ttc_station_reliability WHERE {SUBWAY_ONLY}
             GROUP BY 1, 2, 3, 4, 5 HAVING sum(compared_headways) >= %(min)s
             ORDER BY ewt_seconds DESC NULLS LAST LIMIT %(shown)s""",
         {"min": STATION_MIN_GAPS, "shown": STATIONS_SHOWN},
