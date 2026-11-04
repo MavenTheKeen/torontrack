@@ -124,7 +124,8 @@ Days with and without road restrictions along each route are compared in
 `#/reliability/card` shows each finished month (`src/transit/web/report_card.py`). Lines,
 the bus and streetcar network and routes with at least 300 measured gaps are graded by excess
 wait time: A up to 30 seconds, B up to 60, C up to 120, D up to 240, F beyond that. The same
-scale applies to every mode, and a month with fewer than 10 measured days is not graded. The
+scale applies to every mode, and less frequent routes find it harder to score well. A month
+with fewer than 10 measured days is not graded. The
 scale is this project's choice, not a TTC or industry standard. TTC's delay log is compared
 once it covers the month; it is usually published some time after the month ends.
 

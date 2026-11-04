@@ -964,7 +964,7 @@ async function renderReportCard(month) {
     months.length > 1
       ? el("nav", { class: "chip-group", "aria-label": "Months" }, months.map((m) => el("a", { class: "chip small", href: `#/reliability/card/${m}`, "aria-current": m === chosen ? "page" : null }, monthName(m))))
       : null,
-    el("p", {}, `Graded by extra wait: how much longer than the schedule promises a rider who turns up at a random moment waits on average. ${scale}, F beyond that.`),
+    el("p", {}, `Graded by extra wait: how much longer than the schedule promises a rider who turns up at a random moment waits on average. ${scale}, F beyond that. The same scale applies to every mode, and less frequent routes find it harder to score well.`),
     c.days < c.days_in_month || c.not_collected_hours > 0
       ? el("p", { class: "notice" }, `Measured on ${c.days} of ${c.days_in_month} days${c.not_collected_hours > 0 ? `, with ${c.not_collected_hours} hours not collected` : ""}.`)
       : null,
