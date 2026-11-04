@@ -15,11 +15,12 @@ REALTIME_FEEDS = {
     "trips_surface": f"https://{REALTIME_HOST}/trips/update?format=binary",
 }
 
-# Toronto Open Data "TTC Routes and Schedules" (static GTFS, refreshed roughly monthly).
+# Toronto Open Data "Merged GTFS: TTC Routes and Schedules" (static GTFS). The older "TTC
+# Routes and Schedules" file has been an empty ZIP since late October 2026.
 STATIC_HOST = "ckan0.cf.opendata.inter.prod-toronto.ca"
 STATIC_GTFS_URL = (
-    f"https://{STATIC_HOST}/dataset/7795b45e-e65a-4465-81fc-c36b9dfff169/resource/"
-    "cfb6b2b8-6191-41e3-bda1-b175c51148cb/download/opendata_ttc_schedules.zip"
+    f"https://{STATIC_HOST}/dataset/b811ead4-6eaf-4adb-8408-d389fb5a069c/resource/"
+    "c920e221-7a1c-488b-8c5b-6d8cd4e85eaf/download/completegtfs.zip"
 )
 
 # GTFS route_type 1 = subway/metro. Lines 5 and 6 are light rail (type 0, as streetcars

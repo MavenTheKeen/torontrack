@@ -15,7 +15,9 @@ while true; do
       touch graph.obj
     fi
   fi
-  otp "$JAVA_OPTS" --load --serve &
+  # Java directly, not through otp(): `kill` must reach the server, or it keeps the port
+  # and goes on serving the old graph after a rebuild.
+  java $JAVA_OPTS -cp @/app/jib-classpath-file @/app/jib-main-class-file /var/opentripplanner/ --load --serve &
   server=$!
   trap 'kill $server; wait $server; exit 0' TERM INT
   while kill -0 $server 2>/dev/null && [ ! manifest.json -nt graph.obj ]; do sleep 600 & wait $!; done

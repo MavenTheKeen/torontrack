@@ -1,9 +1,12 @@
 """Trip planner: its input files and the itineraries the map is given."""
 
+import io
 import json
+import zipfile
 from datetime import UTC, datetime
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from transit import planner
@@ -24,10 +27,25 @@ class Client:
         return b""
 
 
+def archive(files: dict) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as z:
+        for name, text in files.items():
+            z.writestr(name, text)
+    return buffer.getvalue()
+
+
+def source_bodies() -> dict:
+    return {
+        url: archive({"routes.txt": name}) if name.endswith(".zip") else name.encode()
+        for name, (url, _, _) in planner.SOURCES.items()
+    }
+
+
 def test_inputs_are_replaced_only_when_they_change(tmp_path):
-    bodies = {url: name.encode() for name, (url, _, _) in planner.SOURCES.items()}
+    bodies = source_bodies()
     assert planner.prepare(tmp_path, Client(bodies))["changed"] is True
-    assert (tmp_path / "ttc-gtfs.zip").read_bytes() == b"ttc-gtfs.zip"
+    assert (tmp_path / "ttc-gtfs.zip").read_bytes() == bodies[planner.STATIC_GTFS_URL]
     config = json.loads((tmp_path / "build-config.json").read_text())
     assert [f["feedId"] for f in config["transitFeeds"]] == ["ttc", "go", "br", "mi", "yr"]
     assert (tmp_path / "yr-gtfs.zip").exists()
@@ -36,15 +54,29 @@ def test_inputs_are_replaced_only_when_they_change(tmp_path):
     assert planner.prepare(tmp_path, Client(bodies))["changed"] is False
     assert (tmp_path / "manifest.json").read_text() == manifest  # The graph stays current.
 
-    bodies[planner.regional.GTFS_URL] = b"new timetable"
+    bodies[planner.regional.GTFS_URL] = archive({"routes.txt": "new timetable"})
     assert planner.prepare(tmp_path, Client(bodies))["changed"] is True
-    assert (tmp_path / "go-gtfs.zip").read_bytes() == b"new timetable"
+    assert (tmp_path / "go-gtfs.zip").read_bytes() == bodies[planner.regional.GTFS_URL]
     assert [p.name for p in tmp_path.iterdir() if p.name.startswith(".")] == []
 
     # The Toronto-only street extract of earlier versions is removed.
     (tmp_path / "toronto.osm.pbf").write_bytes(b"old")
     assert planner.prepare(tmp_path, Client(bodies))["changed"] is True
     assert not (tmp_path / "toronto.osm.pbf").exists()
+
+
+def test_an_empty_archive_does_not_replace_a_working_schedule(tmp_path):
+    bodies = source_bodies()
+    planner.prepare(tmp_path, Client(bodies))
+    good = (tmp_path / "ttc-gtfs.zip").read_bytes()
+    manifest = (tmp_path / "manifest.json").read_text()
+
+    bodies[planner.STATIC_GTFS_URL] = archive({})
+    with pytest.raises(planner.FetchError, match="not a GTFS archive"):
+        planner.prepare(tmp_path, Client(bodies))
+    assert (tmp_path / "ttc-gtfs.zip").read_bytes() == good
+    assert (tmp_path / "manifest.json").read_text() == manifest
+    assert [p.name for p in tmp_path.iterdir() if p.name.startswith(".")] == []
 
 
 def test_polyline_decodes_to_lon_lat():
