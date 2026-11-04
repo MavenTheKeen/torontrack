@@ -106,10 +106,11 @@ those observed passing it, over hours with no collection gap. Stops mostly under
 vehicle near a terminal or on a branch can be missed), so a route's daily figure is the
 upper quartile of its stops, and the report uses only directions with at least three
 stops. In a check of 3,021 route-direction days from 15 October to 3 November 2026, the
-median was 98% and the lower quartile 95%. A few routes read low every day (night routes
-300 to 306, 512 and 927 among them); the cause has not been confirmed, so the report lists
-them as not seen rather than cancelled. A vehicle with its tracker off or on a detour
-looks the same as one that did not run, and a route with no passage all day has no row.
+median was 98% and the lower quartile 95%. Trips scheduled from 04:00 count toward the
+next service day. Some routes still read low every day and the cause has not been
+confirmed, so the report lists them as not seen rather than cancelled. A vehicle with its
+tracker off or on a detour looks the same as one that did not run, and a route with no
+passage all day has no row.
 
 Days with and without road restrictions along each route are compared in
 `ttc_surface_closure_effect`; see [road restrictions](roads.md#closures-and-bus-reliability).

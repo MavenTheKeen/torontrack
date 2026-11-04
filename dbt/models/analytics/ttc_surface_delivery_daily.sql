@@ -13,7 +13,8 @@
 -- most fully run routes read 95 to 100%. Hours overlapping a collection gap are left out.
 -- An empty hour has at least 4 vehicles scheduled at every measured stop and none seen.
 -- Not proof of cancellation: a vehicle with its tracker off looks the same. Stops come
--- from ttc_surface_scheduled, so a route with no passage all day has no row.
+-- from ttc_surface_scheduled, so a route with no passage all day has no row. GTFS hours
+-- from 28 (04:00 the next morning) belong to the next service day, which starts at 04:00.
 {% if is_incremental() %}
     {% set since = "(select coalesce(max(service_date), date '1900-01-01') - 1 from " ~ this ~ ")" %}
 {% endif %}
@@ -33,6 +34,19 @@ with gaps as materialized (
         where service_date >= {{ since }}
     {% endif %}
     group by 1, 2, 3, 4, 5
+), scheduled as (
+    select
+        case when service_hour >= 28 then service_date + 1 else service_date end as service_date,
+        case when service_hour >= 28 then service_hour - 24 else service_hour end as service_hour,
+        route_id,
+        direction_id,
+        stop_id,
+        sum(scheduled_trips) as scheduled_trips
+    from {{ ref('ttc_surface_scheduled') }}
+    {% if is_incremental() %}
+        where service_date >= {{ since }} - 1
+    {% endif %}
+    group by 1, 2, 3, 4, 5
 ), hours as (
     select
         s.service_date,
@@ -42,7 +56,7 @@ with gaps as materialized (
         s.stop_id,
         s.scheduled_trips,
         coalesce(o.observed, 0) as observed
-    from {{ ref('ttc_surface_scheduled') }} s
+    from scheduled s
     left join seen o using (service_date, service_hour, route_id, direction_id, stop_id)
     where not exists (
         select 1 from gaps g
@@ -51,6 +65,8 @@ with gaps as materialized (
             and g.gap_end > (s.service_date::timestamp at time zone 'America/Toronto')
                 + make_interval(hours => s.service_hour)
     )
+    -- The morning after the newest passage has not happened yet.
+    and s.service_date <= (select max(service_date) from seen)
     {% if is_incremental() %}
         and s.service_date >= {{ since }}
     {% endif %}

@@ -2286,7 +2286,7 @@ function planSheet(view) {
         el("button", { type: "button", class: "button", "data-guide": "gps" }, iconSvg("navigate", { size: 18 }), "Start"),
         el("button", { type: "button", class: "button secondary", "data-guide": "simulated", title: "Run through this trip on its timetable, ten times faster" }, "Preview")),
       el("p", { class: "sheet-label" }, "Steps"), planSteps(trip, p.stepFree)] : null] : null,
-    el("p", { class: "muted small" }, "Planned from the published TTC and regional timetables, not live predictions; check the station or stop for live times. Walking routes, addresses and places use OpenStreetMap. Your travel choices are kept on this device."),
+    el("p", { class: "muted small" }, "TTC and neighbouring buses use live times where the feed covers the ride; regional trains use the timetable. Walking routes, addresses and places use OpenStreetMap. Your travel choices are kept on this device."),
   ];
 }
 

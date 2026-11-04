@@ -390,8 +390,7 @@ def test_live_times_replace_the_timetable_where_a_feed_gives_them():
 
 
 def test_planner_reads_live_trip_feeds_that_need_no_key():
-    # The planner logs each feed's URL, so Metrolinx's, which carries its key, is left out;
-    # the TTC's live trip IDs match none of its timetable's.
+    # The planner logs each feed's URL, so Metrolinx's, which carries its key, is left out.
     updaters = [u for u in planner.ROUTER_CONFIG["updaters"] if u["type"] == "stop-time-updater"]
-    assert {u["feedId"] for u in updaters} == set(planner.agencies.AGENCIES)
+    assert {u["feedId"] for u in updaters} == {"ttc", *planner.agencies.AGENCIES}
     assert not any("key" in u["url"] for u in updaters)

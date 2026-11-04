@@ -2,7 +2,7 @@
 
 OpenTripPlanner (docs/planner.md) routes on the TTC and regional train and bus schedules and
 OpenStreetMap streets, and Bike Share from its live station feed. Plans use published
-timetables only, not live predictions. Regional names drop the operator's brand
+timetables, moved by live trip updates except on regional trains. Regional names drop the operator's brand
 ('Hamilton GO' -> 'Hamilton'), as the rest of the site does.
 
 A trip can leave out any of MODES. Subway, streetcar and regional train are modes of their
