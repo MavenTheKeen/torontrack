@@ -21,6 +21,7 @@ LIMITS = {
     "weather": timedelta(hours=2),
     # Loaded every 10 minutes.
     "roads": timedelta(minutes=30),
+    "schedule": timedelta(days=3),
     # Live regional trains: positions and delays every 30 s, alerts every 2 minutes.
     "regional vehicles": timedelta(minutes=2),
     "regional trips": timedelta(minutes=2),
@@ -267,6 +268,28 @@ def roads(conn, now: datetime) -> dict:
     }
 
 
+def schedule(conn, now: datetime) -> dict:
+    """TTC's static schedule: failing once the newest one has run out, since every comparison
+    with the timetable then stops; a refresh that only fails is delayed until then."""
+    row = conn.execute(
+        """SELECT (SELECT max(service_end) FROM normalized.ttc_gtfs_versions) AS service_end,
+                  (SELECT max(finished_at) FROM ops.ttc_static_refreshes
+                   WHERE status IN ('loaded', 'unchanged')) AS last_success,
+                  (SELECT error FROM ops.ttc_static_refreshes
+                   ORDER BY refresh_id DESC LIMIT 1) AS last_error"""
+    ).fetchone()
+    end = row["service_end"]
+    expired = end is None or now.astimezone(TORONTO).date() > end
+    return {
+        "status": "failing" if expired else verdict(row["last_success"], LIMITS["schedule"], now),
+        "last_success": row["last_success"],
+        "age_seconds": _age(row["last_success"], now),
+        "service_end": end,
+        "expired": expired,
+        "last_error": row["last_error"],
+    }
+
+
 def regional(conn, now: datetime) -> dict | None:
     """Metrolinx's live feeds (transit.regional_live); None where no key is set and they
     have never been polled."""
@@ -369,6 +392,7 @@ def pipeline_status(conn, now: datetime) -> dict:
         "dbt": dbt(conn, now),
         "weather": weather(conn, now),
         "roads": roads(conn, now),
+        "schedule": schedule(conn, now),
     }
     regional_part = regional(conn, now)
     if regional_part:

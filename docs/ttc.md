@@ -24,7 +24,7 @@ Data: Toronto Transit Commission. Predictions may be inaccurate.
 | Subway alerts | `https://gtfsrt.ttc.ca/alerts/subway?format=binary` | Delays, closures, planned track work |
 | Accessibility alerts | `https://gtfsrt.ttc.ca/alerts/accessibility?format=binary` | Elevator and escalator outages |
 | Surface trip updates | `https://gtfsrt.ttc.ca/trips/update?format=binary` | Bus and streetcar arrival predictions, every 30 s |
-| Static GTFS | Toronto Open Data, "TTC Routes and Schedules" (ZIP) | Platforms, line order, scheduled trips |
+| Static GTFS | Toronto Open Data, "Merged GTFS: TTC Routes and Schedules" (ZIP) | Platforms, line order, scheduled trips |
 
 The realtime feeds need no API key and publish no rate limits or terms of use. One
 backend process polls them; browsers never call TTC directly. The rapid transit lines

@@ -33,6 +33,7 @@ LABELS = {
     "dbt": "dbt build",
     "weather": "Weather load",
     "roads": "Road restrictions load",
+    "schedule": "TTC schedule",
 }
 
 
@@ -54,6 +55,7 @@ def components(conn, now: datetime) -> dict[str, dict]:
     found["dbt"] = status["dbt"]
     found["weather"] = status["weather"]
     found["roads"] = status["roads"]
+    found["schedule"] = status["schedule"]
     return found
 
 

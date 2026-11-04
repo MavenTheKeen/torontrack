@@ -3601,6 +3601,14 @@ async function renderPipeline() {
           : "No observations loaded yet",
       ),
     ),
+    el("h2", {}, "TTC schedule"),
+    healthCard(
+      "Published timetable",
+      data.schedule.status,
+      el("p", {}, data.schedule.service_end ? `${data.schedule.expired ? "Ran out" : "Runs until"} ${shortDayFmt.format(new Date(`${data.schedule.service_end}T00:00:00Z`))}` : "No schedule loaded"),
+      el("p", { class: "muted small" }, `Last checked successfully ${ageText(data.schedule.age_seconds)} · checked daily`),
+      data.schedule.last_error ? el("p", { class: "muted small" }, `Latest refresh failed: ${data.schedule.last_error}`) : null,
+    ),
     data.roads
       ? [
           el("h2", {}, "Road restrictions"),

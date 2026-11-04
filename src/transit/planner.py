@@ -18,6 +18,7 @@ import hashlib
 import json
 import os
 import tempfile
+import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -105,6 +106,14 @@ def _write_json(path: Path, value: dict) -> bool:
     return True
 
 
+def _is_gtfs(path: str) -> bool:
+    try:
+        with zipfile.ZipFile(path) as archive:
+            return "routes.txt" in archive.namelist()
+    except zipfile.BadZipFile:
+        return False
+
+
 def prepare(out: str | os.PathLike, client: FeedClient) -> dict:
     """Download the sources into `out`; {"changed": bool, "files": {name: sha256}}."""
     out = Path(out)
@@ -129,6 +138,10 @@ def prepare(out: str | os.PathLike, client: FeedClient) -> dict:
         if size == 0:
             os.unlink(tmp.name)
             raise FetchError(f"{name} download is empty")
+        # A valid but empty ZIP must not replace a working schedule.
+        if name.endswith(".zip") and not _is_gtfs(tmp.name):
+            os.unlink(tmp.name)
+            raise FetchError(f"{name} download is not a GTFS archive")
         if digest == previous.get(name) and (out / name).exists():
             os.unlink(tmp.name)
         else:
