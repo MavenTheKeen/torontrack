@@ -72,7 +72,7 @@ PLANNER_ATTRIBUTION = (
     "Trip plans: OpenTripPlanner with TTC schedules (Open Government Licence – Toronto), "
     "regional schedules (Data used in this product or service is provided with the "
     "permission of Metrolinx.) and streets © OpenStreetMap contributors. Planned from "
-    "published timetables, not live predictions."
+    "published timetables, with live times where a live feed covers the ride."
 )
 REGIONAL_ATTRIBUTION = (
     "Data used in this product or service is provided with the permission of Metrolinx. "
