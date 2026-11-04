@@ -89,6 +89,8 @@ minutes along each pattern, never at a terminal.
 | `ttc_surface_scheduled` (incremental) | Scheduled vehicles per route, direction, measured stop and hour, from trip starts per pattern placed at the stop by the pattern's scheduled offset (one hour off for some trips near the top of an hour) |
 | `ttc_surface_headways` (incremental) | Time since the previous vehicle of the route and direction at the stop, with that hour's scheduled headway; the same vehicle twice in a row (a loop) and gaps spanning a collection gap are flagged |
 | `ttc_surface_reliability_daily` | Per route, direction and day: headways, bunched, long gaps and the excess-wait sums |
+| `ttc_on_time_daily` (incremental) | Per route, direction, part of the day and completed day: the 90th percentile wait on frequent service and, for buses and streetcars, the 90th percentile of actual over scheduled ride time; one new day per build |
+| `ttc_on_time_buffers` | The last 28 measured days of `ttc_on_time_daily`, for the [trip planner](planner.md#on-time-estimates) |
 | `ttc_surface_delivery_daily` (incremental) | Per route, direction and day: the share of scheduled vehicles seen on the live feed, and hours with vehicles scheduled and none seen |
 
 Only frequent service counts: hours where the schedule has a vehicle at least every 15

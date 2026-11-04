@@ -248,6 +248,20 @@ models:
       - name: scheduled_trips
         data_tests:
           - not_null
+  - name: ttc_on_time_daily
+    description: >-
+      Waits and rides at the 90th percentile on frequent TTC service, per route, direction,
+      part of the day and completed service day.
+    columns:
+      - name: wait_p90_seconds
+        data_tests:
+          - not_null
+  - name: ttc_on_time_buffers
+    description: The last 28 days of ttc_on_time_daily, for on-time estimates in the trip planner.
+    columns:
+      - name: wait_p90_seconds
+        data_tests:
+          - not_null
   - name: ttc_surface_closure_days
     description: Road restrictions in effect along each route direction on each measured service day.
     columns:
