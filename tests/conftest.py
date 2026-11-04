@@ -67,6 +67,7 @@ def settings():
             "analytics.ttc_collection_gaps",
             "analytics.ttc_surface_scheduled",
             "analytics.ttc_surface_headways",
+            "analytics.ttc_surface_delivery_daily",
         ):
             if conn.execute("SELECT to_regclass(%s) AS t", (table,)).fetchone()["t"]:
                 conn.execute(f"TRUNCATE {table}")

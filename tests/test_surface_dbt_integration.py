@@ -77,6 +77,58 @@ def test_surface_headways_bunching_and_gaps(settings, monkeypatch):
     assert (route["short_name"], route["mode"], route["ewt_seconds"]) == ("10", "bus", 203)
 
 
+def test_scheduled_service_seen_and_empty_hours(settings, monkeypatch):
+    executable = os.environ.get("DBT_EXECUTABLE")
+    if not executable:
+        pytest.skip("Set DBT_EXECUTABLE to the isolated dbt executable")
+    with connect(settings.database_url) as conn:
+        feed = static_gtfs.parse(static_zip())
+        static_gtfs.load(conn, feed, "test://gtfs", T0)
+        surface.load(conn, surface.parse(static_zip()), feed.feed_version)
+        # Eastbound 10: 20 vehicles scheduled in hour 7 and 5 in hour 8, at Midland Ave.
+        [start] = conn.execute(
+            """SELECT s.feed_version, s.pattern_id, s.service_id
+               FROM normalized.ttc_surface_pattern_starts s
+               JOIN normalized.ttc_surface_patterns p USING (feed_version, pattern_id)
+               WHERE p.route_id = '10' AND p.direction_id = 0 AND s.start_hour = 7"""
+        ).fetchall()
+        conn.execute(
+            """DELETE FROM normalized.ttc_surface_pattern_starts
+               WHERE feed_version = %(feed_version)s AND pattern_id = %(pattern_id)s""",
+            start,
+        )
+        for hour, trips in ((7, 20), (8, 5)):
+            conn.execute(
+                """INSERT INTO normalized.ttc_surface_pattern_starts
+                   (feed_version, pattern_id, service_id, start_hour, trips)
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (start["feed_version"], start["pattern_id"], start["service_id"], hour, trips),
+            )
+        arrive(conn, "101", SIX_AM)
+        # Five vehicles in hour 7, one reported twice in a minute; none in hour 8.
+        passages = [(n * 120, f"b{n}") for n in range(5)] + [(10, "b0")]
+        for seconds, vehicle in passages:
+            conn.execute(
+                """INSERT INTO normalized.ttc_surface_passages
+                   (passed_at, route_id, direction_id, stop_id, vehicle_id, pattern_id,
+                    report_gap_seconds) VALUES (%s, '10', 0, '663', %s, %s, 30)""",
+                (SEVEN_TEN + timedelta(seconds=seconds), vehicle, start["pattern_id"]),
+            )
+    assert run_transform(settings.database_url, executable, "dbt")["status"] == "succeeded"
+    monkeypatch.setattr(report, "DELIVERY_MIN_STOPS", 1)
+    monkeypatch.setattr(report, "DELIVERY_MIN_DAYS", 1)
+    monkeypatch.setattr(report, "DELIVERY_MIN_TRIPS", 1)
+    with connect(settings.database_url) as conn:
+        [day] = conn.execute("SELECT * FROM analytics.ttc_surface_delivery_daily").fetchall()
+        summary = report.delivery(conn)
+    assert (day["route_id"], day["direction_id"], day["stops"]) == ("10", 0, 1)
+    assert (day["scheduled_trips"], float(day["delivered"]), day["empty_hours"]) == (25, 0.2, 1)
+    assert (float(summary["missing_pct"]), summary["empty_hours"]) == (80.0, 1)
+    [route] = summary["routes_ranked"]
+    assert (route["short_name"], route["seen_pct"], route["missing_per_day"]) == ("10", 20, 20)
+    assert summary["worst_days"] == []
+
+
 def test_weekdays_with_and_without_a_road_restriction(settings, monkeypatch):
     executable = os.environ.get("DBT_EXECUTABLE")
     if not executable:
