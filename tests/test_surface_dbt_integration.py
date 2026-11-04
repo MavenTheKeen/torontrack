@@ -85,7 +85,8 @@ def test_scheduled_service_seen_and_empty_hours(settings, monkeypatch):
         feed = static_gtfs.parse(static_zip())
         static_gtfs.load(conn, feed, "test://gtfs", T0)
         surface.load(conn, surface.parse(static_zip()), feed.feed_version)
-        # Eastbound 10: 20 vehicles scheduled in hour 7 and 5 in hour 8, at Midland Ave.
+        # Eastbound 10: 20 vehicles scheduled in hour 7 and 5 in hour 8, at Midland Ave. Hour 6
+        # ends before the first passage recorded, so it was not collected and does not count.
         [start] = conn.execute(
             """SELECT s.feed_version, s.pattern_id, s.service_id
                FROM normalized.ttc_surface_pattern_starts s
@@ -97,7 +98,7 @@ def test_scheduled_service_seen_and_empty_hours(settings, monkeypatch):
                WHERE feed_version = %(feed_version)s AND pattern_id = %(pattern_id)s""",
             start,
         )
-        for hour, trips in ((7, 20), (8, 5)):
+        for hour, trips in ((6, 5), (7, 20), (8, 5)):
             conn.execute(
                 """INSERT INTO normalized.ttc_surface_pattern_starts
                    (feed_version, pattern_id, service_id, start_hour, trips)
