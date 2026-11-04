@@ -36,6 +36,7 @@ from transit.web import (
     agencies,
     agenda,
     bikes,
+    ontime,
     pipeline,
     planner,
     queries,
@@ -846,6 +847,18 @@ def create_app(
                 context["outages"],
                 step_free,
             )
+        try:
+            buffers = cached(
+                "on-time",
+                lambda conn, _now: {"buffers": ontime.load(conn)},
+                store=slow,
+                data=True,
+            )
+        except (psycopg.Error, RuntimeError, HTTPException):
+            # Without measurements, plans simply carry no on-time estimate.
+            logger.warning("On-time estimates unavailable", exc_info=True)
+        else:
+            ontime.annotate(body["itineraries"], buffers["buffers"])
         return {"generated_at": now, "attribution": PLANNER_ATTRIBUTION, **body}
 
     @app.get("/api/places")

@@ -142,6 +142,33 @@ so instead of guessing. A walk shorter than 120 m between a subway ride and the 
 stays inside the station (a bus bay or another line), so no exit is suggested for it.
 Guidance repeats the entrance while waiting and the exit while riding.
 
+## On-time estimates
+
+Each trip on frequent TTC service says how much time to allow: with "Arrive by", when to
+leave to arrive on time about 9 times in 10; otherwise, the time you arrive by about 9
+times in 10. The planned times assume every vehicle keeps to its timetable, so the estimate
+adds what the last 28 measured days show for that route, direction, part of the day (morning
+peak, midday, afternoon peak, other) and kind of day (weekday or weekend):
+
+- **Wait:** the 90th percentile wait for a rider arriving at a random moment, from measured
+  gaps on service scheduled at least every 15 minutes.
+- **Ride, on buses and streetcars:** the 90th percentile of actual over scheduled time, for
+  one vehicle across about 30 scheduled minutes. Subway ride times are not measured.
+
+A trip's buffer is halfway between the sum of these and their root sum of squares
+(`src/transit/web/ontime.py`), and is rounded up to a minute. A trip with any ride that has
+no measurements gets no estimate: regional trains, neighbouring agencies, infrequent routes
+and Lines 5 and 6. A holiday is measured with weekends, but a planned trip on a holiday
+that falls on a weekday uses the weekday figures.
+
+The models are in [reliability](reliability.md#buses-and-streetcars). In a check on
+weekdays from 26 to 31 October 2026, using figures from 13 to 25 October on frequent bus and
+streetcar routes, the 90th percentile wait covered 89 to 90% of waits and the ride figure 90
+to 91% of rides. One wait and one 30-minute ride together were covered 84 to 93% of the time
+by the root sum of squares and 94 to 95% by the sum. The halfway buffer used here, trips with
+transfers, subway trips and weekends were not part of that check, and no winter service has
+been measured yet.
+
 ## API
 
 `GET /api/plan?from=lat,lon&to=lat,lon[&at=2026-10-14T08:30][&arrive=true][&step_free=true][&modes=subway,bus]`
