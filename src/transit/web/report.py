@@ -95,9 +95,10 @@ def delivery(conn) -> dict | None:
         SELECT * FROM analytics.ttc_surface_delivery_daily
         WHERE stops >= %(stops)s
           AND service_date < ((now() AT TIME ZONE 'America/Toronto') - interval '4 hours')::date
-          -- Hours counted from midnight are off by one on a day the clocks change.
-          AND ((service_date + 1)::timestamp AT TIME ZONE 'America/Toronto')
-              - (service_date::timestamp AT TIME ZONE 'America/Toronto') = interval '24 hours'
+          -- Hours counted from midnight are off by one on a day the clocks change, and the
+          -- night service of the day before runs through the change.
+          AND ((service_date + 2)::timestamp AT TIME ZONE 'America/Toronto')
+              - (service_date::timestamp AT TIME ZONE 'America/Toronto') = interval '48 hours'
           AND service_date > (
               SELECT max(service_date) FROM analytics.ttc_surface_delivery_daily
               WHERE stops >= %(stops)s
