@@ -2239,6 +2239,9 @@ function planTrips(view) {
       el("span", { class: "plan-pills" }, bike ? el("span", { class: "plan-pill bike", title: "Bike Share" }, iconSvg("bike", { size: 14 })) : null,
         transit.length ? transit.map(planPill) : bike ? null : el("span", { class: "muted" }, "Walk the whole way")),
       el("span", { class: "muted small" }, `${transit.length > 1 ? plural(transit.length - 1, "transfer", "transfers") : transit.length ? "No transfers" : ""}${transit.length ? " · " : ""}${numberFmt.format(Math.round(trip.walk_metres / 10) * 10)} m walking`),
+      trip.on_time ? el("span", { class: "small" }, p.when === "arrive"
+        ? `Leave by ${timeFmt.format(new Date(trip.on_time.leave_by))} to arrive on time about 9 times in 10`
+        : `About 9 times in 10 you arrive by ${timeFmt.format(new Date(trip.on_time.arrive_by))}`) : null,
       trip.outages && trip.outages.length ? el("span", { class: "warn small" }, `Elevator or escalator out at ${trip.outages.map((o) => o.station).join(", ")}`) : null,
     ));
   }));
@@ -2286,7 +2289,7 @@ function planSheet(view) {
         el("button", { type: "button", class: "button", "data-guide": "gps" }, iconSvg("navigate", { size: 18 }), "Start"),
         el("button", { type: "button", class: "button secondary", "data-guide": "simulated", title: "Run through this trip on its timetable, ten times faster" }, "Preview")),
       el("p", { class: "sheet-label" }, "Steps"), planSteps(trip, p.stepFree)] : null] : null,
-    el("p", { class: "muted small" }, "TTC and neighbouring buses use live times where the feed covers the ride; regional trains use the timetable. Walking routes, addresses and places use OpenStreetMap. Your travel choices are kept on this device."),
+    el("p", { class: "muted small" }, "TTC and neighbouring buses use live times where the feed covers the ride; regional trains use the timetable. On-time estimates come from how these TTC rides ran over the last four weeks; they do not cover subway ride times or unusual events. Walking routes, addresses and places use OpenStreetMap. Your travel choices are kept on this device."),
   ];
 }
 

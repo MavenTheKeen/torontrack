@@ -46,7 +46,9 @@ MiWay and YRT rides use live times; regional trains use timetables
 ([trip planner](planner.md)).
 
 The start and end can be typed as an address, a place, an intersection, a station or a
-stop. The search index is built from OpenStreetMap and served by the site, so planning
+stop. On frequent TTC service, each trip says when to leave to arrive on time about 9
+times in 10, from how those rides ran over the last four weeks
+([on-time estimates](planner.md#on-time-estimates)). The search index is built from OpenStreetMap and served by the site, so planning
 does not need the visitor's location. Each mode of travel can be switched off. Subway
 rides name the entrance to use and the exit to take. Step-free trips use only accessible
 stations, and a trip through a station with an elevator out of service carries the TTC's

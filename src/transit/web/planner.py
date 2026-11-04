@@ -36,6 +36,7 @@ query Plan($origin: PlanLabeledLocationInput!, $destination: PlanLabeledLocation
         from { name lat lon stop { gtfsId } vehicleRentalStation { name } }
         to { name lat lon stop { gtfsId } vehicleRentalStation { name } }
         route { gtfsId shortName longName color }
+        trip { directionId }
         legGeometry { points }
         intermediatePlaces {
           name lat lon stop { gtfsId } arrival { scheduledTime estimated { time } }
@@ -168,6 +169,7 @@ def _leg(leg: dict) -> dict:
     transit = leg["mode"] in TRANSIT_MODES
     network = _network(route.get("gtfsId"))
     local = network not in ("ttc", "regional")
+    direction = (leg.get("trip") or {}).get("directionId")
     return {
         "mode": leg["mode"].lower(),
         "network": network if transit else None,
@@ -186,6 +188,7 @@ def _leg(leg: dict) -> dict:
             else None
         ),
         "color": f"#{route['color']}" if transit and route.get("color") else None,
+        "direction": int(direction) if transit and direction not in (None, "") else None,
         "headsign": _headsign(leg.get("headsign"), network) if transit else None,
         # A ride on a Bike Share bike, from one station to another.
         "rented": bool(leg.get("rentedBike")),
