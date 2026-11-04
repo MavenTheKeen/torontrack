@@ -245,7 +245,8 @@ def test_on_time_waits_and_rides(settings):
         2,
     )
     assert float(day["ride_ratio_p90"]) == 1.45  # Between 1.0 and 1.5.
-    assert 200 <= float(day["wait_p90_seconds"]) <= 300  # Gaps of about five minutes.
+    # The gap between the buses grows from five to twenty minutes along the route.
+    assert 600 <= float(day["wait_p90_seconds"]) <= 1200
     assert (buffer["days"], float(buffer["ride_ratio_p90"])) == (1, 1.45)
 
 
