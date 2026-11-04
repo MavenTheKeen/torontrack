@@ -161,13 +161,13 @@ no measurements gets no estimate: regional trains, neighbouring agencies, infreq
 and Lines 5 and 6. A holiday is measured with weekends, but a planned trip on a holiday
 that falls on a weekday uses the weekday figures.
 
-The models are in [reliability](reliability.md#buses-and-streetcars). In a check on
-weekdays from 26 to 31 October 2026, using figures from 13 to 25 October on frequent bus and
-streetcar routes, the 90th percentile wait covered 89 to 90% of waits and the ride figure 90
-to 91% of rides. One wait and one 30-minute ride together were covered 84 to 93% of the time
-by the root sum of squares and 94 to 95% by the sum. The halfway buffer used here, trips with
-transfers, subway trips and weekends were not part of that check, and no winter service has
-been measured yet.
+The models are in [reliability](reliability.md#buses-and-streetcars). In a check on 2 and
+3 November 2026 (weekdays), using only figures from October, the waits covered 90 to 91% on
+buses and streetcars and 87 to 93% on the subway, and the ride figure 88 to 92%. The buffer
+covered 91 to 95% for one wait and one 30-minute ride, and 93 to 97% for two rides drawn
+independently, so it errs on the side of leaving early. Those two days are a short sample.
+Rides drawn independently do not show a delay that affects both rides of a real trip, and
+weekends, subway ride times and winter service have not been checked.
 
 ## API
 
