@@ -180,6 +180,75 @@ def test_night_trips_from_four_count_on_the_next_service_day(settings):
     ]
 
 
+def test_on_time_waits_and_rides(settings):
+    executable = os.environ.get("DBT_EXECUTABLE")
+    if not executable:
+        pytest.skip("Set DBT_EXECUTABLE to the isolated dbt executable")
+    with connect(settings.database_url) as conn:
+        feed = static_gtfs.parse(static_zip())
+        static_gtfs.load(conn, feed, "test://gtfs", T0)
+        surface.load(conn, surface.parse(static_zip()), feed.feed_version)
+        [start] = conn.execute(
+            """SELECT s.feed_version, s.pattern_id
+               FROM normalized.ttc_surface_pattern_starts s
+               JOIN normalized.ttc_surface_patterns p USING (feed_version, pattern_id)
+               WHERE p.route_id = '10' AND p.direction_id = 0 AND s.start_hour = 7"""
+        ).fetchall()
+        conn.execute(
+            """UPDATE normalized.ttc_surface_pattern_starts SET trips = 12
+               WHERE feed_version = %(feed_version)s AND pattern_id = %(pattern_id)s
+                 AND start_hour = 7""",
+            start,
+        )
+        # Four stops ten scheduled minutes apart. The first bus keeps to time and the second
+        # takes half as long again; they pass the first stop five minutes apart.
+        conn.execute(
+            """DELETE FROM normalized.ttc_surface_pattern_stops
+               WHERE feed_version = %(feed_version)s AND pattern_id = %(pattern_id)s""",
+            start,
+        )
+        stops = ["663", "a", "b", "c"]
+        for n, stop in enumerate(stops):
+            conn.execute(
+                """INSERT INTO normalized.ttc_surface_pattern_stops
+                   (feed_version, pattern_id, stop_order, stop_id, offset_seconds)
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (start["feed_version"], start["pattern_id"], n, stop, n * 600),
+            )
+        arrive(conn, "101", SIX_AM)
+        for vehicle, begin, leg in (("b1", 0, 600), ("b2", 300, 900)):
+            for n, stop in enumerate(stops):
+                conn.execute(
+                    """INSERT INTO normalized.ttc_surface_passages
+                       (passed_at, route_id, direction_id, stop_id, vehicle_id, pattern_id,
+                        report_gap_seconds) VALUES (%s, '10', 0, %s, %s, %s, 30)""",
+                    (
+                        SEVEN_TEN + timedelta(seconds=begin + n * leg),
+                        stop,
+                        vehicle,
+                        start["pattern_id"],
+                    ),
+                )
+    assert run_transform(settings.database_url, executable, "dbt")["status"] == "succeeded"
+    with connect(settings.database_url) as conn:
+        [day] = conn.execute(
+            """SELECT * FROM analytics.ttc_on_time_daily
+               WHERE route_id = '10' AND direction_id = 0 AND band = 'am'"""
+        ).fetchall()
+        [buffer] = conn.execute(
+            """SELECT * FROM analytics.ttc_on_time_buffers
+               WHERE route_id = '10' AND direction_id = 0 AND band = 'am'"""
+        ).fetchall()
+    assert (str(day["service_date"]), day["day_kind"], day["rides"]) == (
+        "2026-10-09",
+        "weekday",
+        2,
+    )
+    assert float(day["ride_ratio_p90"]) == 1.45  # Between 1.0 and 1.5.
+    assert 200 <= float(day["wait_p90_seconds"]) <= 300  # Gaps of about five minutes.
+    assert (buffer["days"], float(buffer["ride_ratio_p90"])) == (1, 1.45)
+
+
 def test_weekdays_with_and_without_a_road_restriction(settings, monkeypatch):
     executable = os.environ.get("DBT_EXECUTABLE")
     if not executable:
