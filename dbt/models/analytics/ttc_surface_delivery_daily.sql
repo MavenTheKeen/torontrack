@@ -65,6 +65,10 @@ with gaps as materialized (
             and g.gap_end > (s.service_date::timestamp at time zone 'America/Toronto')
                 + make_interval(hours => s.service_hour)
     )
+    -- Hours before the first passage ever recorded were not collected.
+    and (s.service_date::timestamp at time zone 'America/Toronto')
+        + make_interval(hours => s.service_hour + 1)
+        > (select min(passed_at) from {{ source('normalized', 'ttc_surface_passages') }})
     -- The morning after the newest passage has not happened yet.
     and s.service_date <= (select max(service_date) from seen)
     {% if is_incremental() %}

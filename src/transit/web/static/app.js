@@ -986,7 +986,7 @@ async function renderReportCard(month) {
       ? el("p", {}, `${data.service_seen.seen_pct}% of scheduled bus and streetcar service was seen on the live feed, with ${plural(data.service_seen.empty_hours, "hour", "hours")} on a route and direction with vehicles scheduled and none seen. A vehicle with its tracker off looks the same as one that did not run.`)
       : null,
     data.elevators.outages
-      ? el("p", {}, `${plural(data.elevators.outages, "elevator or escalator outage", "elevator and escalator outages")} began this month, lasting ${durationText(data.elevators.median_minutes)} at the median.`)
+      ? el("p", {}, `TTC posted ${plural(data.elevators.outages, "elevator or escalator alert", "elevator and escalator alerts")} this month, and half cleared within ${durationText(data.elevators.median_minutes)}. One device can have several alerts.`)
       : null,
     el("h3", {}, "TTC's own delay log"),
     o.published
