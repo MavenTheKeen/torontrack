@@ -97,6 +97,11 @@ service that never appeared on the live feed, and elevator outage durations. TTC
 | --- |
 | ![Extra wait by line and time of day](screenshots/site-report.png) |
 
+The report card grades each finished month: every subway line, the bus and streetcar
+network and the routes with the most and least extra wait, on this project's own scale, with
+the change from the month before and TTC's delay log once published
+([report card](reliability.md#monthly-report-card)).
+
 ## Bike Share
 
 Each dock shows live availability and a summary of its trips over the last twelve months:

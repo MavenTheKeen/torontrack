@@ -12,7 +12,7 @@ from transit import weather
 from transit.db import connect
 from transit.transform import run_transform
 from transit.ttc import static_gtfs, store
-from transit.web import report
+from transit.web import report, report_card
 
 pytestmark = pytest.mark.integration
 
@@ -148,6 +148,12 @@ def test_ttc_reliability_models(settings):
         assert (line["wait_seconds"], line["scheduled_wait_seconds"]) == (292, 1800)
         assert line["ewt_seconds"] == round((180**2 + 690**2 - 870 * 3600) / (2 * 870))
         assert [p["period"] for p in summary["periods"]] == ["early"]
+        month = report_card.card(conn, "2026-10")
+        (line,) = month["lines"]
+        assert (line["route_id"], line["days"], line["grade"]) == ("1", 1, None)
+        assert month["official"]["published"] is False
+        assert month["coverage"]["days_in_month"] == 31
+        assert report_card.card(conn, "2026-09") is None
         assert summary["stations"] == []  # Fewer measured gaps than a ranking needs.
         # Both gaps are well within the hourly schedule, so neither is a long gap.
         assert (

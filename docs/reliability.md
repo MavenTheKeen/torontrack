@@ -94,7 +94,9 @@ minutes along each pattern, never at a terminal.
 | `ttc_surface_delivery_daily` (incremental) | Per route, direction and day: the share of scheduled vehicles seen on the live feed, and hours with vehicles scheduled and none seen |
 
 Only frequent service counts: hours where the schedule has a vehicle at least every 15
-minutes. On less frequent routes riders time their trips to the timetable, so the gap
+minutes, and headways of at most 2 hours, because a longer one is a route's break between
+service periods (a peak express between rushes, a night route between nights) rather than
+a wait. On less frequent routes riders time their trips to the timetable, so the gap
 between buses is not their wait. **Bunched** is a headway under a quarter of the scheduled
 one (vehicles arriving together); a **long gap** uses the subway rule. Excess wait time
 uses the same sums. The report ranks routes with at least 300 measured headways.
@@ -116,6 +118,15 @@ passage all day has no row.
 
 Days with and without road restrictions along each route are compared in
 `ttc_surface_closure_effect`; see [road restrictions](roads.md#closures-and-bus-reliability).
+
+## Monthly report card
+
+`#/reliability/card` shows each finished month (`src/transit/web/report_card.py`). Lines,
+the bus and streetcar network and routes with at least 300 measured gaps are graded by excess
+wait time: A up to 30 seconds, B up to 60, C up to 120, D up to 240, F beyond that. The same
+scale applies to every mode, and a month with fewer than 10 measured days is not graded. The
+scale is this project's choice, not a TTC or industry standard. TTC's delay log is compared
+once it covers the month; it is usually published some time after the month ends.
 
 ## Changing incremental models
 

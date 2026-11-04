@@ -396,6 +396,7 @@ input[type="search"]:focus { border-color: var(--accent); box-shadow: inset 0 0 
 .gaps { margin: 0; padding: 0; list-style: none; counter-reset: gap; }
 .gaps li { display: grid; grid-template-columns: 4.5rem 1fr; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
 .gaps li:first-child { border-top: 0; }
+.gaps .grade { font-size: 1.75rem; line-height: 1.1; }
 .outages { list-style: none; padding: 0; margin: 0; }
 .outages li { display: flex; flex-wrap: wrap; gap: 0 6px; padding: 7px 0; border-top: 1px solid var(--border); }
 .outages li:first-child { border-top: 0; }

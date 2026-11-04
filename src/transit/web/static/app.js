@@ -669,7 +669,7 @@ function downloadSection(sets) {
 
 // One Reliability tab with two views: today's measurements and the long-term report.
 function reliabilityHeader(current) {
-  const views = [["today", "#/reliability", "Today"], ["report", "#/reliability/report", "Long-term report"]];
+  const views = [["today", "#/reliability", "Today"], ["report", "#/reliability/report", "Long-term report"], ["card", "#/reliability/card", "Report card"]];
   return [
     el("h1", {}, "Reliability"),
     el("nav", { class: "chip-group view-switch", "aria-label": "Reliability views" },
@@ -931,6 +931,70 @@ function closureComparison(c) {
     el("p", { class: "muted" }, `Extra wait on ${plural(c.with.route_directions, "route direction", "route directions")} that had weekdays both with and without a high-impact City of Toronto road restriction along them.`),
     el("div", { class: "card" }, el("ul", { class: "gaps" }, row("With a restriction", c.with), row("Without", c.without))),
     el("p", { class: "muted small" }, "A comparison, not proof of cause: restrictions are more common on busy streets, and other things change from day to day."),
+  ];
+}
+
+const cardMonthFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "long", year: "numeric" });
+const monthName = (month) => cardMonthFmt.format(new Date(`${month}-01T00:00:00Z`));
+const secondsText = (s) => (s === null || s === undefined ? "not measured" : s <= 0 ? "no extra wait" : ewtText(s));
+
+function cardRow(letter, title, detail) {
+  return el("li", {}, el("strong", { class: "grade", "aria-label": letter ? `Grade ${letter}` : "Not graded" }, letter || "–"), el("span", {}, title, el("span", { class: "detail muted small" }, detail)));
+}
+
+function cardRoute(r) {
+  return cardRow(r.grade, el("span", { class: "with-badge" }, el("span", { class: `route-pill ${r.mode}` }, r.short_name || r.route_id), r.long_name || ""), `${secondsText(r.ewt_seconds)} · ${r.bunched_pct}% bunched, ${r.long_pct}% long gaps`);
+}
+
+// A month's measurements, graded on this project's own scale.
+async function renderReportCard(month) {
+  const { months } = await api("/api/report-card");
+  if (!months.length) {
+    return [...reliabilityHeader("card"), el("p", {}, "The first report card appears when the first measured month has ended.")];
+  }
+  const chosen = months.includes(month) ? month : months[0];
+  const data = await api(`/api/report-card/${chosen}`);
+  const c = data.coverage;
+  const s = data.surface;
+  const o = data.official;
+  const scale = data.grades.map((g) => `${g.grade} up to ${g.up_to_seconds} s`).join(", ");
+  return [
+    ...reliabilityHeader("card"),
+    el("h2", {}, monthName(chosen)),
+    months.length > 1
+      ? el("nav", { class: "chip-group", "aria-label": "Months" }, months.map((m) => el("a", { class: "chip small", href: `#/reliability/card/${m}`, "aria-current": m === chosen ? "page" : null }, monthName(m))))
+      : null,
+    el("p", {}, `Graded by extra wait: how much longer than the schedule promises a rider who turns up at a random moment waits on average. ${scale}, F beyond that.`),
+    c.days < c.days_in_month || c.not_collected_hours > 0
+      ? el("p", { class: "notice" }, `Measured on ${c.days} of ${c.days_in_month} days${c.not_collected_hours > 0 ? `, with ${c.not_collected_hours} hours not collected` : ""}.`)
+      : null,
+    el("h3", {}, "Subway"),
+    el("div", { class: "card" }, el("ol", { class: "gaps" }, data.lines.map((l) => cardRow(
+      l.grade,
+      el("span", { class: "with-badge" }, badge(l.route_id, { small: true }), `Line ${l.route_id}`),
+      `${secondsText(l.ewt_seconds)} · ${l.regular_pct}% of gaps as scheduled, ${numberFmt.format(l.long_gaps)} long gaps${l.previous_grade ? ` · last month ${l.previous_grade}, ${secondsText(l.previous_ewt_seconds)}` : ""}${l.grade ? "" : ` · needs ${data.min_days} measured days to be graded`}`,
+    )))),
+    s
+      ? [
+          el("h3", {}, "Buses and streetcars"),
+          el("div", { class: "card" }, el("ol", { class: "gaps" }, cardRow(s.grade, `All ${s.routes} routes measured`, `${secondsText(s.ewt_seconds)} · ${s.bunched_pct}% bunched, ${s.long_pct}% long gaps`))),
+          s.worst.length ? [el("h3", {}, "Most extra wait"), el("div", { class: "card" }, el("ol", { class: "gaps" }, s.worst.map(cardRoute)))] : null,
+          s.best.length ? [el("h3", {}, "Least extra wait"), el("div", { class: "card" }, el("ol", { class: "gaps" }, s.best.map(cardRoute)))] : null,
+        ]
+      : null,
+    data.service_seen
+      ? el("p", {}, `${data.service_seen.seen_pct}% of scheduled bus and streetcar service was seen on the live feed, with ${plural(data.service_seen.empty_hours, "hour", "hours")} on a route and direction with vehicles scheduled and none seen. A vehicle with its tracker off looks the same as one that did not run.`)
+      : null,
+    data.elevators.outages
+      ? el("p", {}, `${plural(data.elevators.outages, "elevator or escalator outage", "elevator and escalator outages")} began this month, lasting ${durationText(data.elevators.median_minutes)} at the median.`)
+      : null,
+    el("h3", {}, "TTC's own delay log"),
+    o.published
+      ? o.lines.length
+        ? el("div", { class: "card" }, el("ol", { class: "gaps" }, o.lines.map((l) => el("li", {}, el("strong", { class: "mins" }, numberFmt.format(l.incidents)), el("span", {}, `Line ${l.route_id}: incidents TTC logged with a gap between trains`, el("span", { class: "detail muted small" }, `${l.seen_pct === null ? "None could be checked" : `This project saw the gap behind ${l.seen_pct}% of those it could check`}`))))))
+        : el("p", { class: "muted" }, "TTC's log has no incidents this project could compare for this month.")
+      : el("p", { class: "muted" }, `TTC publishes its log some time after a month ends${o.through ? `; it currently runs to ${shortDayFmt.format(new Date(`${o.through}T00:00:00Z`))}` : ""}. The comparison appears here once it covers this month.`),
+    el("p", { class: "muted small" }, "These grades and the scale are this project's own, from predicted arrivals and live positions. They are not TTC statistics."),
   ];
 }
 
@@ -3877,7 +3941,7 @@ if ("serviceWorker" in navigator && window.isSecureContext) {
 }
 
 async function route({ refresh = false } = {}) {
-  let [, kind, id] = (location.hash || "#/").split("/");
+  let [, kind, id, part] = (location.hash || "#/").split("/");
   if (kind === "report") [kind, id] = ["reliability", "report"]; // Old links.
   const seq = ++renderSeq;
   if (!refresh && kind !== "map") {
@@ -3902,7 +3966,7 @@ async function route({ refresh = false } = {}) {
     let content;
     if (kind === "line" && id) content = await renderLine(id);
     else if (kind === "station" && id) content = await renderStation(id);
-    else if (kind === "reliability") content = id === "report" ? await renderReport() : await renderReliability();
+    else if (kind === "reliability") content = id === "report" ? await renderReport() : id === "card" ? await renderReportCard(part) : await renderReliability();
     else if (kind === "map") content = await renderMap(id);
     else if (kind === "stop" && id) content = await renderStop(decodeURIComponent(id));
     else if (kind === "pipeline") content = await renderPipeline();

@@ -14,6 +14,10 @@ with measured as (
     where not same_vehicle
         and not spans_collection_gap
         and scheduled_headway_seconds <= 900
+        -- Over 2 hours is a route's break between service periods (a peak express between
+        -- rushes, a night route between nights), not a wait. Lost service still counts in
+        -- ttc_surface_delivery_daily.
+        and headway_seconds <= 7200
 )
 select
     m.service_date,
