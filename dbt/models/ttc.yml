@@ -237,6 +237,17 @@ models:
     description: >-
       Bus and streetcar headways per route, direction and day on frequent service:
       bunching, long gaps and the sums for excess wait time.
+  - name: ttc_surface_delivery_daily
+    description: >-
+      Share of scheduled bus and streetcar service seen on the live feed per route,
+      direction and day, with hours when nothing scheduled was seen.
+    columns:
+      - name: delivered
+        data_tests:
+          - not_null
+      - name: scheduled_trips
+        data_tests:
+          - not_null
   - name: ttc_surface_closure_days
     description: Road restrictions in effect along each route direction on each measured service day.
     columns:

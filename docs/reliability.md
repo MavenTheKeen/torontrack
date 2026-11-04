@@ -89,6 +89,7 @@ minutes along each pattern, never at a terminal.
 | `ttc_surface_scheduled` (incremental) | Scheduled vehicles per route, direction, measured stop and hour, from trip starts per pattern placed at the stop by the pattern's scheduled offset (one hour off for some trips near the top of an hour) |
 | `ttc_surface_headways` (incremental) | Time since the previous vehicle of the route and direction at the stop, with that hour's scheduled headway; the same vehicle twice in a row (a loop) and gaps spanning a collection gap are flagged |
 | `ttc_surface_reliability_daily` | Per route, direction and day: headways, bunched, long gaps and the excess-wait sums |
+| `ttc_surface_delivery_daily` (incremental) | Per route, direction and day: the share of scheduled vehicles seen on the live feed, and hours with vehicles scheduled and none seen |
 
 Only frequent service counts: hours where the schedule has a vehicle at least every 15
 minutes. On less frequent routes riders time their trips to the timetable, so the gap
@@ -99,6 +100,16 @@ uses the same sums. The report ranks routes with at least 300 measured headways.
 Passage times are interpolated between position reports 20 to 75 seconds apart, so a
 headway is good to about half a minute: fine against a 5- to 15-minute schedule, too
 coarse to call two vehicles exactly together.
+
+Scheduled service seen compares the vehicles scheduled past each measurement stop with
+those observed passing it, over hours with no collection gap. Stops mostly undercount (a
+vehicle near a terminal or on a branch can be missed), so a route's daily figure is the
+upper quartile of its stops, and the report uses only directions with at least three
+stops. In a check of 3,021 route-direction days from 14 October to 3 November 2026, the
+median was 98% and the lower quartile 95%. A few routes read low every day (night routes
+300 to 306, 512 and 927 among them); the cause has not been confirmed, so the report lists
+them as not seen rather than cancelled. A vehicle with its tracker off or on a detour
+looks the same as one that did not run, and a route with no passage all day has no row.
 
 Days with and without road restrictions along each route are compared in
 `ttc_surface_closure_effect`; see [road restrictions](roads.md#closures-and-bus-reliability).

@@ -37,6 +37,14 @@ ROUTES_SHOWN = 15
 # A route is compared with and without road restrictions once it has this many weekdays
 # of each.
 CLOSURE_MIN_DAYS = 3
+# Scheduled service seen on the live feed. One or two stops are too few to trust: a single
+# stop near a terminal can read near zero on a route that ran normally.
+DELIVERY_MIN_STOPS = 3
+DELIVERY_DAYS = 14
+DELIVERY_MIN_DAYS = 7
+DELIVERY_MIN_TRIPS = 100
+DELIVERY_DROP = 0.25
+DELIVERY_SHOWN = 8
 
 MEASURES = """
     sum(compared_headways)::int AS gaps,
@@ -63,6 +71,90 @@ def _rows(conn, sql: str, params=None) -> list[dict]:
 
 def _pct(part, whole, digits=0):
     return round(100 * part / whole, digits) if whole else None
+
+
+def delivery(conn) -> dict | None:
+    """Scheduled bus and streetcar service seen on the live feed over the last completed
+    days; None until dbt has built the model or while nothing is measurable."""
+    if (
+        conn.execute("SELECT to_regclass('analytics.ttc_surface_delivery_daily') AS t").fetchone()[
+            "t"
+        ]
+        is None
+    ):
+        return None
+    params = {
+        "stops": DELIVERY_MIN_STOPS,
+        "days": DELIVERY_DAYS,
+        "min_days": DELIVERY_MIN_DAYS,
+        "min_trips": DELIVERY_MIN_TRIPS,
+        "drop": DELIVERY_DROP,
+        "shown": DELIVERY_SHOWN,
+    }
+    recent = """recent AS (
+        SELECT * FROM analytics.ttc_surface_delivery_daily
+        WHERE stops >= %(stops)s
+          AND service_date < ((now() AT TIME ZONE 'America/Toronto') - interval '4 hours')::date
+          AND service_date > (
+              SELECT max(service_date) FROM analytics.ttc_surface_delivery_daily
+              WHERE stops >= %(stops)s
+                AND service_date < ((now() AT TIME ZONE 'America/Toronto')
+                                    - interval '4 hours')::date
+          ) - %(days)s
+    )"""
+    names = """LEFT JOIN normalized.ttc_surface_routes r
+              ON r.route_id = d.route_id AND r.feed_version = (
+                  SELECT feed_version FROM normalized.ttc_gtfs_versions
+                  ORDER BY loaded_at DESC LIMIT 1)"""
+    overall = conn.execute(
+        f"""WITH {recent}
+            SELECT min(service_date) AS first_day, max(service_date) AS last_day,
+                   count(DISTINCT service_date) AS days, count(DISTINCT route_id) AS routes,
+                   round(100 * (1 - sum(delivered * scheduled_trips)
+                                    / nullif(sum(scheduled_trips), 0)), 1) AS missing_pct,
+                   sum(empty_hours)::int AS empty_hours
+            FROM recent""",
+        params,
+    ).fetchone()
+    if not overall["days"]:
+        return None
+    ranked = conn.execute(
+        f"""WITH {recent}
+            SELECT d.route_id, r.short_name, r.long_name, coalesce(r.mode, 'bus') AS mode,
+                   round(100 * sum(d.delivered * d.scheduled_trips)
+                         / sum(d.scheduled_trips))::int AS seen_pct,
+                   round(sum((1 - d.delivered) * d.scheduled_trips)
+                         / count(DISTINCT d.service_date))::int AS missing_per_day,
+                   sum(d.empty_hours)::int AS empty_hours
+            FROM recent d {names}
+            GROUP BY 1, 2, 3, 4
+            HAVING count(DISTINCT d.service_date) >= %(min_days)s
+               AND sum(d.scheduled_trips) >= %(min_trips)s
+            ORDER BY seen_pct, missing_per_day DESC, d.route_id LIMIT %(shown)s""",
+        params,
+    ).fetchall()
+    # A day far below the route's own usual level, which a steady measurement bias cannot explain.
+    worst_days = conn.execute(
+        f"""WITH {recent},
+            by_day AS (
+                SELECT service_date, route_id,
+                       (sum(delivered * scheduled_trips) / sum(scheduled_trips))::float8 AS share,
+                       sum(scheduled_trips) AS scheduled
+                FROM recent GROUP BY 1, 2
+            ), usual AS (
+                SELECT route_id, percentile_cont(0.5) WITHIN GROUP (ORDER BY share) AS share
+                FROM by_day GROUP BY 1 HAVING count(*) >= %(min_days)s
+            )
+            SELECT d.service_date, d.route_id, r.short_name, r.long_name,
+                   coalesce(r.mode, 'bus') AS mode,
+                   round(100 * d.share)::int AS seen_pct, round(100 * u.share)::int AS usual_pct
+            FROM by_day d JOIN usual u USING (route_id) {names}
+            WHERE u.share - d.share >= %(drop)s
+            ORDER BY (u.share - d.share) * d.scheduled DESC, d.service_date, d.route_id
+            LIMIT %(shown)s""",
+        params,
+    ).fetchall()
+    return {**overall, "routes_ranked": ranked, "worst_days": worst_days}
 
 
 def surface(conn) -> dict | None:
@@ -120,6 +212,7 @@ def surface(conn) -> dict | None:
         "routes_ranked": [with_pct(r) for r in ranked],
         "route_min_headways": ROUTE_MIN_HEADWAYS,
         "closures": closures(conn, sums, with_pct),
+        "delivery": delivery(conn),
     }
 
 

@@ -848,7 +848,72 @@ function surfaceSection(s) {
         ]
       : el("p", { class: "muted" }, `Routes are ranked once they have ${s.route_min_headways} measured gaps.`),
     closureComparison(s.closures),
+    deliverySection(s.delivery),
     el("p", { class: "muted small" }, "Gaps are timed where vehicles pass stops about every 10 scheduled minutes along each route, from TTC's live positions (to within about 20 seconds), and exclude terminals, where buses queue by design."),
+  ];
+}
+
+// Scheduled service that never appeared on the live feed, with the limits of that reading.
+function deliverySection(d) {
+  if (!d) return null;
+  const route = (r) => [el("span", { class: `route-pill ${r.mode}` }, r.short_name || r.route_id), r.long_name || ""];
+  return [
+    el("h3", {}, "Scheduled service not seen"),
+    el(
+      "p",
+      {},
+      `Over the last ${plural(d.days, "day", "days")}, about ${d.missing_pct}% of scheduled bus and streetcar service did not appear on the live feed, and ${plural(d.empty_hours, "hour", "hours")} on a route and direction had vehicles scheduled and none seen.`,
+    ),
+    d.routes_ranked.length
+      ? el(
+          "div",
+          { class: "card" },
+          el(
+            "ol",
+            { class: "gaps" },
+            d.routes_ranked.map((r) =>
+              el(
+                "li",
+                {},
+                el("strong", { class: "mins" }, `${r.seen_pct}%`),
+                el(
+                  "span",
+                  { class: "with-badge" },
+                  ...route(r),
+                  el("span", { class: "detail muted small" }, `seen of scheduled, about ${plural(r.missing_per_day, "trip", "trips")} a day not seen, ${plural(r.empty_hours, "empty hour", "empty hours")}`),
+                ),
+              ),
+            ),
+          ),
+        )
+      : null,
+    d.worst_days.length
+      ? [
+          el("h3", {}, "Days well below a route's usual level"),
+          el(
+            "div",
+            { class: "card" },
+            el(
+              "ol",
+              { class: "gaps" },
+              d.worst_days.map((w) =>
+                el(
+                  "li",
+                  {},
+                  el("strong", { class: "mins" }, `${w.seen_pct}%`),
+                  el(
+                    "span",
+                    { class: "with-badge" },
+                    ...route(w),
+                    el("span", { class: "detail muted small" }, `${shortDayFmt.format(new Date(`${w.service_date}T00:00:00Z`))}, usually ${w.usual_pct}%`),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ]
+      : null,
+    el("p", { class: "muted small" }, "This is not proof of cancellation: a vehicle with its tracker off or on a detour looks the same, and some routes read low every day because of how they are measured. A route that ran in full usually reads 95 to 100%. A route with no vehicle seen all day is not counted."),
   ];
 }
 

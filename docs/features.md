@@ -87,8 +87,8 @@ delay. An hourly table compares each line with its schedule today and over the l
 
 The long-term report measures excess wait time: how much longer riders wait than the
 schedule implies, by line, time of day, platform and weather. It also covers bus
-bunching, bus service on days with and without road closures, and elevator outage
-durations. TTC's official delay log is loaded for comparison
+bunching, bus service on days with and without road closures, scheduled bus and streetcar
+service that never appeared on the live feed, and elevator outage durations. TTC's official delay log is loaded for comparison
 ([reliability](reliability.md), [metric definitions](metrics.md)).
 
 | Reliability report |
