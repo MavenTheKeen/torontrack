@@ -59,13 +59,19 @@ def refresh_static(database_url: str, client: FeedClient, url: str = STATIC_GTFS
             if not loaded and (added := static_gtfs.add_lines(conn, feed)):
                 result["lines_added"] = added
             # Buses and streetcars, also for a version loaded before they (or their
-            # scheduled trip starts) were added, and without the light rail lines.
+            # scheduled trips) were added, and without the light rail lines.
             if not surface.loaded(conn, feed.feed_version):
                 network = surface.without_routes(surface.parse(payload), LIGHT_RAIL_LINES)
                 result["surface"] = surface.load(conn, network, feed.feed_version)
-            elif not surface.starts_loaded(conn, feed.feed_version):
-                network = surface.without_routes(surface.parse(payload), LIGHT_RAIL_LINES)
-                result["surface_starts"] = surface.load_starts(conn, network, feed.feed_version)
+            else:
+                no_starts = not surface.starts_loaded(conn, feed.feed_version)
+                no_trips = not surface.trips_loaded(conn, feed.feed_version)
+                if no_starts or no_trips:
+                    network = surface.without_routes(surface.parse(payload), LIGHT_RAIL_LINES)
+                if no_starts:
+                    result["surface_starts"] = surface.load_starts(conn, network, feed.feed_version)
+                if no_trips:
+                    result["surface_trips"] = surface.load_trips(conn, network, feed.feed_version)
             if removed := surface.remove_routes(conn, feed.feed_version, LIGHT_RAIL_LINES):
                 result["surface_removed"] = removed
         except Exception as exc:

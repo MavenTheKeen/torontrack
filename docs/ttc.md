@@ -218,19 +218,28 @@ For comparison, the schedule loader also counts scheduled trips per pattern, ser
 and hour of first departure (`normalized.ttc_surface_pattern_starts`; 38,336 rows covering
 all 131,793 trips in the October 2026 schedule).
 
+Since November 2026 it also keeps every scheduled trip with its first and last times
+(`normalized.ttc_surface_trips`), and each vehicle snapshot records the trips vehicles
+report running (`normalized.ttc_surface_trips_seen`, one row per trip and service day).
+TTC's live trip IDs are those of the Complete GTFS, so a scheduled trip that no vehicle
+reported can be counted on its own rather than inferred from a long gap.
+
 | Table | Holds |
 | --- | --- |
 | `normalized.ttc_surface_routes` | Route number, name and mode (`bus`, or `streetcar` for GTFS route type 0, except Lines 5 and 6) per feed version |
 | `normalized.ttc_surface_stops` | Stop ID, public stop code, name and coordinates |
 | `normalized.ttc_surface_patterns` | Route, direction, destination and trip count of each stop pattern |
 | `normalized.ttc_surface_pattern_stops` | Each pattern's stops in order with mean scheduled offset |
+| `normalized.ttc_surface_trips` | Each scheduled trip's pattern, service ID and first and last times |
+| `normalized.ttc_surface_trips_seen` | Each trip a vehicle reported, per service day, with first and last report |
 | `normalized.ttc_vehicles` | Latest position of each vehicle in service |
 
 ## Retention
 
 Hourly, the collector deletes raw snapshots older than `TTC_RAW_RETENTION_DAYS`
 (default 3; vehicle snapshots, ~130 KB each, after `TTC_VEHICLE_RAW_RETENTION_HOURS`,
-default 6), train visits older than `TTC_EVENT_RETENTION_DAYS` (default 90), and poll
+default 6), train visits, bus and streetcar passages and trips seen older than
+`TTC_EVENT_RETENTION_DAYS` (default 90), and poll
 runs older than 30 days. The snapshot each feed currently points at is never deleted.
 Alerts and static GTFS versions are kept. Once a day it rebuilds the train visit indexes
 (`REINDEX ... CONCURRENTLY`, which does not block polling): each poll updates the predicted

@@ -509,6 +509,24 @@ def _normalize_vehicles(conn, raw, snapshot):
                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                 rows,
             )
+            # Every trip a vehicle reports running, per service day (04:00 to 04:00), to
+            # check scheduled trips one by one. Two vehicles on one trip count once.
+            cur.execute(
+                """INSERT INTO normalized.ttc_surface_trips_seen AS s
+                   (service_date, trip_id, route_id, vehicle_id, first_seen_at, last_seen_at,
+                    snapshots)
+                   SELECT DISTINCT ON (trip_id)
+                          ((reported_at AT TIME ZONE 'America/Toronto') - interval '4 hours')::date,
+                          trip_id, route_id, vehicle_id, reported_at, reported_at, 1
+                   FROM normalized.ttc_vehicles
+                   WHERE trip_id IS NOT NULL
+                   ORDER BY trip_id, reported_at DESC
+                   ON CONFLICT (service_date, trip_id) DO UPDATE SET
+                     vehicle_id = EXCLUDED.vehicle_id,
+                     first_seen_at = least(s.first_seen_at, EXCLUDED.first_seen_at),
+                     last_seen_at = greatest(s.last_seen_at, EXCLUDED.last_seen_at),
+                     snapshots = s.snapshots + 1"""
+            )
     return len(rows), issues
 
 
@@ -544,11 +562,16 @@ def apply_retention(
             "DELETE FROM normalized.ttc_surface_passages WHERE passed_at < %s",
             (now - timedelta(days=event_days),),
         ).rowcount
+        trips_seen = conn.execute(
+            "DELETE FROM normalized.ttc_surface_trips_seen WHERE service_date < %s",
+            ((now - timedelta(days=event_days)).date(),),
+        ).rowcount
     return {
         "raw_snapshots": raw,
         "train_stop_events": events,
         "poll_runs": polls,
         "surface_passages": surface,
+        "surface_trips_seen": trips_seen,
     }
 
 

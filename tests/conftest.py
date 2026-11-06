@@ -27,6 +27,7 @@ def settings():
         conn.execute("TRUNCATE ops.alert_state, ops.alerts")
         conn.execute(
             "TRUNCATE normalized.ttc_vehicles, normalized.ttc_surface_passages, "
+            "normalized.ttc_surface_trips_seen, "
             "ops.ttc_vehicle_progress"
         )
         conn.execute("TRUNCATE normalized.regional_versions, ops.regional_refreshes CASCADE")
