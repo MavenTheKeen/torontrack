@@ -28,6 +28,10 @@ def test_patterns_carry_mean_scheduled_offsets_and_destinations():
     # Every trip is counted once in the scheduled starts, by pattern, service and hour.
     assert sum(row[3] for row in feed.starts) == feed.trips
     assert {row[0] for row in feed.starts} == {p["pattern_id"] for p in feed.patterns}
+    # And once among the scheduled trips, with its first and last times.
+    assert len(feed.scheduled_trips) == feed.trips
+    trip = next(t for t in feed.scheduled_trips if t[0] == "s1001")
+    assert (trip[1], trip[2:]) == (east["pattern_id"], ("1", 8 * 3600, 8 * 3600 + 360))
     assert surface.towards("East - 504A King towards Distillery Loop") == "Distillery Loop"
 
 
@@ -78,6 +82,27 @@ def test_vehicle_snapshot_keeps_only_vehicles_in_service_inside_toronto(settings
         assert (result["accepted"], result["rejected"]) == (1, 2)
         rows = conn.execute("SELECT vehicle_id, bearing FROM normalized.ttc_vehicles").fetchall()
         assert [(r["vehicle_id"], r["bearing"]) for r in rows] == [("8001", 90)]
+
+
+@pytest.mark.integration
+def test_trips_vehicles_report_are_recorded_once_per_service_day(settings):
+    with connect(settings.database_url) as conn:
+        static_gtfs.load(conn, static_gtfs.parse(static_zip()), "test://gtfs", T0)
+        for n in range(3):
+            when = T0 + timedelta(seconds=30 * n)
+            vehicles = [{"id": "8001", "route_id": "10", "bearing": 90, **MIDWAY_EAST}]
+            snapshot_id, _ = store.store_snapshot(
+                conn, "vehicles", "test://", vehicle_feed(when, vehicles), when
+            )
+            store.normalize_snapshot(conn, snapshot_id)
+        row = conn.execute(
+            """SELECT trip_id, route_id, vehicle_id, snapshots,
+                      last_seen_at - first_seen_at AS span
+               FROM normalized.ttc_surface_trips_seen"""
+        ).fetchall()
+        assert [tuple(r.values()) for r in row] == [
+            ("rt-8001", "10", "8001", 3, timedelta(seconds=60))
+        ]
 
 
 @pytest.mark.integration

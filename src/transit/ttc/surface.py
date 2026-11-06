@@ -28,6 +28,9 @@ class SurfaceFeed:
     pattern_stops: list[tuple]
     # (pattern_id, service_id, start_hour, trips): scheduled trips by first departure hour.
     starts: list[tuple] = field(default_factory=list)
+    # (trip_id, pattern_id, service_id, start_seconds, end_seconds): every scheduled trip,
+    # to check one by one against the trips vehicles report (GTFS seconds pass 24 hours).
+    scheduled_trips: list[tuple] = field(default_factory=list)
     trips: int = 0
     unpatterned_trips: int = 0
     stats: dict = field(default_factory=dict)
@@ -72,6 +75,7 @@ def parse(zip_bytes: bytes, modes: dict = MODES, name_towards=towards) -> Surfac
     offset_sums: dict[int, list[int]] = {}
     headsigns: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     starts: dict[tuple, int] = defaultdict(int)
+    scheduled: list[tuple] = []
     trip_count = 0
     finished: set[str] = set()
     skipped = 0
@@ -103,6 +107,7 @@ def parse(zip_bytes: bytes, modes: dict = MODES, name_towards=towards) -> Surfac
             sums[i] += t - times[0]
         headsigns[pattern_id][headsign] += 1
         starts[(pattern_id, service_id, times[0] // 3600)] += 1
+        scheduled.append((trip_id, pattern_id, service_id, times[0], times[-1]))
         trip_count += 1
 
     # Rows arrive grouped by trip; a trip seen again later is merged before finishing.
@@ -157,6 +162,7 @@ def parse(zip_bytes: bytes, modes: dict = MODES, name_towards=towards) -> Surfac
         patterns=patterns,
         pattern_stops=pattern_stops,
         starts=[(*key, trips) for key, trips in sorted(starts.items())],
+        scheduled_trips=sorted(scheduled),
         trips=trip_count,
         unpatterned_trips=skipped,
         stats={
@@ -185,6 +191,7 @@ def without_routes(feed: SurfaceFeed, route_ids) -> SurfaceFeed:
         patterns=patterns,
         pattern_stops=pattern_stops,
         starts=[row for row in feed.starts if row[0] not in dropped],
+        scheduled_trips=[row for row in feed.scheduled_trips if row[1] not in dropped],
         stats={**feed.stats, "routes": len(routes), "stops": len(stops), "patterns": len(patterns)},
     )
 
@@ -211,7 +218,7 @@ def remove_routes(conn, feed_version: str, route_ids) -> list[str]:
                  WHERE feed_version = %(v)s AND route_id = ANY(%(r)s))""",
             {"v": feed_version, "r": ids},
         )
-        cur.execute(  # Cascades to the pattern stops.
+        cur.execute(  # Cascades to the pattern stops and scheduled trips.
             """DELETE FROM normalized.ttc_surface_patterns
                WHERE feed_version = %s AND route_id = ANY(%s)""",
             (feed_version, ids),
@@ -279,6 +286,7 @@ def load(conn, feed: SurfaceFeed, feed_version: str) -> dict:
             for row in feed.pattern_stops:
                 copy.write_row((feed_version, *row))
         _copy_starts(cur, feed, feed_version)
+        _copy_trips(cur, feed, feed_version)
     return {"status": "loaded", **feed.stats}
 
 
@@ -309,3 +317,32 @@ def load_starts(conn, feed: SurfaceFeed, feed_version: str) -> int:
             return 0
         _copy_starts(cur, feed, feed_version)
     return len(feed.starts)
+
+
+def trips_loaded(conn, feed_version: str) -> bool:
+    return bool(
+        conn.execute(
+            "SELECT 1 FROM normalized.ttc_surface_trips WHERE feed_version = %s LIMIT 1",
+            (feed_version,),
+        ).fetchone()
+    )
+
+
+def _copy_trips(cur, feed: SurfaceFeed, feed_version: str) -> None:
+    with cur.copy(
+        """COPY normalized.ttc_surface_trips
+           (feed_version, trip_id, pattern_id, service_id, start_seconds, end_seconds)
+           FROM STDIN"""
+    ) as copy:
+        for row in feed.scheduled_trips:
+            copy.write_row((feed_version, *row))
+
+
+def load_trips(conn, feed: SurfaceFeed, feed_version: str) -> int:
+    """Scheduled trips for a version whose network was loaded before they were
+    collected (pattern IDs match a re-parse of the same zip, as for the starts)."""
+    with conn.transaction(), conn.cursor() as cur:
+        if trips_loaded(conn, feed_version):
+            return 0
+        _copy_trips(cur, feed, feed_version)
+    return len(feed.scheduled_trips)

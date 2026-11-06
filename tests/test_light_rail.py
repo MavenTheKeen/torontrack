@@ -50,6 +50,7 @@ def test_the_surface_network_leaves_out_light_rail_but_keeps_streetcars():
     kept = {p["pattern_id"] for p in network.patterns}
     assert kept == {p["pattern_id"] for p in full.patterns if p["route_id"] != "6"}
     assert all(row[0] in kept for row in network.pattern_stops + network.starts)
+    assert all(row[1] in kept for row in network.scheduled_trips)
     assert network.stats["routes"] == 2
 
 
