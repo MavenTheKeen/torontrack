@@ -130,6 +130,49 @@ def test_scheduled_service_seen_and_empty_hours(settings, monkeypatch):
     assert summary["worst_days"] == []
 
 
+def test_scheduled_trips_no_vehicle_ran(settings, monkeypatch):
+    executable = os.environ.get("DBT_EXECUTABLE")
+    if not executable:
+        pytest.skip("Set DBT_EXECUTABLE to the isolated dbt executable")
+    day = datetime(2026, 10, 9, 4, tzinfo=UTC)  # Midnight Toronto, Friday 9 October.
+    with connect(settings.database_url) as conn:
+        feed = static_gtfs.parse(static_zip())
+        static_gtfs.load(conn, feed, "test://gtfs", T0)
+        surface.load(conn, surface.parse(static_zip()), feed.feed_version)
+        # Scheduled: the 10 each way at 07:00 and 08:00 (6 minutes each), the 501 at 07:00.
+        # Collection ran 06:00 to 12:00 (a vehicle on a trip not in the timetable).
+        seen = [
+            ("other", 6 * 3600, 12 * 3600),
+            ("s1000", 7 * 3600 - 120, 7 * 3600 + 420),  # Ran.
+            ("s1010", 7 * 3600, 7 * 3600 + 120),  # Reported for 2 of 6 minutes: short.
+        ]
+        for trip_id, start, end in seen:
+            conn.execute(
+                """INSERT INTO normalized.ttc_surface_trips_seen
+                   (service_date, trip_id, route_id, vehicle_id, first_seen_at, last_seen_at,
+                    snapshots) VALUES ('2026-10-09', %s, '10', 'v1', %s, %s, 10)""",
+                (trip_id, day + timedelta(seconds=start), day + timedelta(seconds=end)),
+            )
+    assert run_transform(settings.database_url, executable, "dbt")["status"] == "succeeded"
+    monkeypatch.setattr(report, "TRIPS_MIN_SCHEDULED", 1)
+    with connect(settings.database_url) as conn:
+        rows = conn.execute(
+            """SELECT route_id, direction_id, scheduled_trips, unseen_trips, short_trips
+               FROM analytics.ttc_surface_trips_daily ORDER BY 1, 2"""
+        ).fetchall()
+        summary = report.trips(conn)
+    assert [tuple(r.values()) for r in rows] == [
+        ("10", 0, 2, 1, 0),
+        ("10", 1, 2, 1, 1),
+        ("501", 0, 1, 1, 0),
+    ]
+    assert (summary["scheduled"], summary["unseen"], summary["short"]) == (5, 3, 1)
+    assert [(r["short_name"], r["unseen_pct"]) for r in summary["routes_ranked"]] == [
+        ("501", 100),
+        ("10", 50),
+    ]
+
+
 def test_night_trips_from_four_count_on_the_next_service_day(settings):
     executable = os.environ.get("DBT_EXECUTABLE")
     if not executable:

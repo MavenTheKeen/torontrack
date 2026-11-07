@@ -56,6 +56,10 @@ DELIVERY_MIN_DAYS = 7
 DELIVERY_MIN_TRIPS = 100
 DELIVERY_DROP = 0.25
 DELIVERY_SHOWN = 8
+# Scheduled trips no vehicle reported, over the last completed days.
+TRIPS_DAYS = 7
+TRIPS_MIN_SCHEDULED = 50
+TRIPS_SHOWN = 8
 
 MEASURES = """
     sum(compared_headways)::int AS gaps,
@@ -168,6 +172,56 @@ def delivery(conn) -> dict | None:
     return {**overall, "routes_ranked": ranked, "worst_days": worst_days}
 
 
+def trips(conn) -> dict | None:
+    """Scheduled bus and streetcar trips no vehicle reported running, over the last
+    completed days; None until dbt has built the model or while nothing is measured."""
+    if (
+        conn.execute("SELECT to_regclass('analytics.ttc_surface_trips_daily') AS t").fetchone()["t"]
+        is None
+    ):
+        return None
+    params = {"days": TRIPS_DAYS, "min": TRIPS_MIN_SCHEDULED, "shown": TRIPS_SHOWN}
+    recent = """recent AS (
+        SELECT * FROM analytics.ttc_surface_trips_daily
+        WHERE service_date < ((now() AT TIME ZONE 'America/Toronto') - interval '4 hours')::date
+          -- Scheduled times are placed by the clock, which is an hour off on a day it changes.
+          AND ((service_date + 2)::timestamp AT TIME ZONE 'America/Toronto')
+              - (service_date::timestamp AT TIME ZONE 'America/Toronto') = interval '48 hours'
+    ), last_days AS (
+        SELECT * FROM recent
+        WHERE service_date > (SELECT max(service_date) FROM recent) - %(days)s
+    )"""
+    overall = conn.execute(
+        f"""WITH {recent}
+            SELECT min(service_date) AS first_day, max(service_date) AS last_day,
+                   count(DISTINCT service_date) AS days,
+                   sum(scheduled_trips)::int AS scheduled, sum(unseen_trips)::int AS unseen,
+                   sum(short_trips)::int AS short
+            FROM last_days""",
+        params,
+    ).fetchone()
+    if not overall["days"]:
+        return None
+    ranked = conn.execute(
+        f"""WITH {recent}
+            SELECT d.route_id, r.short_name, r.long_name, coalesce(r.mode, 'bus') AS mode,
+                   sum(d.scheduled_trips)::int AS scheduled, sum(d.unseen_trips)::int AS unseen
+            FROM last_days d {ROUTE_NAMES}
+            GROUP BY 1, 2, 3, 4
+            HAVING sum(d.scheduled_trips) >= %(min)s AND sum(d.unseen_trips) > 0
+            ORDER BY sum(d.unseen_trips)::float8 / sum(d.scheduled_trips) DESC, d.route_id
+            LIMIT %(shown)s""",
+        params,
+    ).fetchall()
+    return {
+        **overall,
+        "unseen_pct": _pct(overall["unseen"], overall["scheduled"], 1),
+        "short_pct": _pct(overall["short"], overall["scheduled"], 1),
+        "routes_ranked": [{**r, "unseen_pct": _pct(r["unseen"], r["scheduled"])} for r in ranked],
+        "route_min_trips": TRIPS_MIN_SCHEDULED,
+    }
+
+
 def surface(conn) -> dict | None:
     """Bus and streetcar reliability on frequent service, by route; None until dbt has
     built the model."""
@@ -220,6 +274,7 @@ def surface(conn) -> dict | None:
         "route_min_headways": ROUTE_MIN_HEADWAYS,
         "closures": closures(conn, sums, with_pct),
         "delivery": delivery(conn),
+        "trips": trips(conn),
     }
 
 

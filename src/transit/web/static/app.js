@@ -848,8 +848,46 @@ function surfaceSection(s) {
         ]
       : el("p", { class: "muted" }, `Routes are ranked once they have ${s.route_min_headways} measured gaps.`),
     closureComparison(s.closures),
-    deliverySection(s.delivery),
+    s.trips ? tripsSection(s.trips) : deliverySection(s.delivery),
     el("p", { class: "muted small" }, "Gaps are timed where vehicles pass stops about every 10 scheduled minutes along each route, from TTC's live positions (to within about 20 seconds), and exclude terminals, where buses queue by design."),
+  ];
+}
+
+// Scheduled trips one by one: those no vehicle reported running.
+function tripsSection(t) {
+  const since = new Date(`${t.first_day}T12:00:00`).toLocaleDateString("en-CA", { month: "long", day: "numeric" });
+  return [
+    el("h3", {}, "Scheduled trips no bus or streetcar ran"),
+    el(
+      "p",
+      {},
+      `${t.days < 7 ? `Since ${since}` : "Over the last 7 days"}, ${t.unseen_pct}% of scheduled bus and streetcar trips (${numberFmt.format(t.unseen)} of ${numberFmt.format(t.scheduled)}) had no vehicle report running them, and ${t.short_pct}% more were reported for less than half their scheduled length.`,
+    ),
+    t.routes_ranked.length
+      ? el(
+          "div",
+          { class: "card" },
+          el(
+            "ol",
+            { class: "gaps" },
+            t.routes_ranked.map((r) =>
+              el(
+                "li",
+                {},
+                el("strong", { class: "mins" }, `${r.unseen_pct}%`),
+                el(
+                  "span",
+                  { class: "with-badge" },
+                  el("span", { class: `route-pill ${r.mode}` }, r.short_name || r.route_id),
+                  r.long_name || "",
+                  el("span", { class: "detail muted small" }, `${numberFmt.format(r.unseen)} of ${numberFmt.format(r.scheduled)} scheduled trips not seen`),
+                ),
+              ),
+            ),
+          ),
+        )
+      : null,
+    el("p", { class: "muted small" }, `Each trip in TTC's timetable is checked against the trip IDs vehicles report on the live feed. A trip not seen was most likely not run, but a vehicle with its tracker off, or running under another trip ID, looks the same. Routes are ranked once they have ${t.route_min_trips} scheduled trips measured.`),
   ];
 }
 
