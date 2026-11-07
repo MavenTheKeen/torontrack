@@ -137,19 +137,24 @@ What the site does, page by page, is in [features](docs/features.md).
 
 ## Quick start
 
-You need Docker with Compose v2 and about 8 GB of RAM.
+You need Docker with Compose v2 and about 8 GB of RAM. On Windows, run
+`make_secrets.sh` in Git Bash.
 
 ```powershell
 Copy-Item .env.example .env
 sh deploy/make_secrets.sh
-docker compose --profile tools build
+docker compose --profile tools --profile scheduler build
 docker compose up -d --wait postgres
 docker compose run --rm init-db
-docker compose up -d ttc-collector web
+docker compose --profile scheduler up -d ttc-collector agencies-collector web scheduler
 ```
 
-The map is then at <http://localhost:8000> with live TTC data. Bike Share, the street
-map, the trip planner and scheduled jobs each take one more command; see
+The map is then at <http://localhost:8000> with live TTC, Brampton Transit, MiWay and
+YRT vehicles. The scheduler, which production also uses, builds the reliability figures
+every 15 minutes and refreshes schedules, roads, weather and events on their own
+timetables. GO and UP Express trains need a Metrolinx API key and the events page a
+Ticketmaster key; both are optional files in `secrets/` ([secrets](docs/deploy.md#secrets)).
+Bike Share history, the street map and the trip planner each take one more command; see
 [running it locally](docs/development.md), which also covers the tests.
 
 ## Documentation
