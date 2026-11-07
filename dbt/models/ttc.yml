@@ -248,6 +248,17 @@ models:
       - name: scheduled_trips
         data_tests:
           - not_null
+  - name: ttc_surface_trips_daily
+    description: >-
+      Scheduled bus and streetcar trips per route, direction and service day, with those
+      no vehicle reported running and those reported for under half their length.
+    columns:
+      - name: scheduled_trips
+        data_tests:
+          - not_null
+      - name: unseen_trips
+        data_tests:
+          - not_null
   - name: ttc_on_time_daily
     description: >-
       Waits and rides at the 90th percentile on frequent TTC service, per route, direction,

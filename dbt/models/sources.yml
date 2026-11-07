@@ -97,6 +97,10 @@ sources:
         description: A pattern's stops in order with the mean scheduled offset from its start.
       - name: ttc_surface_pattern_starts
         description: Scheduled trips per pattern, service ID and hour of first departure.
+      - name: ttc_surface_trips
+        description: Every scheduled bus and streetcar trip with its first and last times.
+      - name: ttc_surface_trips_seen
+        description: Each trip a vehicle reported running, per service day.
       - name: road_restrictions
         description: City of Toronto construction zones and road closures, kept with history.
       - name: road_restriction_routes

@@ -92,6 +92,7 @@ minutes along each pattern, never at a terminal.
 | `ttc_on_time_daily` (incremental) | Per route, direction, part of the day and completed day: the 90th percentile wait on frequent service and, for buses and streetcars, the 90th percentile of actual over scheduled ride time; one new day per build |
 | `ttc_on_time_buffers` | The last 28 measured days of `ttc_on_time_daily`, for the [trip planner](planner.md#on-time-estimates) |
 | `ttc_surface_delivery_daily` (incremental) | Per route, direction and day: the share of scheduled vehicles seen on the live feed, and hours with vehicles scheduled and none seen |
+| `ttc_surface_trips_daily` (incremental) | Per route, direction and day: scheduled trips, those no vehicle reported running, and those reported for under half their scheduled length |
 
 Only frequent service counts: hours where the schedule has a vehicle at least every 15
 minutes, and headways of at most 2 hours, because a longer one is a route's break between
@@ -115,6 +116,16 @@ next service day. Some routes still read low every day and the cause has not bee
 confirmed, so the report lists them as not seen rather than cancelled. A vehicle with its
 tracker off or on a detour looks the same as one that did not run, and a route with no
 passage all day has no row.
+
+Since 6 November 2026 scheduled trips are also checked one by one
+(`ttc_surface_trips_daily`): TTC's live trip IDs are those of the timetable, so a trip
+that no vehicle reported from an hour before its scheduled start to an hour after its end
+is counted as not seen. Only trips that started after collection began, ended at least an
+hour before the newest report and do not overlap a collection gap count. On the first
+evening measured (6 November, 17:00 to 03:00), 98.6% of 13,580 scheduled trips were
+seen, and 99.3% of the trip IDs vehicles reported matched the timetable. Where trip data
+exists, the report shows this count in place of the stop-based estimate; the monthly
+report card still uses the estimate, which covers October.
 
 Days with and without road restrictions along each route are compared in
 `ttc_surface_closure_effect`; see [road restrictions](roads.md#closures-and-bus-reliability).
