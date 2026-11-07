@@ -16,7 +16,7 @@ sh deploy/make_secrets.sh
 docker compose --profile tools build
 docker compose up -d --wait postgres
 docker compose run --rm init-db
-docker compose up -d ttc-collector web alerts dashboard
+docker compose up -d ttc-collector agencies-collector web alerts dashboard
 docker compose run --rm collector collect
 docker compose run --rm dbt
 docker compose run --rm ttc-collector regional-refresh
