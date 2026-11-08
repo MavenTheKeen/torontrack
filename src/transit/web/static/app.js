@@ -3725,6 +3725,17 @@ async function renderPipeline() {
           ),
         ]
       : null,
+    data.food_inspections
+      ? [
+          el("h2", {}, "Food inspections"),
+          healthCard(
+            "City of Toronto DineSafe",
+            data.food_inspections.status,
+            el("p", {}, `Last load ${ageText(data.food_inspections.age_seconds)} · runs daily`),
+            el("p", { class: "muted small" }, `${numberFmt.format(data.food_inspections.premises)} premises. Latest inspection ${data.food_inspections.latest_inspection || "none loaded"}.`),
+          ),
+        ]
+      : null,
     data.regional
       ? [
           el("h2", {}, "Regional trains"),

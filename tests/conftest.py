@@ -36,6 +36,7 @@ def settings():
                normalized.regional_alerts, ops.regional_polls"""
         )
         conn.execute("TRUNCATE normalized.city_events, ops.city_event_refreshes CASCADE")
+        conn.execute("TRUNCATE normalized.food_premises, ops.food_inspection_refreshes CASCADE")
         conn.execute("TRUNCATE normalized.ticketed_events, ops.ticketed_event_refreshes")
         conn.execute(
             """TRUNCATE normalized.agency_versions, normalized.agency_vehicles,

@@ -35,6 +35,7 @@ def dag_bag():
         "ticketed_events",
         "planner_data",
         "agency_schedules",
+        "food_inspections",
     }
     return bag
 
@@ -176,6 +177,21 @@ def test_city_events_load_daily(dag_bag, monkeypatch):
     refresh()
     assert calls == [
         (["/opt/app-venv/bin/transit", "events-refresh"], {"check": True, "timeout": 840})
+    ]
+
+
+def test_food_inspections_load_daily(dag_bag, monkeypatch):
+    dag = dag_bag.dags["food_inspections"]
+    assert dag.catchup is False and dag.is_paused_upon_creation is True
+    assert dag.timetable.expression == "10 10 * * *"
+    refresh = dag.get_task("refresh").python_callable
+    calls = []
+    monkeypatch.setattr(
+        refresh.__globals__["subprocess"], "run", lambda args, **kw: calls.append((args, kw))
+    )
+    refresh()
+    assert calls == [
+        (["/opt/app-venv/bin/transit", "food-inspections-refresh"], {"check": True, "timeout": 840})
     ]
 
 

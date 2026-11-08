@@ -22,6 +22,7 @@ docker compose run --rm dbt
 docker compose run --rm ttc-collector regional-refresh
 docker compose run --rm ttc-collector bikeshare-trips-refresh
 docker compose run --rm ttc-collector events-refresh
+docker compose run --rm ttc-collector food-inspections-refresh
 docker compose --profile tools run --rm map-tiles
 docker compose --profile planner up -d
 ```
@@ -59,7 +60,8 @@ docker compose --profile airflow build airflow
 docker compose --profile airflow up -d airflow
 foreach ($dag in "toronto_bikeshare_reliability", "ttc_static_gtfs", "open_data_export",
     "ttc_official_delays", "weather_hourly", "regional_schedule", "road_restrictions",
-    "bikeshare_trips", "city_events", "ticketed_events", "planner_data") {
+    "bikeshare_trips", "city_events", "ticketed_events", "planner_data",
+    "agency_schedules", "food_inspections") {
   docker compose exec airflow airflow dags unpause $dag
 }
 ```
