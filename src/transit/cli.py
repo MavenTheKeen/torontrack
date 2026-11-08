@@ -11,6 +11,7 @@ from transit import (
     bike_lanes,
     events,
     exports,
+    food_inspections,
     maptiles,
     planner,
     regional,
@@ -80,6 +81,9 @@ def main():
     )
     commands.add_parser("roads-refresh", help="Load City of Toronto road restrictions")
     commands.add_parser("events-refresh", help="Load the City of Toronto events calendar")
+    commands.add_parser(
+        "food-inspections-refresh", help="Load City of Toronto food inspections (DineSafe)"
+    )
     commands.add_parser(
         "ticketed-events-refresh",
         help="Load concerts, games and shows from Ticketmaster (needs TICKETMASTER_API_KEY)",
@@ -220,6 +224,14 @@ def main():
                     client.close()
                 if result["status"] == "failed":
                     raise FetchError(f"Events refresh failed: {result['error']}")
+            elif args.command == "food-inspections-refresh":
+                client = FeedClient()
+                try:
+                    result = food_inspections.refresh(settings.database_url, client)
+                finally:
+                    client.close()
+                if result["status"] == "failed":
+                    raise FetchError(f"Food inspections refresh failed: {result['error']}")
             elif args.command == "ticketed-events-refresh":
                 client = FeedClient()
                 try:

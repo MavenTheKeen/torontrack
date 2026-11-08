@@ -141,7 +141,8 @@ What the site does, page by page, is in [features](docs/features.md).
   [running it locally](docs/development.md), [deployment](docs/deploy.md)
 - **Sources:** [TTC](docs/ttc.md), [neighbouring agencies](docs/agencies.md),
   [regional trains](docs/regional.md), [Bike Share](docs/bikeshare.md),
-  [road restrictions](docs/roads.md), [events](docs/events.md), [weather](docs/weather.md)
+  [road restrictions](docs/roads.md), [events](docs/events.md), [weather](docs/weather.md),
+  [food inspections](docs/food.md)
 - **Site:** [site and API](docs/site.md), [street map](docs/map.md),
   [trip planner](docs/planner.md), [trip guidance](docs/navigation.md)
 - **Analysis:** [reliability](docs/reliability.md), [metric definitions](docs/metrics.md),

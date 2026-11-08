@@ -22,6 +22,8 @@ LIMITS = {
     # Loaded every 10 minutes.
     "roads": timedelta(minutes=30),
     "schedule": timedelta(days=3),
+    # Loaded daily.
+    "food_inspections": timedelta(days=2),
     # Live regional trains: positions and delays every 30 s, alerts every 2 minutes.
     "regional vehicles": timedelta(minutes=2),
     "regional trips": timedelta(minutes=2),
@@ -268,6 +270,26 @@ def roads(conn, now: datetime) -> dict:
     }
 
 
+def food_inspections(conn, now: datetime) -> dict | None:
+    """DineSafe loads; None until the first refresh has been tried."""
+    row = conn.execute(
+        """SELECT (SELECT max(finished_at) FROM ops.food_inspection_refreshes
+                   WHERE status IN ('loaded', 'unchanged')) AS last_success,
+                  (SELECT count(*) FROM ops.food_inspection_refreshes) AS attempts,
+                  (SELECT max(inspected_on) FROM normalized.food_inspections) AS latest,
+                  (SELECT count(*) FROM normalized.food_premises) AS premises"""
+    ).fetchone()
+    if not row["attempts"]:
+        return None
+    return {
+        "status": verdict(row["last_success"], LIMITS["food_inspections"], now),
+        "last_success": row["last_success"],
+        "age_seconds": _age(row["last_success"], now),
+        "latest_inspection": row["latest"],
+        "premises": row["premises"],
+    }
+
+
 def schedule(conn, now: datetime) -> dict:
     """TTC's static schedule: failing once the newest one has run out, since every comparison
     with the timetable then stops; a refresh that only fails is delayed until then."""
@@ -397,6 +419,9 @@ def pipeline_status(conn, now: datetime) -> dict:
     regional_part = regional(conn, now)
     if regional_part:
         parts["regional"] = regional_part
+    food_part = food_inspections(conn, now)
+    if food_part:
+        parts["food_inspections"] = food_part
     statuses = [f["status"] for f in feeds] + [p["status"] for p in parts.values()]
     overall = "failing" if "failing" in statuses else "delayed" if "delayed" in statuses else "ok"
     return {
