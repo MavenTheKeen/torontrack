@@ -67,5 +67,6 @@ with their results and number of infractions, up to ten in all, and directions t
 
 A Conditional Pass or Closed result is a point-in-time finding; premises are re-inspected,
 and a closed premises reopens once it passes. Results shown on the site therefore always
-carry their inspection date, with the latest inspection first. Names and addresses are
-shown as the city publishes them.
+carry their inspection date, with the latest inspection first. Names and addresses the city
+publishes in capitals are shown in normal case (`display`); acronyms such as BBQ, Roman
+numerals and postal codes stay in capitals.

@@ -3298,7 +3298,7 @@ async function renderMap(focusKey) {
   const layersPanel = el("aside", { class: "map-panel", id: "map-layers", "aria-label": "Layers and legend", hidden: "hidden" });
   const safetyButton = el("button", { type: "button", class: "map-tool", "aria-label": "Safety", "aria-expanded": "false", "aria-controls": "map-safety", title: "Safety" }, iconSvg("shield", { size: 22 }));
   const safetyPanelEl = el("aside", { class: "map-panel safety", id: "map-safety", "aria-label": "Safety", hidden: "hidden" });
-  const search = el("input", { type: "search", id: "map-search", name: "q", class: "map-search", placeholder: "Stations, stops, routes", "aria-label": "Search stations, stops or routes", autocomplete: "off", enterkeyhint: "go" });
+  const search = el("input", { type: "search", id: "map-search", name: "q", class: "map-search", placeholder: "Stations, routes, places", "aria-label": "Search stations, stops, routes, addresses, places or restaurants", autocomplete: "off", enterkeyhint: "go" });
   const results = el("ul", { class: "map-results" });
   const modeGroup = el("span", { class: "chip-group", role: "group", "aria-label": "Show Bike Share" });
   const toolbar = el("div", { class: "map-toolbar" }, el("div", { class: "map-search-row" }, el("div", { class: "map-search-wrap" }, search, results), layersButton, safetyButton), status);

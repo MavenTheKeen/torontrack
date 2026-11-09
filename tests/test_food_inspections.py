@@ -147,6 +147,20 @@ def test_a_truncated_export_is_not_loaded(settings):
         )
 
 
+def test_names_and_addresses_in_capitals_are_shown_in_normal_case():
+    show = food_inspections.display
+    assert show("PIZZA NOVA") == "Pizza Nova"
+    assert show("MCDONALD'S") == "McDonald's"
+    assert show("TIM HORTONS #3") == "Tim Hortons #3"
+    assert show("KFC AND TACO BELL") == "KFC and Taco Bell"
+    assert show("THE BBQ PLACE") == "The BBQ Place"
+    assert show("1871 O'CONNOR DR M4A 1X1") == "1871 O'Connor Dr M4A 1X1"
+    assert show("222 THE ESPLANADE M5A 4M8") == "222 The Esplanade M5A 4M8"
+    assert show("100 QUEEN ST W, 2ND FLOOR") == "100 Queen St W, 2nd Floor"
+    assert show("365 Front St W") == "365 Front St W"
+    assert show("ST. LAWRENCE YMCA") == "St. Lawrence YMCA"
+
+
 def test_search_words_are_escaped():
     assert food_inspections._like("50%_off") == "%50\%\_off%"
 

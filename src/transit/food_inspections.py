@@ -12,6 +12,7 @@ import csv
 import hashlib
 import io
 import json
+import re
 import tempfile
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
@@ -222,6 +223,55 @@ LATEST = """JOIN LATERAL (SELECT i.status, i.inspected_on FROM normalized.food_i
                  ORDER BY i.inspected_on DESC LIMIT 1) i ON true"""
 
 
+# Most names and many addresses are published in capitals; they are shown in normal case.
+# Street abbreviations have no vowels but are not acronyms.
+STREET_WORDS = {
+    "st", "rd", "dr", "blvd", "crt", "pl", "pkwy", "ln", "hwy", "sq", "gdns", "pk", "trl", "grv",
+}  # fmt: skip
+SMALL_WORDS = {"and", "of", "the", "de", "la", "le", "du", "des", "on", "at", "by", "for", "in"}
+POSTAL = re.compile(r"[A-Z]\d[A-Z]|\d[A-Z]\d")
+# Acronyms with vowels, which the no-vowel rule below would miss.
+ACRONYMS = {"YMCA", "YWCA", "LCBO", "IGA", "CIBC", "CNE", "UHN", "AGO", "ROM", "OCAD", "USA"}
+ROMAN = {"II", "III", "IV", "VI", "VII", "VIII", "IX", "XI", "XII"}
+
+
+def _word(word: str, first: bool) -> str:
+    if (
+        POSTAL.fullmatch(word)
+        or word in ROMAN
+        or word.strip(".,") in ACRONYMS
+        or word in ("N", "S", "E", "W")
+    ):
+        return word
+    lower = word.lower()
+    letters = re.sub(r"[^a-z]", "", lower)
+    if not letters or word[0].isdigit():
+        return lower  # 2ND -> 2nd, #3, 1/2
+    if not re.search("[aeiouy]", letters) and len(letters) <= 4 and letters not in STREET_WORDS:
+        return word  # BBQ, KFC, TD
+    if lower in SMALL_WORDS and not first:
+        return lower
+    out = "-".join(part[:1].upper() + part[1:] for part in lower.split("-"))
+    if out.startswith("Mc") and len(out) > 3:
+        out = "Mc" + out[2].upper() + out[3:]
+    # O'CONNOR -> O'Connor, but MCDONALD'S -> McDonald's.
+    return re.sub(r"^(\w)'(\w)", lambda m: f"{m[1]}'{m[2].upper()}", out)
+
+
+def display(text: str) -> str:
+    """'PIZZA NOVA' -> 'Pizza Nova', '1871 O'CONNOR DR M4A 1X1' -> '1871 O'Connor Dr M4A 1X1';
+    text already in mixed case is kept as published."""
+    if any(c.islower() for c in text):
+        return text
+    words = text.split()
+    # A small word after a number starts a street name: 222 The Esplanade.
+    return " ".join(_word(w, i == 0 or words[i - 1][0].isdigit()) for i, w in enumerate(words))
+
+
+def _shown(row) -> dict:
+    return {**row, "name": display(row["name"]), "address": display(row["address"])}
+
+
 def points(conn) -> list[list]:
     """[premises ID, lat, lon, latest result code] for every listed premises; codes are
     STATUS_CODES, or 3 for any other status."""
@@ -247,7 +297,7 @@ def search(conn, text: str, near: tuple[float, float] | None = None) -> list[dic
     lat, lon = near or (43.6532, -79.3832)
     where = " AND ".join("lower(p.name) LIKE %s" for _ in words)
     return [
-        dict(r)
+        _shown(r)
         for r in conn.execute(
             f"""SELECT p.premises_id, p.name, p.address, p.lat, p.lon, i.status, i.inspected_on
                 FROM normalized.food_premises p {LATEST}
@@ -292,4 +342,4 @@ def premises(conn, premises_id: str) -> dict | None:
             day = r.pop("inspected_on")
             if day in by_date:
                 by_date[day]["infractions"].append(r)
-    return {**place, "inspections": inspections}
+    return {**_shown(place), "inspections": inspections}
