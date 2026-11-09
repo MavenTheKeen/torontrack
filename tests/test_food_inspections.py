@@ -181,14 +181,18 @@ def test_map_points_search_and_premises_history(settings):
         row("c", day="2026-09-08"),
         row("d", est="E2", estName="Bakery Two", latitude="43.70", longitude="-79.40",
             status="Closed", day="2026-10-20"),
+        row("e", est="E3", estName="Deli Three", latitude="43.66", longitude="-79.39",
+            day="2026-10-02", infraction="Sink not clean", severity="M - Minor"),
     ]  # fmt: skip
     premises, inspections, infractions, _ = food_inspections.read(io.StringIO(export(rows)))
     url = settings.database_url
     with connect(url) as conn:
         food_inspections.load(conn, premises, inspections, infractions, NOW)
-        assert sorted(food_inspections.points(conn)) == [
-            ["E1", 43.6455, -79.3807, 0],
-            ["E2", 43.7, -79.4, 2],
+        # E1 passed its latest inspection but had a crucial infraction in September.
+        assert sorted(food_inspections.points(conn, NOW.date())) == [
+            ["E1", 43.6455, -79.3807, 0, 0],
+            ["E2", 43.7, -79.4, 2, 0],
+            ["E3", 43.66, -79.39, 0, 1],
         ]
         [found] = food_inspections.search(conn, "cafe one", near=(43.65, -79.38))
         assert (found["premises_id"], found["status"]) == ("E1", "Pass")

@@ -1166,7 +1166,16 @@ const WALK_METRES_PER_MIN = 80;
 const TRAIN_OFFSET_M = 28; // Each direction sits a little to its own side of the line.
 const MAP_MODES = { bikes: "Bikes", docks: "Docks" };
 const DIRECTION_SIDE = { 0: 1, 1: -1 };
-const mapState = { view: null, mode: "bikes", layers: { trains: true, regional: true, buses: true, bikes: true, access: true, entrances: true, roads: false, lanes: false, events: false, food: false, parking: false, bikeParking: false } };
+// The map is a transit map or a food map, switched from the toolbar and remembered.
+const MAP_KIND_KEY = "torontrack-map-kind";
+function savedMapKind() {
+  try {
+    return localStorage.getItem(MAP_KIND_KEY) === "food" ? "food" : "transit";
+  } catch {
+    return "transit";
+  }
+}
+const mapState = { view: null, kind: savedMapKind(), food: { levels: { pass: true, conditional: true, closed: true, other: true }, clean: false }, mode: "bikes", layers: { trains: true, regional: true, buses: true, bikes: true, access: true, entrances: true, roads: false, lanes: false, events: false, food: false, parking: false, bikeParking: false } };
 // Buses and streetcars. TTC's subway lines own yellow, green and purple and the site's
 // brand is red-orange, so TTC buses take blue and streetcars crimson, and neighbouring
 // agencies' buses (mode = agency key, transit.agencies) teal and indigo. All are always
@@ -2046,13 +2055,50 @@ async function refreshEvents(view) {
 function addFoodLayers(view) {
   const map = view.map;
   map.addSource("food", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM, buffer: 0 });
+  map.addLayer({ id: "food-dot", type: "circle", source: "food", minzoom: 11, maxzoom: 15, paint: {
+    "circle-color": ["match", ["get", "level"], "pass", FOOD_COLOURS.pass, "conditional", FOOD_COLOURS.conditional, "closed", FOOD_COLOURS.closed, FOOD_COLOURS.other],
+    "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 2, 15, 4.5],
+    "circle-stroke-color": mapCasing(), "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 11, 0.3, 15, 1],
+  } }, "trains-halo");
   map.addLayer({ id: "food", type: "symbol", source: "food", minzoom: 15, layout: {
     "icon-image": ["concat", "badge-food-", ["get", "level"]],
     "icon-size": ["interpolate", ["linear"], ["zoom"], 15, 0.75, 18, 1],
     "icon-allow-overlap": true, "symbol-sort-key": ["-", 3, ["get", "rank"]],
   } }, "trains-halo");
+  applyFoodFilter(map);
   applyLayerToggles(map);
   loadFood(view);
+}
+
+// The food map's filters: which latest results to show, and clean records only.
+function foodFilter() {
+  const filter = ["all", ["in", ["get", "level"], ["literal", FOOD_LEVELS.filter((l) => mapState.food.levels[l])]]];
+  if (mapState.food.clean) filter.push(["==", ["get", "clean"], 1]);
+  return filter;
+}
+
+function applyFoodFilter(map) {
+  for (const id of ["food", "food-dot"]) if (map.getLayer(id)) map.setFilter(id, foodFilter());
+}
+
+const CLEAN_RECORD = "Latest result a pass, and no significant or crucial infraction in two years";
+
+function foodPanel(rerender, map) {
+  const f = mapState.food;
+  const row = (icon, label, note, on, change) => el("li", { class: on ? "layer on" : "layer" }, icon,
+    el("span", { class: "layer-text" }, el("span", { class: "layer-label" }, label), note ? el("span", { class: "muted small" }, note) : null),
+    layerSwitch(on, label, () => { change(); applyFoodFilter(map); rerender(); }));
+  const icon = (level) => badgeEl("food", FOOD_COLOURS[level], level === "conditional" ? "#111418" : "#ffffff");
+  return [
+    el("div", { class: "panel-head" },
+      el("p", { class: "panel-heading" }, "Food map"),
+      el("button", { type: "button", class: "panel-close", "aria-label": "Close food map filters" }, iconSvg("close", { size: 18 }))),
+    el("p", { class: "muted small" }, "Every restaurant and food shop Toronto Public Health inspects, coloured by its latest result. Zoom in for icons and tap one for its inspections."),
+    el("p", { class: "panel-subheading" }, "Latest result"),
+    el("ul", { class: "layer-list" }, FOOD_LEVELS.map((level) => row(icon(level), FOOD_LABELS[level], null, f.levels[level], () => { f.levels[level] = !f.levels[level]; }))),
+    el("p", { class: "panel-subheading" }, "Record"),
+    el("ul", { class: "layer-list" }, row(icon("pass"), "Clean record only", CLEAN_RECORD, f.clean, () => { f.clean = !f.clean; })),
+  ];
 }
 
 function rememberFood(view, id, coord) {
@@ -2061,13 +2107,13 @@ function rememberFood(view, id, coord) {
 }
 
 async function loadFood(view) {
-  if (!mapState.layers.food || view.foodLoading) return;
+  if (!(mapState.layers.food || mapState.kind === "food") || view.foodLoading) return;
   view.foodLoading = true;
   try {
     const body = await api("/api/food");
-    const features = body.premises.map(([id, lat, lon, code]) => {
+    const features = body.premises.map(([id, lat, lon, code, clean]) => {
       rememberFood(view, id, [lon, lat]);
-      return point([lon, lat], { id, level: FOOD_LEVELS[code] || "other", rank: code > 2 ? 0 : code });
+      return point([lon, lat], { id, level: FOOD_LEVELS[code] || "other", rank: code > 2 ? 0 : code, clean: clean ? 1 : 0 });
     });
     view.map.getSource("food")?.setData(featureCollection(features));
   } catch {
@@ -2778,20 +2824,24 @@ function addOverlayLayers(map, data) {
   applyLayerToggles(map);
 }
 
+const FOOD_MAP_LAYERS = { trains: false, regional: false, buses: false, bikes: false, access: false, entrances: false, roads: false, lanes: false, events: false, parking: false, bikeParking: false, food: true };
+
 function applyLayerToggles(map) {
   const show = (ids, on) => ids.forEach((id) => map.getLayer(id) && map.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
-  show(["trains", "trains-halo", "trains-dot"], mapState.layers.trains);
-  show(["regional-line", "regional-line-casing", "regional-stations", "regional-station-label", "regional-trains"], mapState.layers.regional);
-  show(["vehicles", "vehicle-heading", "vehicle-icon", "vehicle-label", "bus-stops", "route-path", "route-path-casing"], mapState.layers.buses);
-  show(["docks", "dock-icon"], mapState.layers.bikes);
-  show(["outages"], mapState.layers.access);
-  show(["entrances"], mapState.layers.entrances);
-  show(["parking", "parking-entrances"], mapState.layers.parking);
-  show(["bike-parking"], mapState.layers.bikeParking);
-  show(["road-work-line", "road-closure-line", "road-closure-point", "road-icons", "road-icons-point"], mapState.layers.roads);
-  show(["lanes", "lanes-trail"], mapState.layers.lanes);
-  show(["events"], mapState.layers.events);
-  show(["food"], mapState.layers.food);
+  const layers = mapState.kind === "food" ? FOOD_MAP_LAYERS : mapState.layers;
+  show(["food-dot"], mapState.kind === "food");
+  show(["trains", "trains-halo", "trains-dot"], layers.trains);
+  show(["regional-line", "regional-line-casing", "regional-stations", "regional-station-label", "regional-trains"], layers.regional);
+  show(["vehicles", "vehicle-heading", "vehicle-icon", "vehicle-label", "bus-stops", "route-path", "route-path-casing"], layers.buses);
+  show(["docks", "dock-icon"], layers.bikes);
+  show(["outages"], layers.access);
+  show(["entrances"], layers.entrances);
+  show(["parking", "parking-entrances"], layers.parking);
+  show(["bike-parking"], layers.bikeParking);
+  show(["road-work-line", "road-closure-line", "road-closure-point", "road-icons", "road-icons-point"], layers.roads);
+  show(["lanes", "lanes-trail"], layers.lanes);
+  show(["events"], layers.events);
+  show(["food"], layers.food);
 }
 
 
@@ -3298,10 +3348,11 @@ async function renderMap(focusKey) {
   const layersPanel = el("aside", { class: "map-panel", id: "map-layers", "aria-label": "Layers and legend", hidden: "hidden" });
   const safetyButton = el("button", { type: "button", class: "map-tool", "aria-label": "Safety", "aria-expanded": "false", "aria-controls": "map-safety", title: "Safety" }, iconSvg("shield", { size: 22 }));
   const safetyPanelEl = el("aside", { class: "map-panel safety", id: "map-safety", "aria-label": "Safety", hidden: "hidden" });
+  const kindButton = el("button", { type: "button", class: "map-tool" });
   const search = el("input", { type: "search", id: "map-search", name: "q", class: "map-search", placeholder: "Stations, routes, places", "aria-label": "Search stations, stops, routes, addresses, places or restaurants", autocomplete: "off", enterkeyhint: "go" });
   const results = el("ul", { class: "map-results" });
   const modeGroup = el("span", { class: "chip-group", role: "group", "aria-label": "Show Bike Share" });
-  const toolbar = el("div", { class: "map-toolbar" }, el("div", { class: "map-search-row" }, el("div", { class: "map-search-wrap" }, search, results), layersButton, safetyButton), status);
+  const toolbar = el("div", { class: "map-toolbar" }, el("div", { class: "map-search-row" }, el("div", { class: "map-search-wrap" }, search, results), kindButton, layersButton, safetyButton), status);
   const guideTop = el("div", { class: "guide-card", "aria-live": "polite" });
   const guideBar = el("div", { class: "guide-bar" });
   const page = el("div", { class: "map-page" }, container, toolbar, layersPanel, safetyPanelEl, guideTop, guideBar, planButton, locateButton, sheet, hasBasemap ? null : el("p", { class: "map-note" }, "Street map not built yet: run the map-tiles tool (docs/map.md)."));
@@ -3313,7 +3364,41 @@ async function renderMap(focusKey) {
     planner: null, plan: null, guide: null, page, guideTop, guideBar,
   };
 
+  const renderKind = () => {
+    const food = mapState.kind === "food";
+    fill(kindButton, iconSvg(food ? "subway" : "food", { size: 22 }));
+    kindButton.setAttribute("aria-label", food ? "Switch to the transit map" : "Switch to the food map");
+    kindButton.title = food ? "Transit map" : "Food map";
+    kindButton.classList.toggle("on", food);
+    search.placeholder = food ? "Restaurants and food shops" : "Stations, routes, places";
+    layersButton.setAttribute("aria-label", food ? "Food map filters" : "Layers and legend");
+    layersButton.title = food ? "Filters" : "Layers and legend";
+  };
+  kindButton.addEventListener("click", () => {
+    mapState.kind = mapState.kind === "food" ? "transit" : "food";
+    try {
+      localStorage.setItem(MAP_KIND_KEY, mapState.kind);
+    } catch {
+      /* Private browsing: the choice lasts for this visit. */
+    }
+    renderKind();
+    renderChips();
+    search.value = "";
+    fill(results);
+    if (view.map) {
+      applyLayerToggles(view.map);
+      loadFood(view);
+      if (view.selected && (mapState.kind === "food") !== (view.selected.kind === "food")) closeSheet(view);
+    }
+  });
+  renderKind();
+
   const renderChips = () => {
+    if (mapState.kind === "food") {
+      fill(layersPanel, foodPanel(renderChips, view.map));
+      layersPanel.querySelector(".panel-close").addEventListener("click", () => setLayersOpen(false));
+      return;
+    }
     fill(modeGroup, Object.entries(MAP_MODES).map(([mode, label]) =>
       chip(label, mapState.mode === mode, () => {
         mapState.mode = mode;
@@ -3386,15 +3471,16 @@ async function renderMap(focusKey) {
       view.placeResults = found.slice(0, 5);
       view.foodResults = food;
       results.querySelectorAll(".place-result").forEach((n) => n.remove());
-      results.append(
-        ...suggestionList(view.placeResults, "data-place").map((li) => { li.classList.add("place-result"); return li; }),
-        ...suggestionList(food, "data-food").map((li) => { li.classList.add("place-result"); return li; }),
-      );
+      const placeItems = suggestionList(view.placeResults, "data-place");
+      const foodItems = suggestionList(food, "data-food");
+      const items = mapState.kind === "food" ? [...foodItems, ...placeItems] : [...placeItems, ...foodItems];
+      results.append(...items.map((li) => { li.classList.add("place-result"); return li; }));
     }, SUGGEST_MS);
-    const stations = view.data.stations.filter((s) => searchKey(s.name).includes(query)).slice(0, 4);
-    const regionalStations = ((view.regional || {}).stations || []).filter((s) => searchKey(s.name).includes(query)).slice(0, 3);
-    const routes = [...view.surfaceRoutes.values()].filter((r) => r.short_name === query || searchKey(`${r.short_name} ${r.long_name}`).startsWith(query)).slice(0, 3);
-    const stops = query.length < 3 ? [] : [...view.surfaceStops.values()].filter((s) => s[1] === query || searchKey(s[2]).includes(query)).slice(0, 5);
+    const transit = mapState.kind !== "food";
+    const stations = !transit ? [] : view.data.stations.filter((s) => searchKey(s.name).includes(query)).slice(0, 4);
+    const regionalStations = !transit ? [] : ((view.regional || {}).stations || []).filter((s) => searchKey(s.name).includes(query)).slice(0, 3);
+    const routes = !transit ? [] : [...view.surfaceRoutes.values()].filter((r) => r.short_name === query || searchKey(`${r.short_name} ${r.long_name}`).startsWith(query)).slice(0, 3);
+    const stops = !transit || query.length < 3 ? [] : [...view.surfaceStops.values()].filter((s) => s[1] === query || searchKey(s[2]).includes(query)).slice(0, 5);
     fill(
       results,
       stations.map((s) => el("li", {}, el("button", { type: "button", "data-station": s.key }, s.name, el("span", { class: "badges" }, s.lines.map((l) => badge(l, { link: false, small: true })))))),
@@ -3649,7 +3735,7 @@ async function renderMap(focusKey) {
         }).catch(() => { /* Vehicles stay at their reported positions. */ });
       }).catch(() => fill(status, el("span", { class: "warn" }, "Buses and streetcars are unavailable right now")));
       fill(status, [el("span", { class: "live-dot", "aria-hidden": "true" }), `Live · ${timeFmt.format(new Date())}`]);
-      for (const layer of ["stations", "docks", "dock-icon", "trains", "vehicles", "vehicle-icon", "bus-stops", "regional-trains", "regional-stations", "road-work-line", "road-closure-line", "road-closure-point", "road-icons", "road-icons-point", "lanes", "lanes-trail", "events", "food", "outages", "entrances", "parking", "parking-entrances", "bike-parking"]) {
+      for (const layer of ["stations", "docks", "dock-icon", "trains", "vehicles", "vehicle-icon", "bus-stops", "regional-trains", "regional-stations", "road-work-line", "road-closure-line", "road-closure-point", "road-icons", "road-icons-point", "lanes", "lanes-trail", "events", "food", "food-dot", "outages", "entrances", "parking", "parking-entrances", "bike-parking"]) {
         map.on("mouseenter", layer, () => { map.getCanvas().style.cursor = "pointer"; });
         map.on("mouseleave", layer, () => { map.getCanvas().style.cursor = ""; });
       }
@@ -3660,7 +3746,7 @@ async function renderMap(focusKey) {
         }
         // A finger-sized box, so small stops and vehicles are easy to hit.
         const box = [[event.point.x - 8, event.point.y - 8], [event.point.x + 8, event.point.y + 8]];
-        const layers = ["trains", "trains-dot", "regional-trains", "events", "food", "entrances", "stations", "outages", "parking-entrances", "parking", "bike-parking", "regional-stations", "vehicle-icon", "vehicles", "bus-stops", "dock-icon", "docks", "road-icons", "road-icons-point", "road-work-line", "road-closure-line", "road-closure-point", "lanes", "lanes-trail"].filter((l) => map.getLayer(l) && map.getLayoutProperty(l, "visibility") !== "none");
+        const layers = ["trains", "trains-dot", "regional-trains", "events", "food", "food-dot", "entrances", "stations", "outages", "parking-entrances", "parking", "bike-parking", "regional-stations", "vehicle-icon", "vehicles", "bus-stops", "dock-icon", "docks", "road-icons", "road-icons-point", "road-work-line", "road-closure-line", "road-closure-point", "lanes", "lanes-trail"].filter((l) => map.getLayer(l) && map.getLayoutProperty(l, "visibility") !== "none");
         const hit = map.queryRenderedFeatures(box, { layers });
         if (!hit.length) {
           clearRoute(view);
@@ -3680,7 +3766,7 @@ async function renderMap(focusKey) {
         else if (f.layer.id.startsWith("road-")) openSheet(view, "road", f.properties.id);
         else if (f.layer.id.startsWith("lanes")) openSheet(view, "lane", f);
         else if (f.layer.id === "events") openSheet(view, "event", f.properties.id);
-        else if (f.layer.id === "food") openSheet(view, "food", f.properties.id);
+        else if (f.layer.id === "food" || f.layer.id === "food-dot") openSheet(view, "food", f.properties.id);
         else if (f.layer.id === "vehicles" || f.layer.id === "vehicle-icon") openSheet(view, "vehicle", f.properties.id);
         else openSheet(view, "train", f.properties.id);
       });

@@ -14,7 +14,7 @@ import io
 import json
 import re
 import tempfile
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from transit.db import connect
@@ -215,6 +215,7 @@ def refresh(database_url: str, client: FeedClient, now: datetime | None = None) 
 # that has left the city's file has closed or changed hands.
 STATUS_CODES = {"Pass": 0, "Conditional Pass": 1, "Closed": 2}
 SEARCH_LIMIT = 4
+CLEAN_DAYS = 730
 HISTORY = 10
 SEVERITY_ORDER = ["crucial", "significant", "minor", "not applicable"]
 CURRENT = "p.last_seen_at = (SELECT max(last_seen_at) FROM normalized.food_premises)"
@@ -272,14 +273,26 @@ def _shown(row) -> dict:
     return {**row, "name": display(row["name"]), "address": display(row["address"])}
 
 
-def points(conn) -> list[list]:
-    """[premises ID, lat, lon, latest result code] for every listed premises; codes are
-    STATUS_CODES, or 3 for any other status."""
+def points(conn, today: date) -> list[list]:
+    """[premises ID, lat, lon, latest result code, clean record] for every listed premises.
+    Codes are STATUS_CODES, or 3 for any other status. A clean record (1) is a latest Pass
+    and no significant or crucial infraction in the CLEAN_DAYS before `today`."""
     return [
-        [r["premises_id"], round(r["lat"], 5), round(r["lon"], 5), STATUS_CODES.get(r["status"], 3)]
+        [
+            r["premises_id"],
+            round(r["lat"], 5),
+            round(r["lon"], 5),
+            STATUS_CODES.get(r["status"], 3),
+            int(r["status"] == "Pass" and not r["serious"]),
+        ]
         for r in conn.execute(
-            f"""SELECT p.premises_id, p.lat, p.lon, i.status
-                FROM normalized.food_premises p {LATEST} WHERE {CURRENT}"""
+            f"""SELECT p.premises_id, p.lat, p.lon, i.status,
+                       EXISTS (SELECT 1 FROM normalized.food_infractions f
+                               WHERE f.premises_id = p.premises_id
+                                 AND f.inspected_on >= %s
+                                 AND f.severity IN ('significant', 'crucial')) AS serious
+                FROM normalized.food_premises p {LATEST} WHERE {CURRENT}""",
+            (today - timedelta(days=CLEAN_DAYS),),
         )
     ]
 

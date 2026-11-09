@@ -699,7 +699,7 @@ def create_app(
             "food",
             lambda conn, now: {
                 "statuses": list(food_inspections.STATUS_CODES),
-                "premises": food_inspections.points(conn),
+                "premises": food_inspections.points(conn, now.astimezone(regional.TORONTO).date()),
             },
             FOOD_ATTRIBUTION,
             store=slow,

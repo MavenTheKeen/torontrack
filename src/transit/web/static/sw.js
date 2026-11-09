@@ -6,7 +6,7 @@
 // network fails or takes over DATA_WAIT_MS; that copy carries X-Torontrack-Saved-At, so
 // the page says it is not live. Moving vehicles, the map's data and trip plans are never
 // served from a copy. Map tiles are left to the browser's own HTTP cache (range requests).
-const SHELL_CACHE = "torontrack-shell-v39";
+const SHELL_CACHE = "torontrack-shell-v40";
 const DATA_CACHE = "torontrack-data-v1";
 const DATA_WAIT_MS = 8000;
 const CACHED_DATA = /^\/api\/(alerts|lines(\/[^/]+)?|stations\/[^/]+|stops\/[^/]+|reliability|report|report-card(\/[^/]+)?|datasets|events|agenda|regional\/stations\/[^/]+)$/;

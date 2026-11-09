@@ -49,7 +49,15 @@ successful run.
 
 ## On the site
 
-The map's **Food inspections** layer (off until switched on) shows, from zoom 15, every
+The map has two kinds, switched with the button beside the search and remembered on the
+device: the transit map and the **food map**. The food map hides trains, buses, docks and
+the other transit layers, keeps the subway lines for orientation, and shows every premises
+as a dot from zoom 11 and an icon from zoom 15. Its filter panel shows or hides each latest
+result and can limit the map to clean records: a latest Pass and no significant or crucial
+infraction in the last two years. Its search lists food premises first. The data has no
+ratings or reviews; no open source of them exists for Toronto.
+
+On the transit map, the **Food inspections** layer (off until switched on) shows, from zoom 15, every
 premises in the newest load, coloured by its latest result: Pass, Conditional Pass, Closed
 or another status. Premises that have left the city's file are not drawn; they have closed
 or changed hands. The layer's data (`/api/food`, about 20,000 premises) is loaded the first
