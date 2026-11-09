@@ -3370,7 +3370,7 @@ async function renderMap(focusKey) {
     kindButton.setAttribute("aria-label", food ? "Switch to the transit map" : "Switch to the food map");
     kindButton.title = food ? "Transit map" : "Food map";
     kindButton.classList.toggle("on", food);
-    search.placeholder = food ? "Restaurants and food shops" : "Stations, routes, places";
+    search.placeholder = food ? "Restaurants, places" : "Stations, routes, places";
     layersButton.setAttribute("aria-label", food ? "Food map filters" : "Layers and legend");
     layersButton.title = food ? "Filters" : "Layers and legend";
   };
