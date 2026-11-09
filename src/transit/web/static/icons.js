@@ -4,8 +4,8 @@
 // the map always match. There are no image files or sprite sheets. Vehicles differ by
 // silhouette as well as colour: the subway from the front, the streetcar with its trolley
 // pole, the bus with wheels, and the two-level regional coach. Station entrances are a door
-// with an arrow, car parks a P, bike parking a pair of racks, and food premises a fork
-// and knife.
+// with an arrow, car parks a P, bike parking a pair of racks; places to eat show a fork
+// and knife, a cup, a burger, a glass or a cupcake.
 
 const ICONS = {
   subway: "M8 3h8a4 4 0 0 1 4 4v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a4 4 0 0 1 4-4z M7 7h10v4H7z M8 14h.01 M16 14h.01 M8 21l2-4 M16 21l-2-4",
@@ -41,6 +41,10 @@ const ICONS = {
   parking: "M8 20V4h5a4.5 4.5 0 0 1 0 9H8",
   rack: "M4 20V9a3 3 0 0 1 6 0v11 M14 20V9a3 3 0 0 1 6 0v11 M2 20h20",
   food: "M5 3v5a2 2 0 0 0 4 0V3 M7 3v18 M17 21V3c-2.2 1.2-3.5 4-3.5 8.5H17",
+  cafe: "M4 9h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z M16 10.5h1.5a2.5 2.5 0 0 1 0 5H16 M8 3.5v2.5 M12 3.5v2.5",
+  fastfood: "M4.5 11a7.5 6 0 0 1 15 0z M3.5 14h17 M5 17h14a2 2 0 0 1-2 3H7a2 2 0 0 1-2-3z",
+  drink: "M5 4h14l-7 8z M12 12v8 M8 20h8",
+  dessert: "M6 12h12l-1.6 8H7.6z M5.5 12a6.5 5.5 0 0 1 13 0 M12 4v2.5",
   pin: "M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z M12 9.5m-2.5 0a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0",
   shield: "M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z M12 8v5 M12 16h.01",
 };

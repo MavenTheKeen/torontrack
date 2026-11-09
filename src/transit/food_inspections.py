@@ -12,8 +12,11 @@ import csv
 import hashlib
 import io
 import json
+import math
 import re
 import tempfile
+import unicodedata
+from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
@@ -273,32 +276,100 @@ def _shown(row) -> dict:
     return {**row, "name": display(row["name"]), "address": display(row["address"])}
 
 
-def points(conn, today: date) -> list[list]:
-    """[premises ID, lat, lon, latest result code, clean record] for every listed premises.
-    Codes are STATUS_CODES, or 3 for any other status. A clean record (1) is a latest Pass
-    and no significant or crucial infraction in the CLEAN_DAYS before `today`."""
+def _listed(conn, today: date) -> list[dict]:
+    """Every listed premises with its latest result code (STATUS_CODES, or 3 for any other
+    status) and clean record: a latest Pass and no significant or crucial infraction in
+    the CLEAN_DAYS before `today`."""
+    rows = conn.execute(
+        f"""SELECT p.premises_id, p.name, p.lat, p.lon, i.status,
+                   EXISTS (SELECT 1 FROM normalized.food_infractions f
+                           WHERE f.premises_id = p.premises_id
+                             AND f.inspected_on >= %s
+                             AND f.severity IN ('significant', 'crucial')) AS serious
+            FROM normalized.food_premises p {LATEST} WHERE {CURRENT}""",
+        (today - timedelta(days=CLEAN_DAYS),),
+    )
     return [
-        [
-            r["premises_id"],
-            round(r["lat"], 5),
-            round(r["lon"], 5),
-            STATUS_CODES.get(r["status"], 3),
-            int(r["status"] == "Pass" and not r["serious"]),
-        ]
-        for r in conn.execute(
-            f"""SELECT p.premises_id, p.lat, p.lon, i.status,
-                       EXISTS (SELECT 1 FROM normalized.food_infractions f
-                               WHERE f.premises_id = p.premises_id
-                                 AND f.inspected_on >= %s
-                                 AND f.severity IN ('significant', 'crucial')) AS serious
-                FROM normalized.food_premises p {LATEST} WHERE {CURRENT}""",
-            (today - timedelta(days=CLEAN_DAYS),),
-        )
+        {
+            **r,
+            "code": STATUS_CODES.get(r["status"], 3),
+            "clean": int(r["status"] == "Pass" and not r["serious"]),
+        }
+        for r in rows
     ]
 
 
+def _point(r) -> list:
+    return [r["premises_id"], round(r["lat"], 5), round(r["lon"], 5), r["code"], r["clean"]]
+
+
+def points(conn, today: date) -> list[list]:
+    """[premises ID, lat, lon, latest result code, clean record] for every listed premises."""
+    return [_point(r) for r in _listed(conn, today)]
+
+
+# The food map shows places to eat from OpenStreetMap (transit.places.eating_places), each
+# matched to the inspected premises of the same name within MATCH_M. The city's list has no
+# type of premises, so grocers, institutional kitchens and the like are kept apart.
+EAT_KINDS = {"restaurant": 0, "cafe": 1, "fast food": 2, "bar": 3, "pub": 3, "bakery": 4,
+             "ice cream": 4}  # fmt: skip
+MATCH_M = 80
+NAME_NOISE = {"the", "and", "restaurant", "cafe", "inc", "ltd", "bar", "grill", "kitchen", "co"}
+CELL = 0.002  # degrees, about 220 m north to south; MATCH_M fits within one cell around
+
+
+def _tokens(name: str) -> set[str]:
+    plain = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
+    return set(re.findall(r"[a-z0-9]+", plain.replace("'", ""))) - NAME_NOISE
+
+
+def _cell(lat: float, lon: float) -> tuple[int, int]:
+    return round(lat / CELL), round(lon / CELL)
+
+
+def eating_places(conn, osm: list[tuple[str, str, float, float]], today: date) -> dict:
+    """Places to eat, [lon, lat, name, kind code, premises ID, result code, clean record]
+    (the last three null without a matched premises), and the listed premises matched to
+    none, as in points(). A premises matches the nearest place within MATCH_M sharing at
+    least half the words of the shorter name; each place takes its nearest match."""
+    grid = defaultdict(list)
+    for index, (name, kind, lon, lat) in enumerate(osm):
+        if kind in EAT_KINDS:
+            grid[_cell(lat, lon)].append((index, lon, lat, _tokens(name)))
+    claimed: dict[int, tuple[float, dict]] = {}
+    listed = _listed(conn, today)
+    for r in listed:
+        words = _tokens(r["name"])
+        if not words:
+            continue
+        y, x = _cell(r["lat"], r["lon"])
+        best = None
+        for cell in ((y + dy, x + dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1)):
+            for index, lon, lat, place_words in grid.get(cell, ()):
+                if not place_words:
+                    continue
+                shared = len(words & place_words) / min(len(words), len(place_words))
+                metres = 111_195 * math.hypot(
+                    (lon - r["lon"]) * math.cos(math.radians(lat)), lat - r["lat"]
+                )
+                if shared >= 0.5 and metres <= MATCH_M and (best is None or metres < best[0]):
+                    best = (metres, index)
+        if best and (best[1] not in claimed or best[0] < claimed[best[1]][0]):
+            claimed[best[1]] = (best[0], r)
+    places = []
+    for index, (name, kind, lon, lat) in enumerate(osm):
+        if kind not in EAT_KINDS:
+            continue
+        r = claimed.get(index, (None, None))[1]
+        match = [r["premises_id"], r["code"], r["clean"]] if r else [None, None, None]
+        places.append([round(lon, 5), round(lat, 5), name, EAT_KINDS[kind], *match])
+    matched = {r["premises_id"] for _, r in claimed.values()}
+    other = [_point(r) for r in listed if r["premises_id"] not in matched]
+    return {"places": places, "other": other}
+
+
 def _like(word: str) -> str:
-    return "%" + word.replace("\\", "\\\\").replace("%", "\%").replace("_", "\_") + "%"
+    return "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
 def search(conn, text: str, near: tuple[float, float] | None = None) -> list[dict]:

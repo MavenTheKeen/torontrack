@@ -194,6 +194,19 @@ def test_map_points_search_and_premises_history(settings):
             ["E2", 43.7, -79.4, 2, 0],
             ["E3", 43.66, -79.39, 0, 1],
         ]
+        osm = [
+            ("Café One", "cafe", -79.3808, 43.6456),  # E1, about 14 m away
+            ("Bakery Two", "bakery", -79.41, 43.70),  # E2's name but 800 m away
+            ("Corner Pub", "pub", -79.39, 43.66),  # beside E3, another name
+            ("Some School", "school", -79.39, 43.66),  # not a place to eat
+        ]
+        food = food_inspections.eating_places(conn, osm, NOW.date())
+        assert food["places"] == [
+            [-79.3808, 43.6456, "Café One", 1, "E1", 0, 0],
+            [-79.41, 43.7, "Bakery Two", 4, None, None, None],
+            [-79.39, 43.66, "Corner Pub", 3, None, None, None],
+        ]
+        assert sorted(p[0] for p in food["other"]) == ["E2", "E3"]
         [found] = food_inspections.search(conn, "cafe one", near=(43.65, -79.38))
         assert (found["premises_id"], found["status"]) == ("E1", "Pass")
         assert food_inspections.search(conn, "pizza") == []

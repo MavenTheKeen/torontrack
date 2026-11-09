@@ -705,6 +705,27 @@ def create_app(
             store=slow,
         )
 
+    @app.get("/api/food/places")
+    def food_places():
+        """The food map: places to eat from OpenStreetMap, each with its matched inspection
+        result, and the inspected premises matched to none (transit.food_inspections)."""
+
+        def build(conn, now):
+            osm = places.eating_places(Path(map_dir) / places.FILE_NAME) if map_dir else []
+            today = now.astimezone(regional.TORONTO).date()
+            return {
+                "kinds": ["restaurant", "cafe", "fast food", "bar", "bakery"],
+                "statuses": list(food_inspections.STATUS_CODES),
+                **food_inspections.eating_places(conn, osm, today),
+            }
+
+        return cached(
+            "food-places",
+            build,
+            FOOD_ATTRIBUTION + " Places: © OpenStreetMap contributors.",
+            store=slow,
+        )
+
     @app.get("/api/food/search")
     def food_search(
         q: str = Query(min_length=2, max_length=60),

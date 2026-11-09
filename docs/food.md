@@ -51,10 +51,19 @@ successful run.
 
 The map has two kinds, switched with the button beside the search and remembered on the
 device: the transit map and the **food map**. The food map hides trains, buses, docks and
-the other transit layers, keeps the subway lines for orientation, and shows every premises
-as a dot from zoom 11 and an icon from zoom 15. Its filter panel shows or hides each latest
-result and can limit the map to clean records: a latest Pass and no significant or crucial
-infraction in the last two years. Its search lists food premises first. The data has no
+the other transit layers and keeps the subway lines for orientation.
+
+The food map shows places to eat from OpenStreetMap: restaurants, cafes, fast food, bars and
+pubs, bakeries and dessert shops (`/api/food/places`, about 14,000). Each is matched to the
+inspected premises nearest it within 80 m whose name shares at least half the words of the
+shorter name; about a third of the city's premises match. Up to zoom 14 places are grouped
+into numbered clusters; from zoom 15 each has an icon for its kind, grey when its latest
+inspection was a pass or none matched, and amber or red after a conditional pass or a
+closure; names appear from zoom 16. The filter panel shows or hides each kind, can limit
+the map to clean records (a latest Pass and no significant or crucial infraction in the
+last two years), and can add the inspected premises matched to no place: grocers,
+institutional kitchens and places missing from OpenStreetMap. The city's list gives no type
+of premises, so they are kept apart. Search lists food premises first. The data has no
 ratings or reviews; no open source of them exists for Toronto.
 
 On the transit map, the **Food inspections** layer (off until switched on) shows, from zoom 15, every

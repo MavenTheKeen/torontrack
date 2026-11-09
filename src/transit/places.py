@@ -117,3 +117,25 @@ def search(path: str | os.PathLike, text: str, near=None, limit: int = 8) -> lis
         if len(out) == limit:
             break
     return out
+
+
+# Places to eat and drink, for the food map (transit.food_inspections.eating_places).
+EATING = ("restaurant", "cafe", "fast food", "bar", "pub", "bakery", "ice cream")
+
+
+def eating_places(path: str | os.PathLike) -> list[tuple[str, str, float, float]]:
+    """(name, kind, lon, lat) of every restaurant, cafe, fast food outlet, bar, pub, bakery
+    and ice cream shop in the index."""
+    if not Path(path).is_file():
+        return []
+    db = sqlite3.connect(f"file:{Path(path).as_posix()}?mode=ro", uri=True)
+    try:
+        kinds = ",".join("?" * len(EATING))
+        return [
+            (label, kind, float(lon), float(lat))
+            for label, kind, lon, lat in db.execute(
+                f"SELECT label, kind, lon, lat FROM places WHERE kind IN ({kinds})", EATING
+            )
+        ]
+    finally:
+        db.close()

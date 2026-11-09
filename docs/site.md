@@ -35,6 +35,7 @@ about 2 h 30 min after collection started.
 | `/api/docks/{id}/trips` | A Bike Share dock's trips over the last 12 months of published ridership: totals, weekday hours and top destinations. |
 | `/api/events` | City of Toronto festivals and events from today to 7 days ahead; see [events](events.md). |
 | `/api/food` | Every food premises in the city's current list with its latest inspection result, as `[premises ID, lat, lon, result code, clean record]`; see [food inspections](food.md#on-the-site). |
+| `/api/food/places` | The food map: places to eat from OpenStreetMap as `[lon, lat, name, kind code, premises ID, result code, clean record]`, and the inspected premises matched to none; see [food inspections](food.md#on-the-site). |
 | `/api/food/search?q=` | Food premises whose name contains every word of `q`, with the latest result; `near=lat,lon` puts the nearest first. |
 | `/api/food/{premises ID}` | One premises with its latest 10 inspections, newest first, and the infractions of each. |
 | `/api/agenda` | The Events page: city events and Ticketmaster concerts, games and shows for the next 14 days, each with its category, major-venue flag and nearest station; see [events](events.md#the-events-page). |
