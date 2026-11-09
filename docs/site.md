@@ -34,6 +34,9 @@ about 2 h 30 min after collection started.
 | `/api/routes/{route_id}` | A surface route with the paths of its main patterns, for drawing it on the map. |
 | `/api/docks/{id}/trips` | A Bike Share dock's trips over the last 12 months of published ridership: totals, weekday hours and top destinations. |
 | `/api/events` | City of Toronto festivals and events from today to 7 days ahead; see [events](events.md). |
+| `/api/food` | Every food premises in the city's current list with its latest inspection result, as `[premises ID, lat, lon, result code]`; see [food inspections](food.md#on-the-site). |
+| `/api/food/search?q=` | Food premises whose name contains every word of `q`, with the latest result; `near=lat,lon` puts the nearest first. |
+| `/api/food/{premises ID}` | One premises with its latest 10 inspections, newest first, and the infractions of each. |
 | `/api/agenda` | The Events page: city events and Ticketmaster concerts, games and shows for the next 14 days, each with its category, major-venue flag and nearest station; see [events](events.md#the-events-page). |
 | `/api/roads` | Construction zones and road closures in effect today, with geometry, hours and impact; see [road restrictions](roads.md). |
 | `/api/regional`, `/api/regional/trains`, `/api/regional/stations/{id}` | Regional train lines, live positions and delays, departures and alerts, for this site only; see [regional trains](regional.md). |
@@ -99,6 +102,8 @@ map opens. On top of the streets:
   orange, faded outside their working hours ([road restrictions](roads.md)).
 - **Events** this week from the city's calendar, today's solid, and a station panel's
   "Events nearby today" ([events](events.md)).
+- **Food inspections** (off until switched on) from zoom 15: each restaurant and food shop
+  coloured by its latest Toronto Public Health result ([food inspections](food.md)).
 - **Station entrances** from zoom 15, step-free ones in their own colour, with their
   names from zoom 16.5. Tapping one shows its street side and whether it is step-free,
   automatic or exit only.
@@ -121,8 +126,8 @@ page and never sent anywhere; it needs HTTPS (or localhost).
 
 The layers button beside the search opens a panel with a switch for each layer (subway,
 regional trains, buses and streetcars, Bike Share, elevator outages, station entrances,
-roadwork, events, bike lanes, bike parking and parking) and a legend. Roadwork, events, bike
-lanes, bike parking and parking start off. Markers are icon badges
+roadwork, events, food inspections, bike lanes, bike parking and parking) and a legend.
+Roadwork, events, food inspections, bike lanes, bike parking and parking start off. Markers are icon badges
 from `static/icons.js`, the same icons the legend shows, and each layer appears from the zoom
 level where it stays readable: buses and streetcars are small dots across the city and icons
 with a heading pointer from zoom 14; docks are coloured dots from zoom 13 and icons with counts

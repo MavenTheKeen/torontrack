@@ -4,7 +4,8 @@
 // the map always match. There are no image files or sprite sheets. Vehicles differ by
 // silhouette as well as colour: the subway from the front, the streetcar with its trolley
 // pole, the bus with wheels, and the two-level regional coach. Station entrances are a door
-// with an arrow, car parks a P, and bike parking a pair of racks.
+// with an arrow, car parks a P, bike parking a pair of racks, and food premises a fork
+// and knife.
 
 const ICONS = {
   subway: "M8 3h8a4 4 0 0 1 4 4v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a4 4 0 0 1 4-4z M7 7h10v4H7z M8 14h.01 M16 14h.01 M8 21l2-4 M16 21l-2-4",
@@ -39,6 +40,7 @@ const ICONS = {
   stepfree: "M10 4.5m-1.5 0a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0 M10 8v6h5l2.5 5 M10 11h5 M7 11.5a5 5 0 1 0 7.5 6",
   parking: "M8 20V4h5a4.5 4.5 0 0 1 0 9H8",
   rack: "M4 20V9a3 3 0 0 1 6 0v11 M14 20V9a3 3 0 0 1 6 0v11 M2 20h20",
+  food: "M5 3v5a2 2 0 0 0 4 0V3 M7 3v18 M17 21V3c-2.2 1.2-3.5 4-3.5 8.5H17",
   pin: "M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z M12 9.5m-2.5 0a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0",
   shield: "M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z M12 8v5 M12 16h.01",
 };

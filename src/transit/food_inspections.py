@@ -208,3 +208,88 @@ def refresh(database_url: str, client: FeedClient, now: datetime | None = None) 
             ),
         )
     return result
+
+
+# Reading, for the map and place search. Only premises in the newest load are shown: one
+# that has left the city's file has closed or changed hands.
+STATUS_CODES = {"Pass": 0, "Conditional Pass": 1, "Closed": 2}
+SEARCH_LIMIT = 4
+HISTORY = 10
+SEVERITY_ORDER = ["crucial", "significant", "minor", "not applicable"]
+CURRENT = "p.last_seen_at = (SELECT max(last_seen_at) FROM normalized.food_premises)"
+LATEST = """JOIN LATERAL (SELECT i.status, i.inspected_on FROM normalized.food_inspections i
+                 WHERE i.premises_id = p.premises_id
+                 ORDER BY i.inspected_on DESC LIMIT 1) i ON true"""
+
+
+def points(conn) -> list[list]:
+    """[premises ID, lat, lon, latest result code] for every listed premises; codes are
+    STATUS_CODES, or 3 for any other status."""
+    return [
+        [r["premises_id"], round(r["lat"], 5), round(r["lon"], 5), STATUS_CODES.get(r["status"], 3)]
+        for r in conn.execute(
+            f"""SELECT p.premises_id, p.lat, p.lon, i.status
+                FROM normalized.food_premises p {LATEST} WHERE {CURRENT}"""
+        )
+    ]
+
+
+def _like(word: str) -> str:
+    return "%" + word.replace("\\", "\\\\").replace("%", "\%").replace("_", "\_") + "%"
+
+
+def search(conn, text: str, near: tuple[float, float] | None = None) -> list[dict]:
+    """Listed premises whose name contains every word of `text`, names starting with it
+    first, then nearest to `near` (lat, lon)."""
+    words = text.lower().split()[:5]
+    if not words:
+        return []
+    lat, lon = near or (43.6532, -79.3832)
+    where = " AND ".join("lower(p.name) LIKE %s" for _ in words)
+    return [
+        dict(r)
+        for r in conn.execute(
+            f"""SELECT p.premises_id, p.name, p.address, p.lat, p.lon, i.status, i.inspected_on
+                FROM normalized.food_premises p {LATEST}
+                WHERE {CURRENT} AND {where}
+                ORDER BY lower(p.name) LIKE %s DESC,
+                         (p.lat - %s) ^ 2 + ((p.lon - %s) * cos(radians(%s))) ^ 2
+                LIMIT {SEARCH_LIMIT}""",
+            [*map(_like, words), _like(text.lower().strip())[1:], lat, lon, lat],
+        )
+    ]
+
+
+def premises(conn, premises_id: str) -> dict | None:
+    """One premises with its latest HISTORY inspections, newest first, each with its
+    infractions, most severe first."""
+    place = conn.execute(
+        f"""SELECT p.premises_id, p.name, p.address, p.lat, p.lon, {CURRENT} AS listed,
+                   (SELECT count(*) FROM normalized.food_inspections i
+                    WHERE i.premises_id = p.premises_id) AS inspections_total
+            FROM normalized.food_premises p WHERE p.premises_id = %s""",
+        (premises_id,),
+    ).fetchone()
+    if place is None:
+        return None
+    inspections = [
+        {**r, "infractions": []}
+        for r in conn.execute(
+            """SELECT inspected_on, status FROM normalized.food_inspections
+               WHERE premises_id = %s ORDER BY inspected_on DESC LIMIT %s""",
+            (premises_id, HISTORY),
+        )
+    ]
+    by_date = {i["inspected_on"]: i for i in inspections}
+    if inspections:
+        for r in conn.execute(
+            """SELECT inspected_on, infraction, category, severity, outcome, outcome_on, fine
+               FROM normalized.food_infractions
+               WHERE premises_id = %s AND inspected_on >= %s
+               ORDER BY array_position(%s, severity), infraction""",
+            (premises_id, inspections[-1]["inspected_on"], SEVERITY_ORDER),
+        ):
+            day = r.pop("inspected_on")
+            if day in by_date:
+                by_date[day]["infractions"].append(r)
+    return {**place, "inspections": inspections}

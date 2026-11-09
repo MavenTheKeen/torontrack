@@ -231,6 +231,7 @@ nav.primary a[aria-current="page"] { color: var(--sign-text); border-bottom-colo
 .tag { font-size: 0.76rem; font-weight: 600; padding: 1px 6px; border-radius: var(--radius-sm); border: 1px solid var(--border); color: var(--muted); }
 .tag.major, .tag.warn { color: var(--warn); border-color: currentColor; }
 .tag.free { color: var(--ok); border-color: currentColor; }
+.tag.bad { color: var(--bad); border-color: currentColor; }
 .agenda-crowd { color: var(--warn); font-weight: 600; }
 .agenda-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 8px !important; }
 .ongoing summary { cursor: pointer; font-weight: 700; }

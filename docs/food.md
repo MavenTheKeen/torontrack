@@ -47,8 +47,25 @@ coordinates outside the city, are skipped and counted.
 The pipeline page and phone alerts report the load as delayed after two days without a
 successful run.
 
+## On the site
+
+The map's **Food inspections** layer (off until switched on) shows, from zoom 15, every
+premises in the newest load, coloured by its latest result: Pass, Conditional Pass, Closed
+or another status. Premises that have left the city's file are not drawn; they have closed
+or changed hands. The layer's data (`/api/food`, about 20,000 premises) is loaded the first
+time the layer is switched on and cached on the server for an hour.
+
+Typing three or more letters in the map search also lists up to four premises whose name
+contains every word typed, names starting with the text first, then the nearest. Each shows
+its latest result and date.
+
+Tapping a premises opens its panel: the latest inspection with its date, result and
+infractions (most severe first, with any court outcome and fine), the earlier inspections
+with their results and number of infractions, up to ten in all, and directions to it.
+
 ## Reading the results
 
 A Conditional Pass or Closed result is a point-in-time finding; premises are re-inspected,
 and a closed premises reopens once it passes. Results shown on the site therefore always
-carry their inspection date, with the latest inspection first.
+carry their inspection date, with the latest inspection first. Names and addresses are
+shown as the city publishes them.

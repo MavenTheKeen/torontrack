@@ -27,7 +27,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from transit import events, places, roads
+from transit import events, food_inspections, places, roads
 from transit.agencies import AGENCIES
 from transit.config import Settings
 from transit.db import connect
@@ -61,6 +61,10 @@ BIKES_ATTRIBUTION = (
 EVENTS_ATTRIBUTION = (
     "Events: City of Toronto festivals and events calendar. Contains information licensed "
     "under the Open Government Licence – Toronto."
+)
+FOOD_ATTRIBUTION = (
+    "Food inspections: Toronto Public Health DineSafe, City of Toronto. Contains information "
+    "licensed under the Open Government Licence – Toronto."
 )
 AGENDA_ATTRIBUTION = EVENTS_ATTRIBUTION + " Concerts, games and shows: Ticketmaster."
 SURFACE_ATTRIBUTION = " ".join([ATTRIBUTION, *(a.credit for a in AGENCIES.values())])
@@ -686,6 +690,46 @@ def create_app(
             lambda conn, now: {"events": events.upcoming(conn, now)},
             EVENTS_ATTRIBUTION,
         )
+
+    @app.get("/api/food")
+    def food_points():
+        """Every listed food premises with its latest inspection result, for the map:
+        [premises ID, lat, lon, result code] (transit.food_inspections.points)."""
+        return cached(
+            "food",
+            lambda conn, now: {
+                "statuses": list(food_inspections.STATUS_CODES),
+                "premises": food_inspections.points(conn),
+            },
+            FOOD_ATTRIBUTION,
+            store=slow,
+        )
+
+    @app.get("/api/food/search")
+    def food_search(
+        q: str = Query(min_length=2, max_length=60),
+        near: str | None = Query(None, max_length=40),
+    ):
+        """Food premises whose name matches `q`, nearest to `near` (lat,lon) first."""
+        point = None
+        if near:
+            try:
+                lat, lon = (float(part) for part in near.split(","))
+                point = (lat, lon)
+            except ValueError:
+                raise HTTPException(status_code=422, detail="near must be lat,lon") from None
+        found = with_conn(lambda conn: food_inspections.search(conn, q, point))
+        return JSONResponse(jsonable_encoder({"premises": found, "attribution": FOOD_ATTRIBUTION}))
+
+    @app.get("/api/food/{premises_id}")
+    def food_premises(premises_id: str):
+        """One food premises with its recent inspections, newest first."""
+        found = None
+        if len(premises_id) <= 20:
+            found = with_conn(lambda conn: food_inspections.premises(conn, premises_id))
+        if found is None:
+            raise HTTPException(status_code=404, detail="No such food premises")
+        return JSONResponse(jsonable_encoder({**found, "attribution": FOOD_ATTRIBUTION}))
 
     @app.get("/api/agenda")
     def event_agenda():

@@ -119,6 +119,13 @@ time. Large arena and stadium events are flagged because they crowd nearby stati
 City construction zones and road closures are drawn on the map with the bus and streetcar
 routes they affect ([road restrictions](roads.md)).
 
+## Food inspections
+
+Toronto Public Health's inspection results for every restaurant and food shop can be shown
+on the map and found by name in the map search. A premises panel gives the latest result
+with its date and infractions, and the earlier inspections
+([food inspections](food.md)).
+
 ## Pipeline status
 
 The pipeline page shows the health of every feed and job: when each last succeeded, how

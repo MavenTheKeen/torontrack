@@ -145,3 +145,56 @@ def test_a_truncated_export_is_not_loaded(settings):
         assert (
             conn.execute("SELECT count(*) AS n FROM normalized.food_premises").fetchone()["n"] == 0
         )
+
+
+def test_search_words_are_escaped():
+    assert food_inspections._like("50%_off") == "%50\%\_off%"
+
+
+@pytest.mark.integration
+def test_map_points_search_and_premises_history(settings):
+    from fastapi.testclient import TestClient
+
+    from transit.config import Settings
+    from transit.web.app import create_app
+
+    rows = [
+        row("a", day="2026-09-01", status="Conditional Pass", infraction="Dirty floor",
+            severity="M - Minor"),
+        row("b", day="2026-09-01", status="Conditional Pass", infraction="Food too warm",
+            severity="C - Crucial", OutcomeDesc="Conviction: Fined", amountFined="300.00",
+            OutcomeDate="2026-10-15T00:00:00"),
+        row("c", day="2026-09-08"),
+        row("d", est="E2", estName="Bakery Two", latitude="43.70", longitude="-79.40",
+            status="Closed", day="2026-10-20"),
+    ]  # fmt: skip
+    premises, inspections, infractions, _ = food_inspections.read(io.StringIO(export(rows)))
+    url = settings.database_url
+    with connect(url) as conn:
+        food_inspections.load(conn, premises, inspections, infractions, NOW)
+        assert sorted(food_inspections.points(conn)) == [
+            ["E1", 43.6455, -79.3807, 0],
+            ["E2", 43.7, -79.4, 2],
+        ]
+        [found] = food_inspections.search(conn, "cafe one", near=(43.65, -79.38))
+        assert (found["premises_id"], found["status"]) == ("E1", "Pass")
+        assert food_inspections.search(conn, "pizza") == []
+    client = TestClient(create_app(Settings(url), clock=lambda: NOW))
+    body = client.get("/api/food/E1").json()
+    assert [(i["inspected_on"], i["status"]) for i in body["inspections"]] == [
+        ("2026-09-08", "Pass"),
+        ("2026-09-01", "Conditional Pass"),
+    ]
+    worst = body["inspections"][1]["infractions"][0]
+    assert (worst["severity"], worst["outcome"], worst["fine"]) == (
+        "crucial",
+        "Conviction - Fined",
+        300.0,
+    )
+    assert body["listed"] and body["inspections_total"] == 2
+    assert client.get("/api/food").json()["statuses"] == ["Pass", "Conditional Pass", "Closed"]
+    assert (
+        client.get("/api/food/search", params={"q": "bakery"}).json()["premises"][0]["name"]
+        == "Bakery Two"
+    )
+    assert client.get("/api/food/NOPE").status_code == 404
