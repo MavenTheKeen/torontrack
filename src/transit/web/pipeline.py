@@ -49,6 +49,8 @@ STATS_TABLES = {
     "surface_gaps": "analytics.ttc_surface_headways",
     "feed_polls": "ops.ttc_poll_runs",
     "bikeshare_readings": "normalized.observations",
+    # Every DineSafe inspection loaded, back to the start of the city's file in 2023.
+    "food_inspections": "normalized.food_inspections",
 }
 
 

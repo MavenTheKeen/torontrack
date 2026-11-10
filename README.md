@@ -18,6 +18,7 @@ Wikidata ([food map](docs/food.md)).
 [![Train gaps measured](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.train_gaps&label=train%20gaps%20measured&color=e8441f)](https://torontrack.skynetlab.duckdns.org/#/reliability)
 [![Bus and streetcar gaps measured](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.surface_gaps&label=bus%20and%20streetcar%20gaps&color=e8441f)](https://torontrack.skynetlab.duckdns.org/#/reliability)
 [![Bike Share trips](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.bikeshare_trips&label=Bike%20Share%20trips&color=e8441f)](docs/bikeshare.md)
+[![Food inspections](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.food_inspections&label=food%20inspections&color=e8441f)](docs/food.md)
 
 ![Trains and buses moving on the map, the Bloor-Yonge station panel, then the reliability page](docs/screenshots/demo.gif)
 
