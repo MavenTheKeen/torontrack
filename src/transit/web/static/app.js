@@ -3483,12 +3483,17 @@ async function renderMap(focusKey) {
   const layersPanel = el("aside", { class: "map-panel", id: "map-layers", "aria-label": "Layers and legend", hidden: "hidden" });
   const safetyButton = el("button", { type: "button", class: "map-tool", "aria-label": "Safety", "aria-expanded": "false", "aria-controls": "map-safety", title: "Safety" }, iconSvg("shield", { size: 22 }));
   const safetyPanelEl = el("aside", { class: "map-panel safety", id: "map-safety", "aria-label": "Safety", hidden: "hidden" });
-  const kindButton = el("button", { type: "button", class: "map-tool" });
+  // The transit map and the food map, switched like the light and dark themes.
+  const kindButtons = { transit: ["subway", "Transit"], food: ["food", "Food"] };
+  for (const [kind, [glyph, label]] of Object.entries(kindButtons)) {
+    kindButtons[kind] = el("button", { type: "button", class: "map-kind-option", "aria-pressed": "false", "data-kind": kind }, iconSvg(glyph, { size: 18 }), label);
+  }
+  const kindSwitch = el("div", { class: "map-kind", role: "group", "aria-label": "Map" }, kindButtons.transit, kindButtons.food);
   const search = el("input", { type: "search", id: "map-search", name: "q", class: "map-search", placeholder: "Stations, routes, places", "aria-label": "Search stations, stops, routes, addresses, places or restaurants", autocomplete: "off", enterkeyhint: "go" });
   const results = el("ul", { class: "map-results" });
   const modeGroup = el("span", { class: "chip-group", role: "group", "aria-label": "Show Bike Share" });
   const kindChips = el("div", { class: "chips food-kinds", role: "group", "aria-label": "Places to eat shown", hidden: "hidden" });
-  const toolbar = el("div", { class: "map-toolbar" }, el("div", { class: "map-search-row" }, el("div", { class: "map-search-wrap" }, search, results), kindButton, layersButton, safetyButton), kindChips, status);
+  const toolbar = el("div", { class: "map-toolbar" }, el("div", { class: "map-search-row" }, el("div", { class: "map-search-wrap" }, search, results), layersButton, safetyButton), kindSwitch, kindChips, status);
   const guideTop = el("div", { class: "guide-card", "aria-live": "polite" });
   const guideBar = el("div", { class: "guide-bar" });
   const page = el("div", { class: "map-page" }, container, toolbar, layersPanel, safetyPanelEl, guideTop, guideBar, planButton, locateButton, sheet, hasBasemap ? null : el("p", { class: "map-note" }, "Street map not built yet: run the map-tiles tool (docs/map.md)."));
@@ -3502,16 +3507,17 @@ async function renderMap(focusKey) {
 
   const renderKind = () => {
     const food = mapState.kind === "food";
-    fill(kindButton, iconSvg(food ? "subway" : "food", { size: 22 }));
-    kindButton.setAttribute("aria-label", food ? "Switch to the transit map" : "Switch to the food map");
-    kindButton.title = food ? "Transit map" : "Food map";
-    kindButton.classList.toggle("on", food);
+    for (const [kind, button] of Object.entries(kindButtons)) button.setAttribute("aria-pressed", String(mapState.kind === kind));
+    safetyButton.hidden = food;
     search.placeholder = food ? "Restaurants, places" : "Stations, routes, places";
     layersButton.setAttribute("aria-label", food ? "Food map filters" : "Layers and legend");
     layersButton.title = food ? "Filters" : "Layers and legend";
   };
-  kindButton.addEventListener("click", () => {
-    mapState.kind = mapState.kind === "food" ? "transit" : "food";
+  kindSwitch.addEventListener("click", (event) => {
+    const kind = event.target.closest("[data-kind]")?.dataset.kind;
+    if (!kind || kind === mapState.kind) return;
+    if (kind === "food") setSafetyOpen(false);
+    mapState.kind = kind;
     try {
       localStorage.setItem(MAP_KIND_KEY, mapState.kind);
     } catch {

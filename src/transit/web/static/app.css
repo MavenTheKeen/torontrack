@@ -505,6 +505,17 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
 .view-switch { margin: 0 0 16px; box-shadow: none; border: 1px solid var(--border); }
 .view-switch .chip { text-decoration: none; display: inline-flex; align-items: center; }
 .chip.small { box-shadow: none; padding: 5px 11px; min-height: 30px; }
+/* Transit map or food map: a two-part switch under the search. */
+.map-kind {
+  align-self: flex-start; display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--radius);
+  background: var(--control-bg); border: 1px solid var(--control-edge); box-shadow: var(--control-shadow);
+}
+.map-kind-option {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 14px; border: 0; cursor: pointer;
+  border-radius: var(--radius-sm); background: none; color: var(--muted); font: inherit; font-size: 0.88rem; font-weight: 650;
+}
+.map-kind-option[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.map-kind-option:not([aria-pressed="true"]):hover { color: var(--text); }
 .food-kinds { margin-top: -2px; padding-bottom: 2px; }
 .food-kinds[hidden] { display: none; }
 .kind-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px 5px 6px; min-height: 34px; background: var(--control-bg); border: 1px solid var(--control-edge); box-shadow: var(--control-shadow); }

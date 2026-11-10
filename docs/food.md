@@ -49,7 +49,7 @@ successful run.
 
 ## On the site
 
-The map has two kinds, switched with the button beside the search and remembered on the
+The map has two kinds, switched with the Transit and Food switch under the search and remembered on the
 device: the transit map and the **food map**. The food map hides trains, buses, docks and
 the other transit layers and keeps the subway lines for orientation.
 
