@@ -4,6 +4,11 @@ A free, ad-free live map and reliability tracker for Toronto transit, built on t
 GTFS-Realtime feeds, for riders who want to know where their train is and for anyone who
 wants to know how reliable the service really is.
 
+A second map, one switch away, covers places to eat: about 14,000 restaurants, cafés, bars
+and bakeries from OpenStreetMap, each with its latest Toronto Public Health inspection,
+how long it has been licensed at its address, and a mark for notable places listed on
+Wikidata ([food map](docs/food.md)).
+
 [![Try it live](https://img.shields.io/badge/Try_it_live-torontrack.skynetlab.duckdns.org-e8441f?style=for-the-badge)](https://torontrack.skynetlab.duckdns.org)
 [![Verify pipeline](https://github.com/MavenTheKeen/torontrack/actions/workflows/ci.yml/badge.svg)](https://github.com/MavenTheKeen/torontrack/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -27,7 +32,7 @@ wants to know how reliable the service really is.
 - **Health checks that look at the data.** A job that ran five minutes ago can still be
   loading day-old data or missing a third of its runs. Each check combines time since the
   last success, the share of expected runs completed, and the age of the newest record.
-- **Tested against real responses.** More than 370 tests run on recorded TTC, Bike Share and
+- **Tested against real responses.** More than 400 tests run on recorded TTC, Bike Share and
   city responses, including PostgreSQL integration tests and a full dbt build, in GitHub
   Actions on every push.
 
@@ -100,7 +105,8 @@ flowchart LR
     end
     subgraph Daily["Daily and hourly sources"]
         GTFS[Schedules<br/>TTC, GO, agencies]
-        City[City of Toronto<br/>roads, events, bike lanes]
+        City[City of Toronto<br/>roads, events, bike lanes,<br/>food inspections, licences]
+        Wikidata[Wikidata<br/>notable places]
         Trips[Bike Share<br/>ridership files]
         Weather[Weather and<br/>TTC delay log]
         OSM[OpenStreetMap]
@@ -112,6 +118,7 @@ flowchart LR
     Sched --> Loaders[Loaders]
     GTFS --> Loaders
     City --> Loaders
+    Wikidata --> Loaders
     Trips --> Loaders
     Weather --> Loaders
     TTCC --> PG[(PostgreSQL<br/>raw → normalized)]
@@ -128,8 +135,8 @@ flowchart LR
     Tiles --> Site
 ```
 
-Browsers only ever talk to this server; only the collectors call the TTC, Metrolinx and
-the city. The stack is Python 3.12, PostgreSQL 16, dbt, FastAPI, MapLibre GL JS,
+Browsers only ever talk to this server; only the collectors and loaders call the TTC,
+Metrolinx, the city and Wikidata. The stack is Python 3.12, PostgreSQL 16, dbt, FastAPI, MapLibre GL JS,
 OpenTripPlanner 2.10 and Docker Compose, with Airflow 3 DAGs for local use. The front end
 is plain HTML, CSS and JavaScript with no build step.
 
@@ -158,8 +165,8 @@ its own licence and terms, and anything derived from it carries its attribution.
 - Toronto Transit Commission GTFS and GTFS-Realtime open data. Predictions may be
   inaccurate. This project is not affiliated with the TTC.
 - [Bike Share Toronto](https://bikesharetoronto.com/) / Toronto Parking Authority (live
-  availability and ridership). Cycling network, road restrictions and events: City of
-  Toronto. Contains information licensed under the
+  availability and ridership). Cycling network, road restrictions, events, DineSafe food
+  inspections and business licences: City of Toronto. Contains information licensed under the
   [Open Government Licence – Toronto](https://www.toronto.ca/city-government/data-research-maps/open-data/open-data-licence/).
 - Regional trains: data used in this product or service is provided with the permission
   of Metrolinx. This project is not affiliated with Metrolinx.
@@ -172,3 +179,4 @@ its own licence and terms, and anything derived from it carries its attribution.
   [MapLibre GL JS](https://maplibre.org/) (BSD-3-Clause). Trip planning by
   [OpenTripPlanner](https://www.opentripplanner.org/) (LGPL).
 - Concerts, games and shows: Ticketmaster Discovery API.
+- Notable places to eat: [Wikidata](https://www.wikidata.org/) (CC0).
