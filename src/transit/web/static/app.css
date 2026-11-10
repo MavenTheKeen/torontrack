@@ -774,3 +774,4 @@ details.month[open] > summary { color: var(--text); }
 .saved-row { padding: 12px 0; border-bottom: 1px solid var(--border); }
 .saved-row .name { font-weight: 700; }
 .saved-times { margin: 4px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.sheet-block.notable .sheet-label { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

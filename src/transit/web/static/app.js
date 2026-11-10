@@ -1175,7 +1175,7 @@ function savedMapKind() {
     return "transit";
   }
 }
-const mapState = { view: null, kind: savedMapKind(), food: { kinds: [true, true, true, true, true], clean: false, long: false, other: false }, mode: "bikes", layers: { trains: true, regional: true, buses: true, bikes: true, access: true, entrances: true, roads: false, lanes: false, events: false, food: false, parking: false, bikeParking: false } };
+const mapState = { view: null, kind: savedMapKind(), food: { kinds: [true, true, true, true, true], clean: false, long: false, notable: false, other: false }, mode: "bikes", layers: { trains: true, regional: true, buses: true, bikes: true, access: true, entrances: true, roads: false, lanes: false, events: false, food: false, parking: false, bikeParking: false } };
 // Buses and streetcars. TTC's subway lines own yellow, green and purple and the site's
 // brand is red-orange, so TTC buses take blue and streetcars crimson, and neighbouring
 // agencies' buses (mode = agency key, transit.agencies) teal and indigo. All are always
@@ -1450,6 +1450,8 @@ const EAT_KINDS = [
   { glyph: "dessert", label: "Bakeries and desserts", short: "Sweets", one: "Bakery or dessert shop", colour: "#db2777" },
 ];
 const EAT_COLOUR = "#475569";
+// Notable places (Wikidata): a gold ring, drawn on top and never clustered.
+const NOTABLE_COLOUR = "#ca8a04";
 
 function mapCasing() {
   return prefersDark() ? "#0a0a0a" : "#ffffff";
@@ -1476,6 +1478,7 @@ function addMapIcons(map) {
     addBadge(map, `badge-eat-${i}`, k.glyph, k.colour, "#ffffff", ring, { css: 22, glyph: 14 });
     addBadge(map, `badge-eat-${i}-conditional`, k.glyph, FOOD_COLOURS.conditional, "#111418", ring, { css: 24, glyph: 15 });
     addBadge(map, `badge-eat-${i}-closed`, k.glyph, FOOD_COLOURS.closed, "#ffffff", ring, { css: 24, glyph: 15 });
+    addBadge(map, `badge-eat-${i}-notable`, k.glyph, k.colour, "#ffffff", ring, { css: 32, glyph: 16, halo: NOTABLE_COLOUR });
   });
   for (const level of FOOD_LEVELS) addBadge(map, `badge-food-${level}`, "food", FOOD_COLOURS[level], level === "conditional" ? "#111418" : "#ffffff", ring, { css: 20, glyph: 13 });
   addHeadingImage(map);
@@ -2096,6 +2099,14 @@ function addFoodLayers(view) {
     "icon-size": ["interpolate", ["linear"], ["zoom"], 14, 0.8, 18, 1.05],
     "icon-allow-overlap": true, "symbol-sort-key": ["case", ["==", ["get", "flag"], ""], 0, 1],
   } }, "trains-halo");
+  map.addSource("eats-notable", { type: "geojson", data: featureCollection([]) });
+  map.addLayer({ id: "eats-notable", type: "symbol", source: "eats-notable", layout: {
+    "icon-image": ["concat", "badge-eat-", ["get", "k"], ["case", ["==", ["get", "flag"], ""], "-notable", ["get", "flag"]]],
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.75, 16, 1],
+    "icon-allow-overlap": true,
+    "text-field": ["step", ["zoom"], "", 13, ["get", "label"]], "text-font": ["Noto Sans Medium"], "text-size": 12, "text-anchor": "top", "text-offset": [0, 1.4],
+    "text-max-width": 9, "text-optional": true,
+  }, paint: { "text-color": prefersDark() ? "#fde68a" : "#713f12", "text-halo-color": c.halo, "text-halo-width": 1.8 } }, "trains-halo");
   map.addLayer({ id: "eats-label", type: "symbol", source: "eats", minzoom: 16, filter: ["!", ["has", "point_count"]], layout: {
     "text-field": ["get", "label"], "text-font": ["Noto Sans Medium"], "text-size": 11.5, "text-anchor": "top", "text-offset": [0, 1.2],
     "text-max-width": 9, "text-optional": true,
@@ -2110,6 +2121,8 @@ async function loadEats(view) {
   view.eatsLoading = true;
   try {
     view.eats = await api("/api/food/places");
+    view.notableByPid = new Map();
+    for (const p of view.eats.places) if (p[4] && p[8] != null) view.notableByPid.set(p[4], view.eats.notable[p[8]]);
     for (const p of view.eats.places) if (p[4]) rememberFood(view, p[4], [p[0], p[1]]);
     for (const p of view.eats.other) rememberFood(view, p[0], [p[2], p[1]]);
     showEats(view);
@@ -2126,14 +2139,16 @@ function showEats(view) {
   const f = mapState.food;
   const flag = (code) => (code === 1 ? "-conditional" : code === 2 ? "-closed" : "");
   const features = [];
+  const notable = [];
   const long = new Date().getFullYear() - LONG_RUNNING;
-  view.eats.places.forEach(([lon, lat, name, k, pid, code, clean, since], i) => {
+  view.eats.places.forEach(([lon, lat, name, k, pid, code, clean, since, star], i) => {
     const old = since && since <= long;
-    if (!f.kinds[k] || (f.clean && !clean) || (f.long && !old)) return;
+    if (!f.kinds[k] || (f.clean && !clean) || (f.long && !old) || (f.notable && star == null)) return;
     const label = old ? `${name}\nsince ${since}` : name;
-    features.push(point([lon, lat], { id: i, k, name, label, pid: pid || "", flag: pid ? flag(code) : "" }));
+    (star == null ? features : notable).push(point([lon, lat], { id: i, k, name, label, pid: pid || "", flag: pid ? flag(code) : "" }));
   });
   view.map.getSource("eats")?.setData(featureCollection(features));
+  view.map.getSource("eats-notable")?.setData(featureCollection(notable));
   const other = f.other ? view.eats.other.filter((p) => !f.clean || p[4]).map(([id, lat, lon, code]) => point([lon, lat], { id, level: FOOD_LEVELS[code] || "other" })) : [];
   view.map.getSource("food-other")?.setData(featureCollection(other));
 }
@@ -2141,10 +2156,11 @@ function showEats(view) {
 function eatSheet(view, i) {
   const p = view.eats && view.eats.places[i];
   if (!p) return null;
-  const [lon, lat, name, k] = p;
+  const [lon, lat, name, k, , , , , star] = p;
   return [
     el("p", { class: "sheet-kicker" }, EAT_KINDS[k].one),
     el("h2", {}, name),
+    star != null ? notableBlock(view.eats.notable[star]) : null,
     el("p", {}, "No Toronto Public Health inspection matched this place by name. It may be inspected under another name."),
     planHere(view, [lon, lat], name),
     el("p", { class: "muted small" }, "From OpenStreetMap."),
@@ -2171,6 +2187,7 @@ function foodPanel(rerender, view) {
     el("p", { class: "panel-subheading" }, "Inspections"),
     el("ul", { class: "layer-list" },
       row(result("pass"), "Clean record only", CLEAN_RECORD, f.clean, () => { f.clean = !f.clean; }),
+      row(badgeEl("notable", NOTABLE_COLOUR, "#ffffff"), "Notable only", "Places with a Wikipedia article or a Michelin Guide award, from Wikidata; always shown, with a gold ring", f.notable, () => { f.notable = !f.notable; }),
       row(badgeEl("clock", EAT_KINDS[0].colour, "#ffffff"), "Long-running only", `Licensed at the same address under the same name for ${LONG_RUNNING} years or more; their names show the year`, f.long, () => { f.long = !f.long; }),
       row(result("other"), "Other inspected premises", "Grocers, institutional kitchens and places not on the map, close up", f.other, () => { f.other = !f.other; })),
     el("ul", { class: "legend-list compact" },
@@ -2190,7 +2207,12 @@ function foodKindChips(rerender, view) {
     if (!kinds.some(Boolean)) kinds.fill(true);
     showEats(view);
     rerender();
-  }, { class: "chip kind-chip", title: k.label }));
+  }, { class: "chip kind-chip", title: k.label })).concat(
+    chip([badgeEl("notable", NOTABLE_COLOUR, "#ffffff", { size: 20 }), "Notable"], mapState.food.notable, () => {
+      mapState.food.notable = !mapState.food.notable;
+      showEats(view);
+      rerender();
+    }, { class: "chip kind-chip", title: "Notable places only" }));
 }
 
 function rememberFood(view, id, coord) {
@@ -2259,6 +2281,7 @@ function foodSheetBody(view, p) {
     el("h2", {}, p.name),
     el("p", { class: "muted small" }, p.address),
     p.licensed_since ? el("p", { class: "sheet-label" }, licensedSince(p.licensed_since)) : null,
+    view.notableByPid?.has(p.premises_id) ? notableBlock(view.notableByPid.get(p.premises_id)) : null,
     latest
       ? el("div", { class: "sheet-block" },
           el("p", { class: "sheet-label" }, `Latest inspection: ${inspectedOn(latest.inspected_on)}`),
@@ -2277,6 +2300,14 @@ function foodSheetBody(view, p) {
     el("p", { class: "muted small" }, "Each result is from its inspection date; premises are inspected again, and a closed premises reopens once it passes. Toronto Public Health DineSafe, City of Toronto Open Data."),
     p.licensed_since ? el("p", { class: "muted small" }, "Licensed since: the earliest city business licence at this address under a matching name; a new owner keeping the name keeps the year. Municipal Licensing and Standards, City of Toronto Open Data.") : null,
   ];
+}
+
+// A notable place's line on its card: Michelin awards, opening year, Wikipedia article.
+function notableBlock(n) {
+  const facts = [n.awards, n.opened ? `Opened ${n.opened}` : null].filter(Boolean).join(" · ");
+  return el("div", { class: "sheet-block notable" },
+    el("p", { class: "sheet-label" }, badgeEl("notable", NOTABLE_COLOUR, "#ffffff", { size: 20 }), " Notable place", facts ? ` · ${facts}` : ""),
+    n.wikipedia ? el("p", {}, el("a", { href: n.wikipedia, target: "_blank", rel: "noopener" }, "Read about it on Wikipedia")) : null);
 }
 
 function licensedSince(day) {
@@ -2930,7 +2961,7 @@ const FOOD_MAP_LAYERS = { trains: false, regional: false, buses: false, bikes: f
 function applyLayerToggles(map) {
   const show = (ids, on) => ids.forEach((id) => map.getLayer(id) && map.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
   const layers = mapState.kind === "food" ? FOOD_MAP_LAYERS : mapState.layers;
-  show(["eats-cluster", "eats-count", "eats", "eats-label"], mapState.kind === "food");
+  show(["eats-cluster", "eats-count", "eats", "eats-label", "eats-notable"], mapState.kind === "food");
   show(["food-other"], mapState.kind === "food" && mapState.food.other);
   show(["trains", "trains-halo", "trains-dot"], layers.trains);
   show(["regional-line", "regional-line-casing", "regional-stations", "regional-station-label", "regional-trains"], layers.regional);
@@ -3842,7 +3873,7 @@ async function renderMap(focusKey) {
         }).catch(() => { /* Vehicles stay at their reported positions. */ });
       }).catch(() => fill(status, el("span", { class: "warn" }, "Buses and streetcars are unavailable right now")));
       fill(status, [el("span", { class: "live-dot", "aria-hidden": "true" }), `Live · ${timeFmt.format(new Date())}`]);
-      for (const layer of ["stations", "docks", "dock-icon", "trains", "vehicles", "vehicle-icon", "bus-stops", "regional-trains", "regional-stations", "road-work-line", "road-closure-line", "road-closure-point", "road-icons", "road-icons-point", "lanes", "lanes-trail", "events", "food", "eats", "eats-cluster", "food-other", "outages", "entrances", "parking", "parking-entrances", "bike-parking"]) {
+      for (const layer of ["stations", "docks", "dock-icon", "trains", "vehicles", "vehicle-icon", "bus-stops", "regional-trains", "regional-stations", "road-work-line", "road-closure-line", "road-closure-point", "road-icons", "road-icons-point", "lanes", "lanes-trail", "events", "food", "eats", "eats-notable", "eats-cluster", "food-other", "outages", "entrances", "parking", "parking-entrances", "bike-parking"]) {
         map.on("mouseenter", layer, () => { map.getCanvas().style.cursor = "pointer"; });
         map.on("mouseleave", layer, () => { map.getCanvas().style.cursor = ""; });
       }
@@ -3853,7 +3884,7 @@ async function renderMap(focusKey) {
         }
         // A finger-sized box, so small stops and vehicles are easy to hit.
         const box = [[event.point.x - 8, event.point.y - 8], [event.point.x + 8, event.point.y + 8]];
-        const layers = ["trains", "trains-dot", "regional-trains", "events", "eats", "eats-cluster", "food", "food-other", "entrances", "stations", "outages", "parking-entrances", "parking", "bike-parking", "regional-stations", "vehicle-icon", "vehicles", "bus-stops", "dock-icon", "docks", "road-icons", "road-icons-point", "road-work-line", "road-closure-line", "road-closure-point", "lanes", "lanes-trail"].filter((l) => map.getLayer(l) && map.getLayoutProperty(l, "visibility") !== "none");
+        const layers = ["trains", "trains-dot", "regional-trains", "events", "eats-notable", "eats", "eats-cluster", "food", "food-other", "entrances", "stations", "outages", "parking-entrances", "parking", "bike-parking", "regional-stations", "vehicle-icon", "vehicles", "bus-stops", "dock-icon", "docks", "road-icons", "road-icons-point", "road-work-line", "road-closure-line", "road-closure-point", "lanes", "lanes-trail"].filter((l) => map.getLayer(l) && map.getLayoutProperty(l, "visibility") !== "none");
         const hit = map.queryRenderedFeatures(box, { layers });
         if (!hit.length) {
           clearRoute(view);
@@ -3874,7 +3905,7 @@ async function renderMap(focusKey) {
         else if (f.layer.id.startsWith("lanes")) openSheet(view, "lane", f);
         else if (f.layer.id === "events") openSheet(view, "event", f.properties.id);
         else if (f.layer.id === "food" || f.layer.id === "food-other") openSheet(view, "food", f.properties.id);
-        else if (f.layer.id === "eats") f.properties.pid ? openSheet(view, "food", f.properties.pid) : openSheet(view, "eat", f.properties.id);
+        else if (f.layer.id === "eats" || f.layer.id === "eats-notable") f.properties.pid ? openSheet(view, "food", f.properties.pid) : openSheet(view, "eat", f.properties.id);
         else if (f.layer.id === "eats-cluster") {
           map.getSource("eats").getClusterExpansionZoom(f.properties.cluster_id)
             .then((zoom) => map.easeTo({ center: f.geometry.coordinates, zoom: zoom + 0.3, duration: reduceMotion() ? 0 : 500 }))

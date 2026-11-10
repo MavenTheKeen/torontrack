@@ -106,3 +106,19 @@ code) whose operating name shares at least half the words of the shorter name, s
 of owner that keeps the name keeps the year (`food_licences.since`). About half of the
 inspected premises match a licence. The premises card shows the year, and the food map can
 show only places licensed there for 20 years or more, labelled with the year.
+
+## Notable places
+
+`transit food-notable-refresh` runs last in the daily food job. It asks the Wikidata query
+service (CC0) for restaurants, cafés, bars, pubs, bakeries and similar places within the
+city's bounds that are not marked dissolved or closed, and keeps those with an English
+Wikipedia article or a Michelin Guide award (`normalized.notable_eats`, replaced on each
+load). The request names the site in its User-Agent, as Wikidata asks of automated clients.
+
+The food map shows a notable place only where it matches an OpenStreetMap place to eat
+within 150 m sharing at least half the words of the shorter name (`food_notable.match`);
+this also leaves out places that closed without Wikidata recording it. Matched places are
+drawn larger with a gold ring, are never grouped into clusters, and show their names from
+zoom 13. The "Notable" chip and the filter panel limit the map to them, and their card
+links to the Wikipedia article. In November 2026, 36 of the 60 notable places matched. The
+Michelin Guide publishes no open data; Wikidata records an award for few Toronto places.

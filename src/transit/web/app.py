@@ -27,7 +27,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from transit import events, food_inspections, food_licences, places, roads
+from transit import events, food_inspections, food_licences, food_notable, places, roads
 from transit.agencies import AGENCIES
 from transit.config import Settings
 from transit.db import connect
@@ -718,6 +718,14 @@ def create_app(
             since = food_licences.since_listed(conn)
             for place in found["places"]:
                 place.append(since[place[4]].year if place[4] in since else None)
+            notable = food_notable.match(found["places"], food_notable.listed(conn))
+            shown = []
+            for index, place in enumerate(found["places"]):
+                n = notable.get(index)
+                place.append(len(shown) if n else None)
+                if n:
+                    shown.append({key: n[key] for key in ("name", "opened", "wikipedia", "awards")})
+            found["notable"] = shown
             return {
                 "kinds": ["restaurant", "cafe", "fast food", "bar", "bakery"],
                 "statuses": list(food_inspections.STATUS_CODES),
@@ -727,7 +735,7 @@ def create_app(
         return cached(
             "food-places",
             build,
-            FOOD_ATTRIBUTION + " Places: © OpenStreetMap contributors.",
+            FOOD_ATTRIBUTION + " Places: © OpenStreetMap contributors. Notable places: Wikidata.",
             store=slow,
         )
 

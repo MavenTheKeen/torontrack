@@ -13,6 +13,7 @@ from transit import (
     exports,
     food_inspections,
     food_licences,
+    food_notable,
     maptiles,
     planner,
     regional,
@@ -88,6 +89,7 @@ def main():
     commands.add_parser(
         "food-licences-refresh", help="Load City of Toronto business licences of food places"
     )
+    commands.add_parser("food-notable-refresh", help="Load notable places to eat from Wikidata")
     commands.add_parser(
         "ticketed-events-refresh",
         help="Load concerts, games and shows from Ticketmaster (needs TICKETMASTER_API_KEY)",
@@ -244,6 +246,14 @@ def main():
                     client.close()
                 if result["status"] == "failed":
                     raise FetchError(f"Food licences refresh failed: {result['error']}")
+            elif args.command == "food-notable-refresh":
+                client = FeedClient()
+                try:
+                    result = food_notable.refresh(settings.database_url, client)
+                finally:
+                    client.close()
+                if result["status"] == "failed":
+                    raise FetchError(f"Notable places refresh failed: {result['error']}")
             elif args.command == "ticketed-events-refresh":
                 client = FeedClient()
                 try:

@@ -191,12 +191,14 @@ def test_food_inspections_load_daily(dag_bag, monkeypatch):
     )
     refresh()
     dag.get_task("licences").python_callable()
+    dag.get_task("notable").python_callable()
     assert calls == [
         (
             ["/opt/app-venv/bin/transit", "food-inspections-refresh"],
             {"check": True, "timeout": 840},
         ),
         (["/opt/app-venv/bin/transit", "food-licences-refresh"], {"check": True, "timeout": 840}),
+        (["/opt/app-venv/bin/transit", "food-notable-refresh"], {"check": True, "timeout": 300}),
     ]
 
 

@@ -45,6 +45,7 @@ const ICONS = {
   fastfood: "M4.5 11a7.5 6 0 0 1 15 0z M3.5 14h17 M5 17h14a2 2 0 0 1-2 3H7a2 2 0 0 1-2-3z",
   drink: "M5 4h14l-7 8z M12 12v8 M8 20h8",
   dessert: "M6 12h12l-1.6 8H7.6z M5.5 12a6.5 5.5 0 0 1 13 0 M12 4v2.5",
+  notable: "M12 9m-6 0a6 6 0 1 0 12 0a6 6 0 1 0-12 0 M8.5 14l-1.5 7 5-2.5 5 2.5-1.5-7",
   pin: "M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z M12 9.5m-2.5 0a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0",
   shield: "M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z M12 8v5 M12 16h.01",
 };
@@ -91,13 +92,20 @@ function drawIcon(ctx, name, cx, cy, size, colour) {
 
 // A round map badge: a filled disc with a ring in the map's casing colour and the glyph on
 // top. Sizes are CSS pixels; the canvas is drawn at twice that for sharp screens.
-function badgeImage(name, fill, ink, ring, { css = 26, glyph = 15, hollow = false } = {}) {
+// With `halo`, a wider outer ring in that colour marks the badge out.
+function badgeImage(name, fill, ink, ring, { css = 26, glyph = 15, hollow = false, halo = null } = {}) {
   const ratio = 2;
   const size = css * ratio;
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext("2d");
-  const r = size / 2 - ratio;
+  const r = size / 2 - (halo ? 4 : 1) * ratio;
+  if (halo) {
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 0.5 * ratio, 0, 2 * Math.PI);
+    ctx.fillStyle = halo;
+    ctx.fill();
+  }
   ctx.beginPath();
   ctx.arc(size / 2, size / 2, r, 0, 2 * Math.PI);
   ctx.fillStyle = hollow ? ring : fill;
