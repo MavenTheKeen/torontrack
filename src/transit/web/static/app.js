@@ -1175,7 +1175,7 @@ function savedMapKind() {
     return "transit";
   }
 }
-const mapState = { view: null, kind: savedMapKind(), food: { kinds: [true, true, true, true, true], clean: false, other: false }, mode: "bikes", layers: { trains: true, regional: true, buses: true, bikes: true, access: true, entrances: true, roads: false, lanes: false, events: false, food: false, parking: false, bikeParking: false } };
+const mapState = { view: null, kind: savedMapKind(), food: { kinds: [true, true, true, true, true], clean: false, long: false, other: false }, mode: "bikes", layers: { trains: true, regional: true, buses: true, bikes: true, access: true, entrances: true, roads: false, lanes: false, events: false, food: false, parking: false, bikeParking: false } };
 // Buses and streetcars. TTC's subway lines own yellow, green and purple and the site's
 // brand is red-orange, so TTC buses take blue and streetcars crimson, and neighbouring
 // agencies' buses (mode = agency key, transit.agencies) teal and indigo. All are always
@@ -2097,7 +2097,7 @@ function addFoodLayers(view) {
     "icon-allow-overlap": true, "symbol-sort-key": ["case", ["==", ["get", "flag"], ""], 0, 1],
   } }, "trains-halo");
   map.addLayer({ id: "eats-label", type: "symbol", source: "eats", minzoom: 16, filter: ["!", ["has", "point_count"]], layout: {
-    "text-field": ["get", "name"], "text-font": ["Noto Sans Medium"], "text-size": 11.5, "text-anchor": "top", "text-offset": [0, 1.2],
+    "text-field": ["get", "label"], "text-font": ["Noto Sans Medium"], "text-size": 11.5, "text-anchor": "top", "text-offset": [0, 1.2],
     "text-max-width": 9, "text-optional": true,
   }, paint: { "text-color": prefersDark() ? "#e5e7eb" : "#1f2937", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
   applyLayerToggles(map);
@@ -2126,9 +2126,12 @@ function showEats(view) {
   const f = mapState.food;
   const flag = (code) => (code === 1 ? "-conditional" : code === 2 ? "-closed" : "");
   const features = [];
-  view.eats.places.forEach(([lon, lat, name, k, pid, code, clean], i) => {
-    if (!f.kinds[k] || (f.clean && !clean)) return;
-    features.push(point([lon, lat], { id: i, k, name, pid: pid || "", flag: pid ? flag(code) : "" }));
+  const long = new Date().getFullYear() - LONG_RUNNING;
+  view.eats.places.forEach(([lon, lat, name, k, pid, code, clean, since], i) => {
+    const old = since && since <= long;
+    if (!f.kinds[k] || (f.clean && !clean) || (f.long && !old)) return;
+    const label = old ? `${name}\nsince ${since}` : name;
+    features.push(point([lon, lat], { id: i, k, name, label, pid: pid || "", flag: pid ? flag(code) : "" }));
   });
   view.map.getSource("eats")?.setData(featureCollection(features));
   const other = f.other ? view.eats.other.filter((p) => !f.clean || p[4]).map(([id, lat, lon, code]) => point([lon, lat], { id, level: FOOD_LEVELS[code] || "other" })) : [];
@@ -2149,6 +2152,8 @@ function eatSheet(view, i) {
 }
 
 const CLEAN_RECORD = "Latest result a pass, and no significant or crucial infraction in two years";
+// Years at one address, under one name, for the food map's long-running filter and labels.
+const LONG_RUNNING = 20;
 
 function foodPanel(rerender, view) {
   const f = mapState.food;
@@ -2160,12 +2165,13 @@ function foodPanel(rerender, view) {
     el("div", { class: "panel-head" },
       el("p", { class: "panel-heading" }, "Food map"),
       el("button", { type: "button", class: "panel-close", "aria-label": "Close food map filters" }, iconSvg("close", { size: 18 }))),
-    el("p", { class: "muted small" }, "Places to eat from OpenStreetMap, with Toronto Public Health's latest inspection where the names match. Numbers show how many places an area has; zoom in for each place, and closer for names."),
+    el("p", { class: "muted small" }, "Places to eat from OpenStreetMap, with Toronto Public Health's latest inspection and the city's business licences where the names match. Numbers show how many places an area has; zoom in for each place, and closer for names."),
     el("p", { class: "panel-subheading" }, "Places"),
     el("ul", { class: "layer-list" }, EAT_KINDS.map((k, i) => row(badgeEl(k.glyph, k.colour, "#ffffff"), k.label, null, f.kinds[i], () => { f.kinds[i] = !f.kinds[i]; }))),
     el("p", { class: "panel-subheading" }, "Inspections"),
     el("ul", { class: "layer-list" },
       row(result("pass"), "Clean record only", CLEAN_RECORD, f.clean, () => { f.clean = !f.clean; }),
+      row(badgeEl("clock", EAT_KINDS[0].colour, "#ffffff"), "Long-running only", `Licensed at the same address under the same name for ${LONG_RUNNING} years or more; their names show the year`, f.long, () => { f.long = !f.long; }),
       row(result("other"), "Other inspected premises", "Grocers, institutional kitchens and places not on the map, close up", f.other, () => { f.other = !f.other; })),
     el("ul", { class: "legend-list compact" },
       legendRow(badgeEl("food", EAT_KINDS[0].colour, "#ffffff", { size: 20 }), "Colour of its kind: passed its latest inspection, or none matched"),
@@ -2252,6 +2258,7 @@ function foodSheetBody(view, p) {
     el("p", { class: "sheet-kicker" }, "Food inspection"),
     el("h2", {}, p.name),
     el("p", { class: "muted small" }, p.address),
+    p.licensed_since ? el("p", { class: "sheet-label" }, licensedSince(p.licensed_since)) : null,
     latest
       ? el("div", { class: "sheet-block" },
           el("p", { class: "sheet-label" }, `Latest inspection: ${inspectedOn(latest.inspected_on)}`),
@@ -2268,7 +2275,14 @@ function foodSheetBody(view, p) {
     p.listed ? null : el("p", { class: "muted small" }, "No longer in the city's current list of food premises."),
     planHere(view, [p.lon, p.lat], p.name),
     el("p", { class: "muted small" }, "Each result is from its inspection date; premises are inspected again, and a closed premises reopens once it passes. Toronto Public Health DineSafe, City of Toronto Open Data."),
+    p.licensed_since ? el("p", { class: "muted small" }, "Licensed since: the earliest city business licence at this address under a matching name; a new owner keeping the name keeps the year. Municipal Licensing and Standards, City of Toronto Open Data.") : null,
   ];
+}
+
+function licensedSince(day) {
+  const year = Number(day.slice(0, 4));
+  const years = new Date().getFullYear() - year;
+  return years >= 1 ? `Licensed here since ${year} (${plural(years, "year", "years")})` : `Licensed here since ${year}`;
 }
 
 async function loadFoodSheet(view, id) {

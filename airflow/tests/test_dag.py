@@ -190,8 +190,13 @@ def test_food_inspections_load_daily(dag_bag, monkeypatch):
         refresh.__globals__["subprocess"], "run", lambda args, **kw: calls.append((args, kw))
     )
     refresh()
+    dag.get_task("licences").python_callable()
     assert calls == [
-        (["/opt/app-venv/bin/transit", "food-inspections-refresh"], {"check": True, "timeout": 840})
+        (
+            ["/opt/app-venv/bin/transit", "food-inspections-refresh"],
+            {"check": True, "timeout": 840},
+        ),
+        (["/opt/app-venv/bin/transit", "food-licences-refresh"], {"check": True, "timeout": 840}),
     ]
 
 

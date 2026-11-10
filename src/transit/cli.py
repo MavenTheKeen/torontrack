@@ -12,6 +12,7 @@ from transit import (
     events,
     exports,
     food_inspections,
+    food_licences,
     maptiles,
     planner,
     regional,
@@ -83,6 +84,9 @@ def main():
     commands.add_parser("events-refresh", help="Load the City of Toronto events calendar")
     commands.add_parser(
         "food-inspections-refresh", help="Load City of Toronto food inspections (DineSafe)"
+    )
+    commands.add_parser(
+        "food-licences-refresh", help="Load City of Toronto business licences of food places"
     )
     commands.add_parser(
         "ticketed-events-refresh",
@@ -232,6 +236,14 @@ def main():
                     client.close()
                 if result["status"] == "failed":
                     raise FetchError(f"Food inspections refresh failed: {result['error']}")
+            elif args.command == "food-licences-refresh":
+                client = FeedClient()
+                try:
+                    result = food_licences.refresh(settings.database_url, client)
+                finally:
+                    client.close()
+                if result["status"] == "failed":
+                    raise FetchError(f"Food licences refresh failed: {result['error']}")
             elif args.command == "ticketed-events-refresh":
                 client = FeedClient()
                 try:

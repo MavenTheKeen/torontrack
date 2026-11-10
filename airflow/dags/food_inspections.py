@@ -1,4 +1,5 @@
-"""Daily load of City of Toronto food inspections (DineSafe); skipped when unchanged."""
+"""Daily load of City of Toronto food inspections (DineSafe) and food business licences;
+each is skipped when unchanged."""
 
 import subprocess
 from datetime import UTC, datetime, timedelta
@@ -27,4 +28,8 @@ with DAG(
     def refresh() -> None:
         subprocess.run([APP, "food-inspections-refresh"], check=True, timeout=840)
 
-    refresh()
+    @task
+    def licences() -> None:
+        subprocess.run([APP, "food-licences-refresh"], check=True, timeout=840)
+
+    refresh() >> licences()

@@ -54,7 +54,12 @@ JOBS = (
     Job("bikeshare_trips", "40 9 * * *", (("bikeshare-trips-refresh",),), timeout_min=45),
     Job("city_events", "50 9 * * *", (("events-refresh",),)),
     Job("ttc_official_delays", "0 10 * * *", (("ttc-delays-refresh",),)),
-    Job("food_inspections", "10 10 * * *", (("food-inspections-refresh",),)),
+    Job(
+        "food_inspections",
+        "10 10 * * *",
+        (("food-inspections-refresh",), ("food-licences-refresh",)),
+        timeout_min=20,
+    ),
     Job("planner_data", "20 10 * * *", (("planner-data", "--out", PLANNER_DIR),)),
 )
 

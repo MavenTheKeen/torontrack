@@ -27,7 +27,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from transit import events, food_inspections, places, roads
+from transit import events, food_inspections, food_licences, places, roads
 from transit.agencies import AGENCIES
 from transit.config import Settings
 from transit.db import connect
@@ -708,15 +708,20 @@ def create_app(
     @app.get("/api/food/places")
     def food_places():
         """The food map: places to eat from OpenStreetMap, each with its matched inspection
-        result, and the inspected premises matched to none (transit.food_inspections)."""
+        result and the year it was first licensed there (transit.food_licences), and the
+        inspected premises matched to none (transit.food_inspections)."""
 
         def build(conn, now):
             osm = places.eating_places(Path(map_dir) / places.FILE_NAME) if map_dir else []
             today = now.astimezone(regional.TORONTO).date()
+            found = food_inspections.eating_places(conn, osm, today)
+            since = food_licences.since_listed(conn)
+            for place in found["places"]:
+                place.append(since[place[4]].year if place[4] in since else None)
             return {
                 "kinds": ["restaurant", "cafe", "fast food", "bar", "bakery"],
                 "statuses": list(food_inspections.STATUS_CODES),
-                **food_inspections.eating_places(conn, osm, today),
+                **found,
             }
 
         return cached(
@@ -744,10 +749,18 @@ def create_app(
 
     @app.get("/api/food/{premises_id}")
     def food_premises(premises_id: str):
-        """One food premises with its recent inspections, newest first."""
+        """One food premises with its recent inspections, newest first, and the date it
+        was first licensed at its address (transit.food_licences)."""
+
+        def build(conn):
+            found = food_inspections.premises(conn, premises_id)
+            if found is not None:
+                found["licensed_since"] = food_licences.since(conn, [found]).get(premises_id)
+            return found
+
         found = None
         if len(premises_id) <= 20:
-            found = with_conn(lambda conn: food_inspections.premises(conn, premises_id))
+            found = with_conn(build)
         if found is None:
             raise HTTPException(status_code=404, detail="No such food premises")
         return JSONResponse(jsonable_encoder({**found, "attribution": FOOD_ATTRIBUTION}))

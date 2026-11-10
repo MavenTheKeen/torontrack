@@ -63,7 +63,7 @@ pass or a closure; names appear from zoom 16. A row of kind chips under the sear
 the map: with every kind shown, a tap shows only that kind, and further taps add or remove
 kinds. The filter panel shows or hides each kind as well, can limit
 the map to clean records (a latest Pass and no significant or crucial infraction in the
-last two years), and can add the inspected premises matched to no place: grocers,
+last two years) or to long-running places (below), and can add the inspected premises matched to no place: grocers,
 institutional kitchens and places missing from OpenStreetMap. The city's list gives no type
 of premises, so they are kept apart. Search lists food premises first. The data has no
 ratings or reviews; no open source of them exists for Toronto.
@@ -89,3 +89,20 @@ and a closed premises reopens once it passes. Results shown on the site therefor
 carry their inspection date, with the latest inspection first. Names and addresses the city
 publishes in capitals are shown in normal case (`display`); acronyms such as BBQ, Roman
 numerals and postal codes stay in capitals.
+
+## Business licences
+
+`transit food-licences-refresh` loads the City of Toronto business licences
+(`municipal-licensing-and-standards-business-licences-and-permits`, Open Government
+Licence – Toronto) in the categories eating or drinking establishment, expanded eating or
+drinking establishment and take-out or retail food establishment, current and cancelled,
+into `normalized.food_licences`. It runs after the inspections load in the same daily job
+and is skipped when the export has not changed. Only the licence number, category,
+operating name, street address and dates are kept; holder names and phone numbers are not.
+
+A licence belongs to its holder, so a new owner takes out a new one. A premises is shown as
+licensed since the earliest licence at the same street address (without unit or postal
+code) whose operating name shares at least half the words of the shorter name, so a change
+of owner that keeps the name keeps the year (`food_licences.since`). About half of the
+inspected premises match a licence. The premises card shows the year, and the food map can
+show only places licensed there for 20 years or more, labelled with the year.
