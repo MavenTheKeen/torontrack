@@ -2963,6 +2963,8 @@ function applyLayerToggles(map) {
   const layers = mapState.kind === "food" ? FOOD_MAP_LAYERS : mapState.layers;
   show(["eats-cluster", "eats-count", "eats", "eats-label", "eats-notable"], mapState.kind === "food");
   show(["food-other"], mapState.kind === "food" && mapState.food.other);
+  // The food map leaves out the subway lines and stations as well as every transit layer.
+  show(["line-casing", "line", "stations", "station-label"], mapState.kind !== "food");
   show(["trains", "trains-halo", "trains-dot"], layers.trains);
   show(["regional-line", "regional-line-casing", "regional-stations", "regional-station-label", "regional-trains"], layers.regional);
   show(["vehicles", "vehicle-heading", "vehicle-icon", "vehicle-label", "bus-stops", "route-path", "route-path-casing"], layers.buses);

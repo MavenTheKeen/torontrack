@@ -475,6 +475,7 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
   background: var(--control-bg); color: var(--text); border: 1px solid var(--control-edge); box-shadow: var(--control-shadow);
   transition: background 0.2s, color 0.2s;
 }
+.map-tool[hidden] { display: none; }
 .map-tool.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .map-tool:hover, .map-fab:hover { border-color: var(--accent); }
 .map-page input.map-search { background-color: var(--control-bg); border: 1px solid var(--control-edge); box-shadow: var(--control-shadow); }
