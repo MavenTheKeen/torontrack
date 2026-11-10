@@ -57,9 +57,11 @@ The food map shows places to eat from OpenStreetMap: restaurants, cafes, fast fo
 pubs, bakeries and dessert shops (`/api/food/places`, about 14,000). Each is matched to the
 inspected premises nearest it within 80 m whose name shares at least half the words of the
 shorter name; about a third of the city's premises match. Up to zoom 14 places are grouped
-into numbered clusters; from zoom 15 each has an icon for its kind, grey when its latest
-inspection was a pass or none matched, and amber or red after a conditional pass or a
-closure; names appear from zoom 16. The filter panel shows or hides each kind, can limit
+into numbered clusters; from zoom 15 each has an icon and colour for its kind (restaurant, café, fast
+food, bar or pub, bakery or dessert shop), replaced by amber or red after a conditional
+pass or a closure; names appear from zoom 16. A row of kind chips under the search filters
+the map: with every kind shown, a tap shows only that kind, and further taps add or remove
+kinds. The filter panel shows or hides each kind as well, can limit
 the map to clean records (a latest Pass and no significant or crucial infraction in the
 last two years), and can add the inspected premises matched to no place: grocers,
 institutional kitchens and places missing from OpenStreetMap. The city's list gives no type

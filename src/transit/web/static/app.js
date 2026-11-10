@@ -1440,13 +1440,14 @@ const BIKE_PARKING_COLOUR = "#0f766e";
 const FOOD_LEVELS = ["pass", "conditional", "closed", "other"];
 const FOOD_COLOURS = { pass: "#15803d", conditional: "#d97706", closed: "#b91c1c", other: "#6b7280" };
 const FOOD_LABELS = { pass: "Pass", conditional: "Conditional pass", closed: "Closed", other: "Other result" };
-// The food map's places to eat, in the order of /api/food/places' kind codes.
+// The food map's places to eat, in the order of /api/food/places' kind codes. Each kind has
+// its own icon and colour; amber and red are kept for failed inspections.
 const EAT_KINDS = [
-  { glyph: "food", label: "Restaurants", one: "Restaurant" },
-  { glyph: "cafe", label: "Cafés", one: "Café" },
-  { glyph: "fastfood", label: "Fast food", one: "Fast food" },
-  { glyph: "drink", label: "Bars and pubs", one: "Bar or pub" },
-  { glyph: "dessert", label: "Bakeries and desserts", one: "Bakery or dessert shop" },
+  { glyph: "food", label: "Restaurants", short: "Restaurants", one: "Restaurant", colour: "#2563eb" },
+  { glyph: "cafe", label: "Cafés", short: "Cafés", one: "Café", colour: "#7c4a21" },
+  { glyph: "fastfood", label: "Fast food", short: "Fast food", one: "Fast food", colour: "#0f766e" },
+  { glyph: "drink", label: "Bars and pubs", short: "Bars", one: "Bar or pub", colour: "#7c3aed" },
+  { glyph: "dessert", label: "Bakeries and desserts", short: "Sweets", one: "Bakery or dessert shop", colour: "#db2777" },
 ];
 const EAT_COLOUR = "#475569";
 
@@ -1472,7 +1473,7 @@ function addMapIcons(map) {
   addBadge(map, "badge-parking-entrance", "entrance", PARKING_COLOUR, "#ffffff", ring, { css: 18, glyph: 12 });
   addBadge(map, "badge-rack", "rack", BIKE_PARKING_COLOUR, "#ffffff", ring, { css: 20, glyph: 13 });
   EAT_KINDS.forEach((k, i) => {
-    addBadge(map, `badge-eat-${i}`, k.glyph, EAT_COLOUR, "#ffffff", ring, { css: 22, glyph: 14 });
+    addBadge(map, `badge-eat-${i}`, k.glyph, k.colour, "#ffffff", ring, { css: 22, glyph: 14 });
     addBadge(map, `badge-eat-${i}-conditional`, k.glyph, FOOD_COLOURS.conditional, "#111418", ring, { css: 24, glyph: 15 });
     addBadge(map, `badge-eat-${i}-closed`, k.glyph, FOOD_COLOURS.closed, "#ffffff", ring, { css: 24, glyph: 15 });
   });
@@ -2161,16 +2162,29 @@ function foodPanel(rerender, view) {
       el("button", { type: "button", class: "panel-close", "aria-label": "Close food map filters" }, iconSvg("close", { size: 18 }))),
     el("p", { class: "muted small" }, "Places to eat from OpenStreetMap, with Toronto Public Health's latest inspection where the names match. Numbers show how many places an area has; zoom in for each place, and closer for names."),
     el("p", { class: "panel-subheading" }, "Places"),
-    el("ul", { class: "layer-list" }, EAT_KINDS.map((k, i) => row(badgeEl(k.glyph, EAT_COLOUR, "#ffffff"), k.label, null, f.kinds[i], () => { f.kinds[i] = !f.kinds[i]; }))),
+    el("ul", { class: "layer-list" }, EAT_KINDS.map((k, i) => row(badgeEl(k.glyph, k.colour, "#ffffff"), k.label, null, f.kinds[i], () => { f.kinds[i] = !f.kinds[i]; }))),
     el("p", { class: "panel-subheading" }, "Inspections"),
     el("ul", { class: "layer-list" },
       row(result("pass"), "Clean record only", CLEAN_RECORD, f.clean, () => { f.clean = !f.clean; }),
       row(result("other"), "Other inspected premises", "Grocers, institutional kitchens and places not on the map, close up", f.other, () => { f.other = !f.other; })),
     el("ul", { class: "legend-list compact" },
-      legendRow(badgeEl("food", EAT_COLOUR, "#ffffff", { size: 20 }), "Passed its latest inspection, or none matched"),
+      legendRow(badgeEl("food", EAT_KINDS[0].colour, "#ffffff", { size: 20 }), "Colour of its kind: passed its latest inspection, or none matched"),
       legendRow(result("conditional", 20), "Latest inspection: conditional pass"),
       legendRow(result("closed", 20), "Latest inspection: closed")),
   ];
+}
+
+// The food map's kind chips under the search. With every kind shown, a tap shows only that
+// kind; after that, taps add or remove kinds, and removing the last shows them all again.
+function foodKindChips(rerender, view) {
+  const kinds = mapState.food.kinds;
+  return EAT_KINDS.map((k, i) => chip([badgeEl(k.glyph, k.colour, "#ffffff", { size: 20 }), k.short], kinds[i], () => {
+    if (kinds.every(Boolean)) kinds.forEach((_, j) => { kinds[j] = j === i; });
+    else kinds[i] = !kinds[i];
+    if (!kinds.some(Boolean)) kinds.fill(true);
+    showEats(view);
+    rerender();
+  }, { class: "chip kind-chip", title: k.label }));
 }
 
 function rememberFood(view, id, coord) {
@@ -3428,7 +3442,8 @@ async function renderMap(focusKey) {
   const search = el("input", { type: "search", id: "map-search", name: "q", class: "map-search", placeholder: "Stations, routes, places", "aria-label": "Search stations, stops, routes, addresses, places or restaurants", autocomplete: "off", enterkeyhint: "go" });
   const results = el("ul", { class: "map-results" });
   const modeGroup = el("span", { class: "chip-group", role: "group", "aria-label": "Show Bike Share" });
-  const toolbar = el("div", { class: "map-toolbar" }, el("div", { class: "map-search-row" }, el("div", { class: "map-search-wrap" }, search, results), kindButton, layersButton, safetyButton), status);
+  const kindChips = el("div", { class: "chips food-kinds", role: "group", "aria-label": "Places to eat shown", hidden: "hidden" });
+  const toolbar = el("div", { class: "map-toolbar" }, el("div", { class: "map-search-row" }, el("div", { class: "map-search-wrap" }, search, results), kindButton, layersButton, safetyButton), kindChips, status);
   const guideTop = el("div", { class: "guide-card", "aria-live": "polite" });
   const guideBar = el("div", { class: "guide-bar" });
   const page = el("div", { class: "map-page" }, container, toolbar, layersPanel, safetyPanelEl, guideTop, guideBar, planButton, locateButton, sheet, hasBasemap ? null : el("p", { class: "map-note" }, "Street map not built yet: run the map-tiles tool (docs/map.md)."));
@@ -3470,7 +3485,9 @@ async function renderMap(focusKey) {
   renderKind();
 
   const renderChips = () => {
+    kindChips.hidden = mapState.kind !== "food";
     if (mapState.kind === "food") {
+      fill(kindChips, foodKindChips(renderChips, view));
       fill(layersPanel, foodPanel(renderChips, view));
       layersPanel.querySelector(".panel-close").addEventListener("click", () => setLayersOpen(false));
       return;

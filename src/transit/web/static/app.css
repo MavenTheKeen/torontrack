@@ -505,6 +505,12 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
 .view-switch { margin: 0 0 16px; box-shadow: none; border: 1px solid var(--border); }
 .view-switch .chip { text-decoration: none; display: inline-flex; align-items: center; }
 .chip.small { box-shadow: none; padding: 5px 11px; min-height: 30px; }
+.food-kinds { margin-top: -2px; padding-bottom: 2px; }
+.food-kinds[hidden] { display: none; }
+.kind-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px 5px 6px; min-height: 34px; background: var(--control-bg); border: 1px solid var(--control-edge); box-shadow: var(--control-shadow); }
+.kind-chip[aria-pressed="true"] { background: var(--control-bg); color: var(--text); }
+.kind-chip[aria-pressed="false"] { opacity: 0.55; }
+.kind-chip[aria-pressed="false"] svg { filter: grayscale(1); }
 .map-status {
   align-self: flex-start; margin: -2px 0 0; font-size: 0.76rem; font-weight: 650; color: var(--muted);
   background: var(--control-bg); border: 1px solid var(--control-edge); padding: 5px 10px; border-radius: var(--radius-sm); box-shadow: var(--control-shadow); display: flex; align-items: center; gap: 6px;
