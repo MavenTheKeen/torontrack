@@ -885,6 +885,26 @@ details.month[open] > summary { color: var(--text); }
   .finding-chart.in-view .chart .dot { opacity: 1; }
   .finding-chart.in-view .hbar { transform: scaleX(1); }
 }
+/* Small charts in map sheets. */
+.hour-chart, .inspect-timeline { margin: 8px 0 4px; }
+.hour-chart svg, .inspect-timeline svg { display: block; width: 100%; height: auto; overflow: visible; }
+.rain-bar { fill: #60a5fa; opacity: 0.55; }
+.temp-line { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
+.temp-label { font-size: 11px; font-weight: 700; fill: var(--text); }
+.chart-base { stroke: var(--border); stroke-width: 1; }
+.inspect-timeline .tick { font-size: 10px; fill: var(--muted); }
+.inspect-mark { fill: var(--muted); }
+.inspect-mark.pass { fill: var(--ok, #16a34a); }
+.inspect-mark.conditional { fill: #d97706; }
+.inspect-mark.closed { fill: var(--bad, #dc2626); }
+@media (prefers-reduced-motion: no-preference) {
+  .sheet-fresh .chart-draw .temp-line { stroke-dasharray: 1; animation: draw-line 0.9s ease-out both; }
+  .sheet-fresh .chart-draw .rain-bar, .sheet-fresh .chart-draw .inspect-mark { transform-box: fill-box; transform-origin: bottom; animation: grow-up 0.5s var(--ease) both; animation-delay: calc(var(--k, 0) * 30ms); }
+  .sheet-fresh .chart-draw .temp-label { animation: fade-in 0.4s 0.7s both; }
+}
+@keyframes draw-line { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes grow-up { from { transform: scaleY(0); } }
+
 /* Reliability heatmap. */
 :root { --rel-1: #16a34a; --rel-2: #84cc16; --rel-3: #eab308; --rel-4: #f97316; --rel-5: #dc2626; }
 .heatmap { display: grid; gap: 7px; }

@@ -2909,6 +2909,53 @@ function weatherPanel() {
   ];
 }
 
+// Twelve hours at a glance: temperature as a line, chance of precipitation as bars.
+function hourChart(hours) {
+  const temps = hours.map((h) => h.temperature).filter((t) => t != null);
+  if (hours.length < 3 || !temps.length) return null;
+  const W = 320, H = 86, top = 18, base = 70;
+  const lo = Math.min(...temps) - 1, hi = Math.max(...temps) + 1;
+  const x = (i) => 10 + (i * (W - 20)) / (hours.length - 1);
+  const y = (t) => base - ((t - lo) / (hi - lo)) * (base - top);
+  const bars = hours.map((h, i) => {
+    const chance = h.precip_chance || 0;
+    const bar = svgNode("rect", { class: "rain-bar", x: x(i) - 7, y: base - (chance / 100) * (base - top), width: 14, height: (chance / 100) * (base - top), rx: 2 });
+    bar.style.setProperty("--k", i);
+    return bar;
+  });
+  const points = hours.map((h, i) => (h.temperature == null ? null : `${x(i).toFixed(1)},${y(h.temperature).toFixed(1)}`)).filter(Boolean);
+  const warmest = hours.reduce((a, h, i) => (h.temperature != null && (a < 0 || h.temperature > hours[a].temperature) ? i : a), -1);
+  return el("figure", { class: "hour-chart chart-draw" },
+    svgNode("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Temperature and chance of precipitation over the next hours" },
+      bars,
+      svgNode("polyline", { class: "temp-line", points: points.join(" "), pathLength: 1 }),
+      warmest >= 0 ? svgNode("text", { class: "temp-label", x: x(warmest), y: y(hours[warmest].temperature) - 6, "text-anchor": "middle" }, `${Math.round(hours[warmest].temperature)}°`) : null,
+      svgNode("line", { class: "chart-base", x1: 0, x2: W, y1: base, y2: base })));
+}
+
+// Inspections over time: one mark per inspection, placed by date, coloured by result and
+// as tall as its number of infractions.
+function inspectionTimeline(inspections) {
+  if (inspections.length < 2) return null;
+  const days = inspections.map((i) => Date.parse(`${String(i.inspected_on).slice(0, 10)}T12:00:00Z`));
+  const first = Math.min(...days), last = Math.max(...days, first + 864e5);
+  const most = Math.max(1, ...inspections.map((i) => i.infractions.length));
+  const W = 320, H = 54;
+  const marks = inspections.map((i, k) => {
+    const level = foodLevel(i.status);
+    const height = 8 + (i.infractions.length / most) * (H - 22);
+    const mark = svgNode("rect", { class: `inspect-mark ${level}`, x: 8 + ((days[k] - first) / (last - first)) * (W - 22), y: H - 12 - height, width: 6, height, rx: 2 });
+    mark.style.setProperty("--k", k);
+    return svgNode("g", {}, svgNode("title", {}, `${inspectedOn(i.inspected_on)}: ${i.status}, ${plural(i.infractions.length, "infraction", "infractions")}`), mark);
+  });
+  const year = (t) => new Date(t).getUTCFullYear();
+  return el("figure", { class: "inspect-timeline chart-draw" },
+    svgNode("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Inspection results over time" },
+      svgNode("line", { class: "chart-base", x1: 0, x2: W, y1: H - 12, y2: H - 12 }), marks,
+      svgNode("text", { class: "tick", x: 4, y: H - 1 }, String(year(first))),
+      svgNode("text", { class: "tick", x: W - 4, y: H - 1, "text-anchor": "end" }, String(year(last)))));
+}
+
 const hourShortFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", hour: "numeric" });
 
 // What the findings say this weather tends to do, for the coming day.
@@ -2943,6 +2990,7 @@ function weatherSheet(view) {
       el("span", {}, el("strong", {}, p.condition || ""), el("br"), el("span", { class: "muted small" },
         [p.feels_like != null ? `Feels like ${round(p.feels_like)}` : null, p.wind_kmh != null ? `wind ${p.wind_dir ? `${p.wind_dir} ` : ""}${p.wind_kmh} km/h${p.gust_kmh ? `, gusts ${p.gust_kmh}` : ""}` : null, p.humidity != null ? `humidity ${p.humidity}%` : null].filter(Boolean).join(" · ")))),
     p.warnings.length ? p.warnings.map((x) => el("p", { class: "notice" }, el("strong", {}, x.description || x.type || "Weather warning"), x.url ? [" ", el("a", { href: x.url, target: "_blank", rel: "noopener" }, "Details")] : null)) : null,
+    hourChart(p.hourly.slice(0, 12)),
     el("ol", { class: "hour-strip", "aria-label": "Next hours" }, p.hourly.slice(0, 12).map((h) => el("li", {},
       el("span", { class: "muted small" }, hourShortFmt.format(new Date(h.at))),
       el("strong", {}, round(h.temperature)),
@@ -3044,6 +3092,7 @@ function foodSheetBody(view, p) {
           el("p", {}, foodStatus(latest.status), latest.infractions.length ? ` ${plural(latest.infractions.length, "infraction", "infractions")}` : " No infractions"),
           latest.infractions.length ? el("ul", { class: "sheet-list" }, latest.infractions.map(infractionRow)) : null)
       : null,
+    inspectionTimeline(p.inspections),
     earlier.length
       ? [
           el("p", { class: "sheet-label" }, "Earlier inspections"),
@@ -3871,6 +3920,7 @@ function nearSheet(view) {
 function openSheet(view, kind, id) {
   const fresh = !view.selected || view.selected.kind !== kind || view.selected.id !== id;
   view.selected = { kind, id };
+  view.sheetBody.classList.toggle("sheet-fresh", fresh); // Charts draw in only for a new selection.
   const content =
     kind === "station" ? stationSheet(view, id)
     : kind === "dock" ? dockSheet(view, id)
@@ -3956,7 +4006,7 @@ function sheetDrag(sheet) {
     sheet.style.maxHeight = "";
     if (dy > 90 || v > 0.6) {
       if (sheet.classList.contains("full")) sheet.classList.remove("full");
-      else if (mapState.view) closeSheet(mapState.view);
+      else sheet.querySelector(".sheet-close").click();
     } else if (dy < -50 || v < -0.6) sheet.classList.add("full");
   };
   grip.addEventListener("pointerup", end);
