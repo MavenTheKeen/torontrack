@@ -35,6 +35,7 @@ from transit import (
     food_notable,
     neighbourhood,
     places,
+    recreation,
     roads,
     waste,
 )
@@ -782,6 +783,21 @@ def create_app(
                     "Toronto Open Data, Open Government Licence – Toronto.",
                 }
             )
+        )
+
+    @app.get("/api/recreation")
+    def recreation_today():
+        """Drop-in skating and swimming today, by location (transit.recreation)."""
+
+        def build(conn, now):
+            today = now.astimezone(regional.TORONTO).date()
+            return {"day": today, "places": recreation.day_sessions(conn, today)}
+
+        return cached(
+            "recreation",
+            build,
+            "City of Toronto Open Data (drop-in programs, parks and recreation facilities), "
+            "Open Government Licence – Toronto.",
         )
 
     @app.get("/api/street")

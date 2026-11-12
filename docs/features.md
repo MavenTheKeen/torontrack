@@ -119,6 +119,11 @@ time. Large arena and stadium events are flagged because they crowd nearby stati
 City construction zones and road closures are drawn on the map with the bus and streetcar
 routes they affect ([road restrictions](roads.md)).
 
+## City map
+
+The map's third kind shows drop-in skating and swimming today at city rinks, pools and
+community centres, with what is on now and next ([skating and swimming](recreation.md)).
+
 ## Findings
 
 A Findings page compares the sources side by side: rain and Bike Share use, snow and

@@ -62,6 +62,7 @@ JOBS = (
     ),
     Job("waste_collection", "40 10 * * *", (("waste-refresh",),)),
     Job("service_requests", "50 10 * * *", (("neighbourhood-refresh",),), timeout_min=30),
+    Job("recreation", "0 11 * * *", (("recreation-refresh",),)),
     Job("planner_data", "20 10 * * *", (("planner-data", "--out", PLANNER_DIR),)),
 )
 

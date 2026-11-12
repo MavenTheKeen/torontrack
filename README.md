@@ -151,7 +151,7 @@ What the site does, page by page, is in [features](docs/features.md).
   [regional trains](docs/regional.md), [Bike Share](docs/bikeshare.md),
   [road restrictions](docs/roads.md), [events](docs/events.md), [weather](docs/weather.md),
   [food inspections](docs/food.md), [curbside collection](docs/waste.md),
-  [wards and 311](docs/neighbourhood.md)
+  [wards and 311](docs/neighbourhood.md), [skating and swimming](docs/recreation.md)
 - **Site:** [site and API](docs/site.md), [street map](docs/map.md),
   [trip planner](docs/planner.md), [trip guidance](docs/navigation.md)
 - **Analysis:** [findings](docs/findings.md), [reliability](docs/reliability.md), [metric definitions](docs/metrics.md),

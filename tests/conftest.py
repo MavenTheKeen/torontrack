@@ -46,6 +46,9 @@ def settings():
             """TRUNCATE normalized.city_wards, normalized.service_requests_daily,
                ops.service_request_files, ops.service_request_refreshes"""
         )
+        conn.execute(
+            "TRUNCATE normalized.rec_facilities, normalized.rec_sessions, ops.rec_refreshes"
+        )
         conn.execute("TRUNCATE normalized.ticketed_events, ops.ticketed_event_refreshes")
         conn.execute(
             """TRUNCATE normalized.agency_versions, normalized.agency_vehicles,

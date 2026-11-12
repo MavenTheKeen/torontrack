@@ -1183,12 +1183,13 @@ const DIRECTION_SIDE = { 0: 1, 1: -1 };
 const MAP_KIND_KEY = "torontrack-map-kind";
 function savedMapKind() {
   try {
-    return localStorage.getItem(MAP_KIND_KEY) === "food" ? "food" : "transit";
+    const kind = localStorage.getItem(MAP_KIND_KEY);
+    return kind === "food" || kind === "city" ? kind : "transit";
   } catch {
     return "transit";
   }
 }
-const mapState = { view: null, kind: savedMapKind(), food: { kinds: [true, true, true, true, true], clean: false, long: false, notable: false, other: false }, mode: "bikes", layers: { trains: true, regional: true, buses: true, bikes: true, access: true, entrances: true, roads: false, lanes: false, events: false, food: false, parking: false, bikeParking: false } };
+const mapState = { view: null, kind: savedMapKind(), food: { kinds: [true, true, true, true, true], clean: false, long: false, notable: false, other: false }, city: { skate: true, swim: true, now: false }, mode: "bikes", layers: { trains: true, regional: true, buses: true, bikes: true, access: true, entrances: true, roads: false, lanes: false, events: false, food: false, parking: false, bikeParking: false } };
 // Buses and streetcars. TTC's subway lines own yellow, green and purple and the site's
 // brand is red-orange, so TTC buses take blue and streetcars crimson, and neighbouring
 // agencies' buses (mode = agency key, transit.agencies) teal and indigo. All are always
@@ -1493,6 +1494,11 @@ function addMapIcons(map) {
     addBadge(map, `badge-eat-${i}-closed`, k.glyph, FOOD_COLOURS.closed, "#ffffff", ring, { css: 24, glyph: 15 });
     addBadge(map, `badge-eat-${i}-notable`, k.glyph, k.colour, "#ffffff", ring, { css: 32, glyph: 16, halo: NOTABLE_COLOUR });
   });
+  for (const [kind, colour] of Object.entries(REC_COLOURS)) {
+    addBadge(map, `badge-rec-${kind}`, kind, colour, "#ffffff", ring, { css: 26, glyph: 16 });
+    addBadge(map, `badge-rec-${kind}-now`, kind, colour, "#ffffff", ring, { css: 30, glyph: 17, halo: "#16a34a" });
+    addBadge(map, `badge-rec-${kind}-done`, kind, colour, "#ffffff", ring, { css: 22, glyph: 13, hollow: true });
+  }
   for (const level of FOOD_LEVELS) addBadge(map, `badge-food-${level}`, "food", FOOD_COLOURS[level], level === "conditional" ? "#111418" : "#ffffff", ring, { css: 20, glyph: 13 });
   addHeadingImage(map);
 }
@@ -2241,6 +2247,128 @@ function foodPanel(rerender, view) {
       legendRow(badgeEl("food", EAT_KINDS[0].colour, "#ffffff", { size: 20 }), "Colour of its kind: passed its latest inspection, or none matched"),
       legendRow(result("conditional", 20), "Latest inspection: conditional pass"),
       legendRow(result("closed", 20), "Latest inspection: closed")),
+  ];
+}
+
+// The city map: drop-in skating and swimming today at city rinks, pools and community
+// centres (transit.recreation). A place is ringed in green while a session is on, and drawn
+// hollow once its last session of the day has ended.
+const REC_COLOURS = { skate: "#0284c7", swim: "#0d9488" };
+const REC_LABELS = { skate: "Skating", swim: "Swimming" };
+
+function addCityLayers(view) {
+  const map = view.map;
+  const c = basemapColours(prefersDark());
+  map.addSource("rec", { type: "geojson", data: featureCollection([]) });
+  map.addLayer({ id: "rec", type: "symbol", source: "rec", layout: {
+    "icon-image": ["concat", "badge-rec-", ["get", "kind"], ["get", "state"]],
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.75, 16, 1],
+    "icon-allow-overlap": true, "symbol-sort-key": ["get", "rank"],
+    "text-field": ["step", ["zoom"], "", 13, ["get", "label"]], "text-font": ["Noto Sans Medium"], "text-size": 12, "text-anchor": "top", "text-offset": [0, 1.3],
+    "text-max-width": 10, "text-optional": true,
+  }, paint: { "text-color": prefersDark() ? "#e5e7eb" : "#1f2937", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
+  applyLayerToggles(map);
+  loadCity(view);
+}
+
+async function loadCity(view) {
+  if (mapState.kind !== "city" || !view.map) return;
+  const today = torontoDay(new Date());
+  if (!view.rec || view.rec.day !== today) {
+    try {
+      view.rec = await api("/api/recreation");
+    } catch {
+      return; /* Tried again the next time the city map opens. */
+    }
+  }
+  showCity(view);
+}
+
+const minutesOf = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+function nowMinutes() {
+  const [h, m] = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date()).split(":");
+  return Number(h) * 60 + Number(m);
+}
+
+// A place's sessions after the city map's filters.
+function recSessions(place) {
+  const f = mapState.city;
+  return place.sessions.filter((s) => f[s.kind]);
+}
+
+function showCity(view) {
+  if (!view.rec || !view.map) return;
+  const now = nowMinutes();
+  const features = [];
+  for (const p of view.rec.places) {
+    const sessions = recSessions(p);
+    if (!sessions.length) continue;
+    const on = sessions.find((s) => minutesOf(s.starts) <= now && now < minutesOf(s.ends));
+    const next = sessions.find((s) => minutesOf(s.starts) > now);
+    if (mapState.city.now && !on) continue;
+    const kind = (on || next || sessions[0]).kind;
+    const state = on ? "-now" : next ? "" : "-done";
+    const label = on ? `${p.name}\n${REC_LABELS[on.kind]} until ${clockText(on.ends)}` : next ? `${p.name}\n${REC_LABELS[next.kind]} at ${clockText(next.starts)}` : p.name;
+    features.push(point([p.lon, p.lat], { id: p.id, kind, state, label, rank: on ? 0 : next ? 1 : 2 }));
+  }
+  view.map.getSource("rec")?.setData(featureCollection(features));
+}
+
+function clockText(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return timeFmt.format(new Date(2000, 0, 1, h, m));
+}
+
+const recPlace = (view, id) => (view.rec ? view.rec.places.find((p) => p.id === Number(id)) : null);
+
+function recSheet(view, id) {
+  const p = recPlace(view, id);
+  if (!p) return null;
+  const now = nowMinutes();
+  const ages = ([low, high]) => (low && high && high < 99 ? `ages ${low} to ${high}` : low ? `ages ${low}+` : null);
+  return [
+    el("p", { class: "sheet-kicker" }, "Drop-in today"),
+    el("h2", {}, p.name),
+    p.address ? el("p", { class: "muted small" }, p.address) : null,
+    el("ul", { class: "sheet-list" }, p.sessions.map((s) => {
+      const on = minutesOf(s.starts) <= now && now < minutesOf(s.ends);
+      const over = minutesOf(s.ends) <= now;
+      return el("li", { class: `arrival-row${over ? " muted" : ""}` },
+        el("span", {}, badgeEl(s.kind, REC_COLOURS[s.kind], "#ffffff", { size: 18 }), ` ${s.title}`, ages(s.ages) ? el("span", { class: "muted small" }, ` · ${ages(s.ages)}`) : null),
+        el("span", { class: "mins" }, on ? `now, until ${clockText(s.ends)}` : `${clockText(s.starts)} to ${clockText(s.ends)}`));
+    })),
+    planHere(view, [p.lon, p.lat], p.name),
+    p.url ? el("p", {}, el("a", { href: p.url, target: "_blank", rel: "noopener" }, "Facility page on toronto.ca")) : null,
+    el("p", { class: "muted small" }, "Drop-in programs as the city publishes them, refreshed weekly; check the facility page for closures. City of Toronto Open Data."),
+  ];
+}
+
+function cityChips(rerender, view) {
+  const f = mapState.city;
+  const toggle = (key) => () => {
+    f[key] = !f[key];
+    if (!f.skate && !f.swim) { f.skate = true; f.swim = true; }
+    showCity(view);
+    rerender();
+  };
+  return [
+    ...Object.entries(REC_LABELS).map(([kind, label]) => chip([badgeEl(kind, REC_COLOURS[kind], "#ffffff", { size: 20 }), label], f[kind], toggle(kind), { class: "chip kind-chip" })),
+    chip([badgeEl("clock", "#16a34a", "#ffffff", { size: 20 }), "On now"], f.now, toggle("now"), { class: "chip kind-chip", title: "Only places with a session on now" }),
+  ];
+}
+
+function cityPanel(rerender, view) {
+  return [
+    el("div", { class: "panel-head" },
+      el("p", { class: "panel-heading" }, "City map"),
+      el("button", { type: "button", class: "panel-close", "aria-label": "Close city map filters" }, iconSvg("close", { size: 18 }))),
+    el("p", { class: "muted small" }, "Drop-in skating and swimming today at city rinks, pools and community centres. Use the chips under the search to choose what is shown."),
+    el("ul", { class: "legend-list compact" },
+      legendRow(badgeEl("skate", REC_COLOURS.skate, "#ffffff", { size: 20 }), "Skating later today"),
+      legendRow(badgeEl("swim", REC_COLOURS.swim, "#ffffff", { size: 20 }), "Swimming later today"),
+      legendRow(badgeEl("clock", "#16a34a", "#ffffff", { size: 20 }), "Green ring: a session is on now"),
+      legendRow(badgeEl("swim", REC_COLOURS.swim, "#ffffff", { size: 20, hollow: true }), "Hollow: today's sessions are over")),
   ];
 }
 
@@ -3007,11 +3135,12 @@ const FOOD_MAP_LAYERS = { trains: false, regional: false, buses: false, bikes: f
 
 function applyLayerToggles(map) {
   const show = (ids, on) => ids.forEach((id) => map.getLayer(id) && map.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
-  const layers = mapState.kind === "food" ? FOOD_MAP_LAYERS : mapState.layers;
+  const layers = mapState.kind !== "transit" ? FOOD_MAP_LAYERS : mapState.layers;
+  show(["rec", "rec-label"], mapState.kind === "city");
   show(["eats-cluster", "eats-count", "eats", "eats-label", "eats-notable"], mapState.kind === "food");
   show(["food-other"], mapState.kind === "food" && mapState.food.other);
   // The food map leaves out the subway lines and stations as well as every transit layer.
-  show(["line-casing", "line", "stations", "station-label"], mapState.kind !== "food");
+  show(["line-casing", "line", "stations", "station-label"], mapState.kind === "transit");
   show(["trains", "trains-halo", "trains-dot"], layers.trains);
   show(["regional-line", "regional-line-casing", "regional-stations", "regional-station-label", "regional-trains"], layers.regional);
   show(["vehicles", "vehicle-heading", "vehicle-icon", "vehicle-label", "bus-stops", "route-path", "route-path-casing"], layers.buses);
@@ -3171,6 +3300,7 @@ function openSheet(view, kind, id) {
     : kind === "event" ? eventSheet(view, id)
     : kind === "food" ? foodSheet()
     : kind === "eat" ? eatSheet(view, id)
+    : kind === "rec" ? recSheet(view, id)
     : kind === "plan" ? planSheet(view)
     : nearSheet(view);
   if (!content) return closeSheet(view);
@@ -3189,6 +3319,7 @@ function openSheet(view, kind, id) {
     : kind === "place" ? (view.placeResults || [])[id]?.coord || null
     : kind === "food" ? (view.foodCoords && view.foodCoords.get(id)) || null
     : kind === "eat" ? (view.eats && view.eats.places[id] ? view.eats.places[id].slice(0, 2) : null)
+    : kind === "rec" ? (() => { const p = recPlace(view, id); return p ? [p.lon, p.lat] : null; })()
     : null;
   if (selected) selected.setData(featureCollection(where ? [point(where, {})] : []));
   if (kind === "stop") loadStopSheet(view, id);
@@ -3533,11 +3664,11 @@ async function renderMap(focusKey) {
   const safetyButton = el("button", { type: "button", class: "map-tool", "aria-label": "Safety", "aria-expanded": "false", "aria-controls": "map-safety", title: "Safety" }, iconSvg("shield", { size: 22 }));
   const safetyPanelEl = el("aside", { class: "map-panel safety", id: "map-safety", "aria-label": "Safety", hidden: "hidden" });
   // The transit map and the food map, switched like the light and dark themes.
-  const kindButtons = { transit: ["subway", "Transit"], food: ["food", "Food"] };
+  const kindButtons = { transit: ["subway", "Transit"], food: ["food", "Food"], city: ["park", "City"] };
   for (const [kind, [glyph, label]] of Object.entries(kindButtons)) {
     kindButtons[kind] = el("button", { type: "button", class: "map-kind-option", "aria-pressed": "false", "data-kind": kind }, iconSvg(glyph, { size: 18 }), label);
   }
-  const kindSwitch = el("div", { class: "map-kind", role: "group", "aria-label": "Map" }, kindButtons.transit, kindButtons.food);
+  const kindSwitch = el("div", { class: "map-kind", role: "group", "aria-label": "Map" }, kindButtons.transit, kindButtons.food, kindButtons.city);
   const search = el("input", { type: "search", id: "map-search", name: "q", class: "map-search", placeholder: "Stations, routes, places", "aria-label": "Search stations, stops, routes, addresses, places or restaurants", autocomplete: "off", enterkeyhint: "go" });
   const results = el("ul", { class: "map-results" });
   const modeGroup = el("span", { class: "chip-group", role: "group", "aria-label": "Show Bike Share" });
@@ -3556,16 +3687,17 @@ async function renderMap(focusKey) {
 
   const renderKind = () => {
     const food = mapState.kind === "food";
+    const transit = mapState.kind === "transit";
     for (const [kind, button] of Object.entries(kindButtons)) button.setAttribute("aria-pressed", String(mapState.kind === kind));
-    safetyButton.hidden = food;
-    search.placeholder = food ? "Restaurants, places" : "Stations, routes, places";
-    layersButton.setAttribute("aria-label", food ? "Food map filters" : "Layers and legend");
-    layersButton.title = food ? "Filters" : "Layers and legend";
+    safetyButton.hidden = !transit;
+    search.placeholder = food ? "Restaurants, places" : transit ? "Stations, routes, places" : "Places, addresses";
+    layersButton.setAttribute("aria-label", food ? "Food map filters" : transit ? "Layers and legend" : "City map filters");
+    layersButton.title = transit ? "Layers and legend" : "Filters";
   };
   kindSwitch.addEventListener("click", (event) => {
     const kind = event.target.closest("[data-kind]")?.dataset.kind;
     if (!kind || kind === mapState.kind) return;
-    if (kind === "food") setSafetyOpen(false);
+    if (kind !== "transit") setSafetyOpen(false);
     mapState.kind = kind;
     try {
       localStorage.setItem(MAP_KIND_KEY, mapState.kind);
@@ -3579,13 +3711,20 @@ async function renderMap(focusKey) {
     if (view.map) {
       applyLayerToggles(view.map);
       loadFood(view);
-      if (view.selected && (mapState.kind === "food") !== (view.selected.kind === "food")) closeSheet(view);
+      loadCity(view);
+      if (view.selected) closeSheet(view);
     }
   });
   renderKind();
 
   const renderChips = () => {
-    kindChips.hidden = mapState.kind !== "food";
+    kindChips.hidden = mapState.kind === "transit";
+    if (mapState.kind === "city") {
+      fill(kindChips, cityChips(renderChips, view));
+      fill(layersPanel, cityPanel(renderChips, view));
+      layersPanel.querySelector(".panel-close").addEventListener("click", () => setLayersOpen(false));
+      return;
+    }
     if (mapState.kind === "food") {
       fill(kindChips, foodKindChips(renderChips, view));
       fill(layersPanel, foodPanel(renderChips, view));
@@ -3669,7 +3808,7 @@ async function renderMap(focusKey) {
       const items = mapState.kind === "food" ? [...foodItems, ...placeItems] : [...placeItems, ...foodItems];
       results.append(...items.map((li) => { li.classList.add("place-result"); return li; }));
     }, SUGGEST_MS);
-    const transit = mapState.kind !== "food";
+    const transit = mapState.kind === "transit";
     const stations = !transit ? [] : view.data.stations.filter((s) => searchKey(s.name).includes(query)).slice(0, 4);
     const regionalStations = !transit ? [] : ((view.regional || {}).stations || []).filter((s) => searchKey(s.name).includes(query)).slice(0, 3);
     const routes = !transit ? [] : [...view.surfaceRoutes.values()].filter((r) => r.short_name === query || searchKey(`${r.short_name} ${r.long_name}`).startsWith(query)).slice(0, 3);
@@ -3875,6 +4014,7 @@ async function renderMap(focusKey) {
       addOsmLayers(view);
       addEventLayers(view);
       addFoodLayers(view);
+      addCityLayers(view);
       addPlanLayers(view);
       addGuideLayers(view);
       // Panning by hand stops the camera following the traveller until Recenter.
@@ -3928,7 +4068,7 @@ async function renderMap(focusKey) {
         }).catch(() => { /* Vehicles stay at their reported positions. */ });
       }).catch(() => fill(status, el("span", { class: "warn" }, "Buses and streetcars are unavailable right now")));
       fill(status, [el("span", { class: "live-dot", "aria-hidden": "true" }), `Live · ${timeFmt.format(new Date())}`]);
-      for (const layer of ["stations", "docks", "dock-icon", "trains", "vehicles", "vehicle-icon", "bus-stops", "regional-trains", "regional-stations", "road-work-line", "road-closure-line", "road-closure-point", "road-icons", "road-icons-point", "lanes", "lanes-trail", "events", "food", "eats", "eats-notable", "eats-cluster", "food-other", "outages", "entrances", "parking", "parking-entrances", "bike-parking"]) {
+      for (const layer of ["stations", "docks", "dock-icon", "trains", "vehicles", "vehicle-icon", "bus-stops", "regional-trains", "regional-stations", "road-work-line", "road-closure-line", "road-closure-point", "road-icons", "road-icons-point", "lanes", "lanes-trail", "events", "food", "eats", "eats-notable", "eats-cluster", "food-other", "rec", "outages", "entrances", "parking", "parking-entrances", "bike-parking"]) {
         map.on("mouseenter", layer, () => { map.getCanvas().style.cursor = "pointer"; });
         map.on("mouseleave", layer, () => { map.getCanvas().style.cursor = ""; });
       }
@@ -3939,7 +4079,7 @@ async function renderMap(focusKey) {
         }
         // A finger-sized box, so small stops and vehicles are easy to hit.
         const box = [[event.point.x - 8, event.point.y - 8], [event.point.x + 8, event.point.y + 8]];
-        const layers = ["trains", "trains-dot", "regional-trains", "events", "eats-notable", "eats", "eats-cluster", "food", "food-other", "entrances", "stations", "outages", "parking-entrances", "parking", "bike-parking", "regional-stations", "vehicle-icon", "vehicles", "bus-stops", "dock-icon", "docks", "road-icons", "road-icons-point", "road-work-line", "road-closure-line", "road-closure-point", "lanes", "lanes-trail"].filter((l) => map.getLayer(l) && map.getLayoutProperty(l, "visibility") !== "none");
+        const layers = ["trains", "trains-dot", "regional-trains", "events", "rec", "eats-notable", "eats", "eats-cluster", "food", "food-other", "entrances", "stations", "outages", "parking-entrances", "parking", "bike-parking", "regional-stations", "vehicle-icon", "vehicles", "bus-stops", "dock-icon", "docks", "road-icons", "road-icons-point", "road-work-line", "road-closure-line", "road-closure-point", "lanes", "lanes-trail"].filter((l) => map.getLayer(l) && map.getLayoutProperty(l, "visibility") !== "none");
         const hit = map.queryRenderedFeatures(box, { layers });
         if (!hit.length) {
           clearRoute(view);
@@ -3960,6 +4100,7 @@ async function renderMap(focusKey) {
         else if (f.layer.id.startsWith("lanes")) openSheet(view, "lane", f);
         else if (f.layer.id === "events") openSheet(view, "event", f.properties.id);
         else if (f.layer.id === "food" || f.layer.id === "food-other") openSheet(view, "food", f.properties.id);
+        else if (f.layer.id === "rec") openSheet(view, "rec", f.properties.id);
         else if (f.layer.id === "eats" || f.layer.id === "eats-notable") f.properties.pid ? openSheet(view, "food", f.properties.pid) : openSheet(view, "eat", f.properties.id);
         else if (f.layer.id === "eats-cluster") {
           map.getSource("eats").getClusterExpansionZoom(f.properties.cluster_id)
