@@ -38,6 +38,7 @@ about 2 h 30 min after collection started.
 | `/api/food/places` | The food map: places to eat from OpenStreetMap as `[lon, lat, name, kind code, premises ID, result code, clean record]`, and the inspected premises matched to none; see [food inspections](food.md#on-the-site). |
 | `/api/food/search?q=` | Food premises whose name contains every word of `q`, with the latest result; `near=lat,lon` puts the nearest first. |
 | `/api/food/{premises ID}` | One premises with its latest 10 inspections, newest first, and the infractions of each. |
+| `/api/findings` | The Findings page: sources compared, each with headline, chart data, method and period ([findings](findings.md)). |
 | `/api/street?at=lat,lon` | My street: next collections, road work within 500 m, and the ward's most common 311 requests ([wards and 311](neighbourhood.md)). |
 | `/api/waste?at=lat,lon` | The curbside collection calendar at a point and its next four collections ([curbside collection](waste.md)). |
 | `/api/agenda` | The Events page: city events and Ticketmaster concerts, games and shows for the next 14 days, each with its category, major-venue flag and nearest station; see [events](events.md#the-events-page). |

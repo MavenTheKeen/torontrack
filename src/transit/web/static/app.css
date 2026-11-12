@@ -787,3 +787,29 @@ details.month[open] > summary { color: var(--text); }
 .saved-row .name { font-weight: 700; }
 .saved-times { margin: 4px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
 .sheet-block.notable .sheet-label { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* Findings */
+.finding { margin: 0 0 18px; }
+.finding h2 { margin-top: 2px; }
+.finding-chart { margin: 14px 0 6px; }
+.chart { width: 100%; height: auto; display: block; overflow: visible; }
+.chart .grid { stroke: var(--border); stroke-width: 1; }
+.chart .tick { fill: var(--muted); font-size: 12px; }
+.chart .axis-label { fill: var(--muted); font-size: 12px; font-weight: 600; }
+.chart .line { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.chart .series-0 .line, .chart .bar.series-0 { stroke: var(--accent); }
+.chart .series-1 .line { stroke: #2563eb; }
+.chart .series-0 .dot, .chart .bar.series-0 { fill: var(--accent); }
+.chart .series-1 .dot { fill: #2563eb; }
+.chart .bar { stroke: none; }
+.chart-y { margin: 0 0 4px; }
+.chart-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 6px 0 0; padding: 0; font-size: 0.85rem; color: var(--muted); }
+.chart-legend li::before { content: ""; display: inline-block; width: 12px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; background: var(--accent); }
+.chart-legend li.series-1::before { background: #2563eb; }
+.hbars { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.hbars li { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 0.86rem; }
+.hbar-track { background: var(--surface-2); border-radius: 3px; height: 10px; overflow: hidden; }
+.hbar { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.hbar-value { color: var(--muted); font-variant-numeric: tabular-nums; }
+.finding-method summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+@media (max-width: 520px) { .hbars li { grid-template-columns: 1fr auto; } .hbar-track { grid-column: 1 / -1; grid-row: 2; } }

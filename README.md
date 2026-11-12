@@ -154,7 +154,7 @@ What the site does, page by page, is in [features](docs/features.md).
   [wards and 311](docs/neighbourhood.md)
 - **Site:** [site and API](docs/site.md), [street map](docs/map.md),
   [trip planner](docs/planner.md), [trip guidance](docs/navigation.md)
-- **Analysis:** [reliability](docs/reliability.md), [metric definitions](docs/metrics.md),
+- **Analysis:** [findings](docs/findings.md), [reliability](docs/reliability.md), [metric definitions](docs/metrics.md),
   [open data](docs/datasets.md)
 - **Operations:** [Airflow](docs/airflow.md), [phone alerts](docs/alerts.md),
   [Windows setup](docs/setup-windows.md), [demo walkthrough](docs/demo.md)

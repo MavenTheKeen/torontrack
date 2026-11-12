@@ -29,6 +29,7 @@ from fastapi.staticfiles import StaticFiles
 
 from transit import (
     events,
+    findings,
     food_inspections,
     food_licences,
     food_notable,
@@ -1029,6 +1030,23 @@ def create_app(
     @app.get("/api/pipeline")
     def pipeline_health():
         return cached("pipeline", lambda conn, now: pipeline.pipeline_status(conn, now))
+
+    @app.get("/api/findings")
+    def findings_page():
+        """Findings: sources compared side by side (transit.findings)."""
+
+        def build(conn, now):
+            return {
+                "findings": findings.all_findings(conn, now.astimezone(regional.TORONTO).date())
+            }
+
+        return cached(
+            "findings",
+            build,
+            "TTC, Bike Share Toronto, City of Toronto Open Data (Open Government Licence – "
+            "Toronto) and Environment and Climate Change Canada.",
+            store=slow,
+        )
 
     @app.get("/api/stats")
     def project_stats():

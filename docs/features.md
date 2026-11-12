@@ -119,6 +119,13 @@ time. Large arena and stadium events are flagged because they crowd nearby stati
 City construction zones and road closures are drawn on the map with the bus and streetcar
 routes they affect ([road restrictions](roads.md)).
 
+## Findings
+
+A Findings page compares the sources side by side: rain and Bike Share use, snow and
+subway delays, the causes of subway delay, potholes after freeze-thaw, and inspection
+results by how long a place has been open. Each finding shows its chart, method and period
+([findings](findings.md)).
+
 ## My street
 
 An address or place card on the map lists its next garbage, Green Bin, recycling and yard

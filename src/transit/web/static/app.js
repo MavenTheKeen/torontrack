@@ -4286,6 +4286,91 @@ function agendaItem(e, categories) {
   );
 }
 
+// Findings: what the collected data shows when sources are compared (transit.findings).
+const findingDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "short", year: "numeric" });
+
+function svgNode(name, attrs = {}, ...children) {
+  const node = document.createElementNS(SVG_NS, name);
+  for (const [k, v] of Object.entries(attrs)) if (v != null) node.setAttribute(k, v);
+  for (const child of children.flat()) if (child != null) node.append(child);
+  return node;
+}
+
+function niceMax(value) {
+  const step = 10 ** Math.floor(Math.log10(value || 1));
+  return Math.ceil(value / step) * step;
+}
+
+// A small chart for one finding: lines or vertical bars in SVG, or horizontal bars in HTML.
+function findingChart(c) {
+  const all = c.series.flatMap((s) => s.values).filter((v) => v != null);
+  const max = niceMax(Math.max(...all));
+  const legend = c.series.length > 1
+    ? el("ul", { class: "chart-legend" }, c.series.map((s, i) => el("li", { class: `series-${i}` }, s.name)))
+    : null;
+  if (c.kind === "hbars") {
+    return el("div", { class: "finding-chart" },
+      el("ul", { class: "hbars", "aria-label": c.y_label }, c.x.map((label, i) => {
+        const v = c.series[0].values[i];
+        return el("li", {}, el("span", { class: "hbar-label" }, label),
+          el("span", { class: "hbar-track" }, el("span", { class: "hbar", style: { width: `${(100 * v) / max}%` } })),
+          el("span", { class: "hbar-value" }, numberFmt.format(v)));
+      })));
+  }
+  const W = 600, H = 240, L = 52, R = 10, T = 12, B = 44;
+  const x = (i) => L + ((W - L - R) * (i + 0.5)) / c.x.length;
+  const y = (v) => T + (H - T - B) * (1 - v / max);
+  const grid = [0, 0.25, 0.5, 0.75, 1].map((f) => svgNode("g", {},
+    svgNode("line", { x1: L, x2: W - R, y1: y(max * f), y2: y(max * f), class: "grid" }),
+    svgNode("text", { x: L - 6, y: y(max * f) + 4, "text-anchor": "end", class: "tick" }, numberFmt.format(Math.round(max * f)))));
+  const every = Math.ceil(c.x.length / 8);
+  const labels = c.x.map((label, i) => (i % every ? null : svgNode("text", { x: x(i), y: H - B + 16, "text-anchor": "middle", class: "tick" }, label)));
+  let marks;
+  if (c.kind === "bars") {
+    const width = ((W - L - R) / c.x.length) * 0.6;
+    marks = c.series[0].values.map((v, i) => (v == null ? null : svgNode("rect", { x: x(i) - width / 2, y: y(v), width, height: y(0) - y(v), class: "bar series-0" },
+      svgNode("title", {}, `${c.x[i]}: ${numberFmt.format(v)}`))));
+  } else {
+    marks = c.series.map((s, k) => {
+      const runs = [];
+      let run = [];
+      s.values.forEach((v, i) => {
+        if (v == null) { if (run.length) runs.push(run); run = []; } else run.push(`${x(i)},${y(v)}`);
+      });
+      if (run.length) runs.push(run);
+      return svgNode("g", { class: `series-${k}` },
+        runs.map((r) => svgNode("polyline", { points: r.join(" "), class: "line" })),
+        s.values.map((v, i) => (v == null ? null : svgNode("circle", { cx: x(i), cy: y(v), r: 3.5, class: "dot" }, svgNode("title", {}, `${s.name}, ${c.x[i]}: ${numberFmt.format(v)}`)))));
+    });
+  }
+  const svg = svgNode("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img", "aria-label": `${c.y_label} by ${c.x_label || "group"}` },
+    grid, labels, marks,
+    c.x_label ? svgNode("text", { x: (L + W - R) / 2, y: H - 6, "text-anchor": "middle", class: "axis-label" }, c.x_label) : null);
+  return el("div", { class: "finding-chart" }, el("p", { class: "muted small chart-y" }, c.y_label), svg, legend);
+}
+
+function findingCard(f) {
+  const [first, last] = f.period.map((d) => findingDayFmt.format(new Date(`${String(d).slice(0, 10)}T00:00:00Z`)));
+  return el("article", { class: "card finding", id: f.id },
+    el("p", { class: "sheet-kicker" }, f.topic),
+    el("h2", {}, f.title),
+    el("p", {}, f.summary),
+    findingChart(f.chart),
+    el("details", { class: "finding-method" },
+      el("summary", {}, "How this was worked out"),
+      el("p", {}, f.method),
+      el("p", { class: "muted small" }, `${first} to ${last}. Sources: ${f.sources.join("; ")}.`)));
+}
+
+async function renderFindings() {
+  const data = await api("/api/findings");
+  return [
+    el("h1", {}, "Findings"),
+    el("p", {}, "What the data collected here shows when the sources are put side by side: transit, Bike Share, weather and the city's open data. Each finding is recomputed from the stored data, with its method and period below it."),
+    data.findings.length ? data.findings.map(findingCard) : el("p", { class: "muted" }, "Findings appear once enough data has been collected."),
+  ];
+}
+
 async function renderEvents(dayParam) {
   const data = await api("/api/agenda");
   const { days, categories } = data;
@@ -4441,6 +4526,7 @@ async function route({ refresh = false } = {}) {
     else if (kind === "stop" && id) content = await renderStop(decodeURIComponent(id));
     else if (kind === "pipeline") content = await renderPipeline();
     else if (kind === "events") content = await renderEvents(id);
+    else if (kind === "findings") content = await renderFindings();
     else content = await renderHome();
     clearTimeout(waiting);
     if (seq !== renderSeq) return; // A newer navigation or refresh finished first.
