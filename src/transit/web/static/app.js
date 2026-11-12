@@ -136,12 +136,13 @@ function statusDetails(status) {
   ];
 }
 
-function statusRow(status) {
+function statusRow(status, hours) {
   return el(
     "li",
     { class: "status-row board-row" },
     badge(status.line, { link: false }),
-    el("div", {}, el("a", { class: "name", href: `#/line/${status.line}` }, status.name), statusDetails(status)),
+    el("div", {}, el("a", { class: "name", href: `#/line/${status.line}` }, status.name), statusDetails(status),
+      hours && hours.length ? el("div", { class: "heat-strip mini", "aria-label": "Reliability by hour today" }, hourCells(hours)) : null),
     el("span", { class: "chevron", "aria-hidden": "true" }, "›"),
   );
 }
@@ -338,7 +339,8 @@ function airLine(air) {
 }
 
 async function renderHome() {
-  const [lineData, alertData, airData] = await Promise.all([api("/api/lines"), api("/api/alerts"), api("/api/air").catch(() => null)]);
+  const [lineData, alertData, airData, rel] = await Promise.all([api("/api/lines"), api("/api/alerts"), api("/api/air").catch(() => null), api("/api/reliability").catch(() => null)]);
+  const hourly = rel && rel.available ? rel.hourly : {};
   const accessibility = alertData.accessibility;
   const saved = await savedSection(lineData);
   return [
@@ -347,7 +349,8 @@ async function renderHome() {
     airData ? airLine(airData.air) : null,
     saved,
     el("h2", {}, "Lines"),
-    el("ul", { class: "status-list" }, lineData.lines.map((l) => statusRow(l.status))),
+    el("ul", { class: "status-list" }, lineData.lines.map((l) => statusRow(l.status, hourly[l.status.line]))),
+    Object.keys(hourly).length ? el("p", { class: "muted small" }, "Squares: today's service hour by hour, green when trains came as scheduled. ", el("a", { href: "#/reliability" }, "Reliability")) : null,
     stationSearch(lineData.stations),
     el("h2", {}, "Active alerts"),
     activeAlerts(alertData.active, lineData.lines),
@@ -575,6 +578,39 @@ function gapList(gaps) {
   );
 }
 
+// Share of regular gaps by hour of service, as coloured cells: green when trains came as
+// scheduled, through amber, to red when many gaps were long. Hours not yet run are blank.
+const HOURS_SHOWN = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25];
+const hourName = (h) => { const x = h % 24; return x === 0 ? "midnight" : x === 12 ? "noon" : x < 12 ? `${x} a.m.` : `${x - 12} p.m.`; };
+
+function reliabilityColour(pct) {
+  if (pct == null) return null;
+  return pct >= 90 ? "var(--rel-1)" : pct >= 80 ? "var(--rel-2)" : pct >= 65 ? "var(--rel-3)" : pct >= 50 ? "var(--rel-4)" : "var(--rel-5)";
+}
+
+function hourCells(hours, { week = false } = {}) {
+  const by = new Map(hours.map((h) => [h.hour, h]));
+  return HOURS_SHOWN.map((hour, k) => {
+    const h = by.get(hour) || by.get(hour % 24);
+    const pct = h ? (week ? h.week_regular_pct : h.today_headways ? h.today_regular_pct : null) : null;
+    const colour = reliabilityColour(pct);
+    return el("span", { class: `heat-cell${colour ? "" : " empty"}`, style: { "--k": k, background: colour || "" },
+      title: pct == null ? `${hourName(hour)}: no trains measured` : `${hourName(hour)}: ${pct}% of gaps regular${h.today_delays ? `, ${h.today_delays} long gaps` : ""}` });
+  });
+}
+
+function reliabilityHeatmap(hourly) {
+  return el("section", { class: "card heatmap", "aria-label": "Reliability by hour today" },
+    lines.filter((line) => (hourly[line.id] || []).length).map((line) => el("div", { class: "heatmap-row" },
+      badge(line.id, { link: false, small: true }),
+      el("div", { class: "heat-strip" }, hourCells(hourly[line.id])))),
+    el("div", { class: "heatmap-axis", "aria-hidden": "true" }, el("span"), el("div", { class: "heat-axis" },
+      ["5 a.m.", "9 a.m.", "1 p.m.", "5 p.m.", "9 p.m.", "1 a.m."].map((t) => el("span", {}, t)))),
+    el("div", { class: "heat-legend" }, el("span", { class: "muted small" }, "Gaps regular:"),
+      [["var(--rel-1)", "90%+"], ["var(--rel-2)", "80%"], ["var(--rel-3)", "65%"], ["var(--rel-4)", "50%"], ["var(--rel-5)", "less"]].map(([c, t]) =>
+        el("span", { class: "heat-key small" }, el("span", { class: "heat-cell", style: { background: c } }), t))));
+}
+
 function hourTable(hours) {
   if (!hours.length) return el("p", { class: "muted" }, "No data yet.");
   return el(
@@ -738,6 +774,9 @@ async function renderReliability() {
     el("h2", {}, "Worst delays today"),
     el("p", { class: "muted small" }, "Overlapping long gaps on a line count as one delay, ranked by minutes over the scheduled gap between trains."),
     el("div", { class: "grid" }, lines.map((line) => lineCard(line, gapList(data.longest_gaps_today.filter((g) => g.route_id === line.id))))),
+    el("h2", {}, "Through the day"),
+    el("p", { class: "muted small" }, "Each square is an hour of service today, coloured by the share of gaps between trains within 1.5 times the scheduled headway. Hover or tap for the figure."),
+    reliabilityHeatmap(data.hourly),
     el("h2", {}, "Headway reliability by hour"),
     el(
       "p",
@@ -4223,7 +4262,18 @@ async function renderMap(focusKey) {
   for (const [kind, [glyph, label]] of Object.entries(kindButtons)) {
     kindButtons[kind] = el("button", { type: "button", class: "map-kind-option", "aria-pressed": "false", "data-kind": kind }, iconSvg(glyph, { size: 18 }), label);
   }
-  const kindSwitch = el("div", { class: "map-kind", role: "group", "aria-label": "Map" }, kindButtons.transit, kindButtons.food, kindButtons.city, kindButtons.weather);
+  const kindThumb = el("span", { class: "map-kind-thumb", "aria-hidden": "true" });
+  const kindSwitch = el("div", { class: "map-kind has-thumb", role: "group", "aria-label": "Map" }, kindThumb, kindButtons.transit, kindButtons.food, kindButtons.city, kindButtons.weather);
+  // The highlight follows the pressed option; it moves only after the first placement.
+  const placeThumb = () => {
+    const on = Object.values(kindButtons).find((b) => b.getAttribute("aria-pressed") === "true");
+    if (!on || !on.offsetWidth) return;
+    kindThumb.style.width = `${on.offsetWidth}px`;
+    kindThumb.style.transform = `translateX(${on.offsetLeft - 3}px)`;
+    requestAnimationFrame(() => kindThumb.classList.add("ready"));
+  };
+  new MutationObserver(placeThumb).observe(kindSwitch, { subtree: true, attributes: true, attributeFilter: ["aria-pressed"] });
+  if ("ResizeObserver" in window) new ResizeObserver(placeThumb).observe(kindSwitch);
   const search = el("input", { type: "search", id: "map-search", name: "q", class: "map-search", placeholder: "Stations, routes, places", "aria-label": "Search stations, stops, routes, addresses, places or restaurants", autocomplete: "off", enterkeyhint: "go" });
   const results = el("ul", { class: "map-results" });
   const modeGroup = el("span", { class: "chip-group", role: "group", "aria-label": "Show Bike Share" });
@@ -5027,7 +5077,7 @@ function findingChart(c) {
     return el("div", { class: "finding-chart" },
       el("ul", { class: "hbars", "aria-label": c.y_label }, c.x.map((label, i) => {
         const v = c.series[0].values[i];
-        return el("li", {}, el("span", { class: "hbar-label" }, label),
+        return el("li", { style: { "--k": i } }, el("span", { class: "hbar-label" }, label),
           el("span", { class: "hbar-track" }, hbarFill((100 * v) / max)),
           el("span", { class: "hbar-value" }, numberFmt.format(v)));
       })));
@@ -5078,7 +5128,7 @@ const findingObserver = "IntersectionObserver" in window
         e.target.classList.add("in-view");
         findingObserver.unobserve(e.target);
       }
-    }), { threshold: 0.25 })
+    }), { threshold: 0.6, rootMargin: "0px 0px -8% 0px" })
   : null;
 
 function findingCard(f) {
@@ -5092,10 +5142,11 @@ function findingCard(f) {
       el("summary", {}, "How this was worked out"),
       el("p", {}, f.method),
       el("p", { class: "muted small" }, `${first} to ${last}. Sources: ${f.sources.join("; ")}.`)));
+  const chart = card.querySelector(".finding-chart") || card;
   if (findingObserver && !findingsSeen.has(f.id)) {
     findingsSeen.add(f.id);
-    findingObserver.observe(card);
-  } else card.classList.add("in-view");
+    findingObserver.observe(chart);
+  } else chart.classList.add("in-view");
   return card;
 }
 
@@ -5200,7 +5251,8 @@ function markCurrentNav(kind, id) {
 }
 
 function skeleton() {
-  return el("div", { class: "skeleton", "aria-hidden": "true" }, el("div"), el("div"), el("div"));
+  return el("div", { class: "skeleton", "aria-hidden": "true" },
+    el("div", { class: "sk-title" }), el("div", { class: "sk-line" }), el("div"), el("div"), el("div"));
 }
 
 // Swap in new content. Navigations cross-fade (View Transitions, where supported) and
@@ -5309,7 +5361,20 @@ setInterval(() => {
   route({ refresh: true });
 }, REFRESH_MS);
 window.addEventListener("resize", setHeaderHeight);
-document.getElementById("theme-switch").addEventListener("click", () => window.toggleTheme());
+document.getElementById("theme-switch").addEventListener("click", (event) => {
+  if (!document.startViewTransition || reduceMotion()) return window.toggleTheme();
+  const box = event.currentTarget.getBoundingClientRect();
+  const x = box.left + box.width / 2;
+  const y = box.top + box.height / 2;
+  const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+  document.documentElement.classList.add("theme-flip");
+  const flip = document.startViewTransition(() => window.toggleTheme());
+  flip.ready.then(() => document.documentElement.animate(
+    { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+    { duration: 520, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)", pseudoElement: "::view-transition-new(root)" },
+  )).catch(() => {});
+  flip.finished.finally(() => document.documentElement.classList.remove("theme-flip"));
+});
 // The page restyles itself; the map draws its colours when built, so it is rebuilt, unless
 // guidance is running, which a rebuild would end.
 window.addEventListener("themechange", () => {
