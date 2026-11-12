@@ -7,6 +7,9 @@ version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    commit-message:
+      prefix: build
+      include: scope
     schedule:
       interval: weekly
     ignore:
@@ -14,6 +17,9 @@ updates:
         update-types: ["version-update:semver-major"]
   - package-ecosystem: uv
     directories: [/, /dbt]
+    commit-message:
+      prefix: build
+      include: scope
     schedule:
       interval: weekly
     groups:
@@ -28,6 +34,9 @@ updates:
         update-types: ["version-update:semver-minor"]
   - package-ecosystem: docker
     directories: [/, /airflow, /docker]
+    commit-message:
+      prefix: build
+      include: scope
     schedule:
       interval: weekly
     groups:
@@ -45,6 +54,9 @@ updates:
         update-types: ["version-update:semver-minor"]
   - package-ecosystem: docker-compose
     directory: /
+    commit-message:
+      prefix: build
+      include: scope
     schedule:
       interval: weekly
     ignore:
