@@ -128,7 +128,8 @@ rest of today and for tomorrow, with the other Toronto stations on request
 ## City map
 
 The map's third kind shows drop-in skating and swimming today at city rinks, pools and
-community centres, with what is on now and next ([skating and swimming](recreation.md)).
+community centres, with what is on now and next, and beach water quality in season
+([skating, swimming and beaches](recreation.md)).
 
 ## Findings
 

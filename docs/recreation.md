@@ -22,3 +22,17 @@ Names and the next session appear from zoom 13. Chips under the search show skat
 swimming or only places with a session on now, and a place's card lists the day's
 sessions with their ages and a link to its page on toronto.ca. Sessions are shown as
 published; closures announced elsewhere are not reflected.
+
+## Beaches
+
+`transit beaches-refresh` runs after the drop-in load in the same daily job. It loads
+Toronto Public Health's beach water quality samples (`toronto-beaches-water-quality`):
+every E. coli count since 2007, at several sites per beach, in `normalized.beach_samples`,
+replaced on each load. A beach's result for a day is the geometric mean of its sites (a
+count of 0 is taken as 1). Toronto posts a beach as unsafe above 100 E. coli per 100 mL,
+stricter than the 200 used by Ontario and Canada; the site applies the same threshold.
+
+`GET /api/beaches` returns each beach with its latest seven sampling days, and whether
+the season is on (a sample within the last three days). On the city map a beach is green
+or red by its latest result in season and hollow grey out of season; its card lists the
+recent results. The same samples feed the beach and rain finding ([findings](findings.md)).

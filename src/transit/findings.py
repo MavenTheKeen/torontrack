@@ -10,7 +10,7 @@ into Toronto calendar days; a day counts only with at least 20 reported hours.
 import logging
 from datetime import date, timedelta
 
-from transit import food_licences
+from transit import beaches, food_licences
 
 log = logging.getLogger(__name__)
 
@@ -275,6 +275,58 @@ def potholes(conn) -> dict | None:
     }
 
 
+RAIN_BANDS = ((0, 1, "Under 1 mm"), (1, 10, "1 to 10 mm"), (10, 1000, "10 mm or more"))
+
+
+def beach_rain(conn) -> dict | None:
+    """Beach days over Toronto's E. coli standard by the rain of the day before."""
+    rows = conn.execute(
+        f"""WITH w AS ({WEATHER_DAYS}),
+                b AS ({beaches.DAILY})
+            SELECT w.precip AS rain, b.geomean, b.day
+            FROM b JOIN w ON w.day = b.day - 1"""
+    ).fetchall()
+    groups = {label: [0, 0] for _, _, label in RAIN_BANDS}  # beach days, unsafe
+    for r in rows:
+        for low, high, label in RAIN_BANDS:
+            if low <= float(r["rain"]) < high:
+                groups[label][0] += 1
+                groups[label][1] += round(float(r["geomean"])) > beaches.UNSAFE
+    labels = [label for _, _, label in RAIN_BANDS]
+    if any(groups[label][0] < 50 for label in labels):
+        return None
+    shares = [groups[label][1] / groups[label][0] for label in labels]
+    return {
+        "id": "beach-rain",
+        "topic": "Beaches",
+        "title": (
+            f"After 10 mm of rain, {_pct(shares[-1])}% of beach days fail the E. coli "
+            f"standard, against {_pct(shares[0])}% after a dry day"
+        ),
+        "summary": (
+            f"Across {len(rows):,} beach sampling days, a beach's water was over Toronto's "
+            f"standard of {beaches.UNSAFE} E. coli per 100 mL on {_pct(shares[0])}% of days "
+            f"after a day with under 1 mm of rain, {_pct(shares[1])}% after 1 to 10 mm and "
+            f"{_pct(shares[-1])}% after 10 mm or more."
+        ),
+        "chart": {
+            "kind": "bars",
+            "x": labels,
+            "x_label": "Rain the day before",
+            "y_label": "Beach days over the standard, %",
+            "series": [{"name": "Over the standard", "values": [round(100 * s) for s in shares]}],
+        },
+        "method": (
+            "Toronto Public Health's beach samples: each beach's result for a day is the "
+            "geometric mean of its sites, compared with Toronto's standard of 100 E. coli per "
+            "100 mL (Ontario and Canada use 200). Rain is the previous calendar day's total "
+            "at the downtown weather station, not at the beach."
+        ),
+        "period": [min(r["day"] for r in rows), max(r["day"] for r in rows)],
+        "sources": ["Toronto Public Health beach water quality", "ECCC hourly weather"],
+    }
+
+
 AGE_BANDS = ((0, 5, "Under 5 years"), (5, 20, "5 to 19 years"), (20, 200, "20 years or more"))
 
 
@@ -350,6 +402,7 @@ def all_findings(conn, today: date) -> list[dict]:
         lambda: snow_delays(conn),
         lambda: delay_causes(conn),
         lambda: potholes(conn),
+        lambda: beach_rain(conn),
         lambda: food_age(conn, today),
     ):
         try:

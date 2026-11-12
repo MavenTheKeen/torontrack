@@ -9,6 +9,7 @@ from transit import (
     agencies,
     air_quality,
     alerts,
+    beaches,
     bike_lanes,
     events,
     exports,
@@ -97,6 +98,7 @@ def main():
         "recreation-refresh", help="Load City of Toronto drop-in skating and swimming"
     )
     commands.add_parser("air-quality-refresh", help="Load the AQHI for Toronto from ECCC")
+    commands.add_parser("beaches-refresh", help="Load Toronto beach water quality samples")
     commands.add_parser(
         "food-inspections-refresh", help="Load City of Toronto food inspections (DineSafe)"
     )
@@ -252,6 +254,14 @@ def main():
                     client.close()
                 if result["status"] == "failed":
                     raise FetchError(f"Waste collection refresh failed: {result['error']}")
+            elif args.command == "beaches-refresh":
+                client = FeedClient()
+                try:
+                    result = beaches.refresh(settings.database_url, client)
+                finally:
+                    client.close()
+                if result["status"] == "failed":
+                    raise FetchError(f"Beaches refresh failed: {result['error']}")
             elif args.command == "air-quality-refresh":
                 client = FeedClient()
                 try:

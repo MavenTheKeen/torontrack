@@ -1211,7 +1211,7 @@ function savedMapKind() {
     return "transit";
   }
 }
-const mapState = { view: null, kind: savedMapKind(), food: { kinds: [true, true, true, true, true], clean: false, long: false, notable: false, other: false }, city: { skate: true, swim: true, now: false }, mode: "bikes", layers: { trains: true, regional: true, buses: true, bikes: true, access: true, entrances: true, roads: false, lanes: false, events: false, food: false, parking: false, bikeParking: false } };
+const mapState = { view: null, kind: savedMapKind(), food: { kinds: [true, true, true, true, true], clean: false, long: false, notable: false, other: false }, city: { skate: true, swim: true, beach: true, now: false }, mode: "bikes", layers: { trains: true, regional: true, buses: true, bikes: true, access: true, entrances: true, roads: false, lanes: false, events: false, food: false, parking: false, bikeParking: false } };
 // Buses and streetcars. TTC's subway lines own yellow, green and purple and the site's
 // brand is red-orange, so TTC buses take blue and streetcars crimson, and neighbouring
 // agencies' buses (mode = agency key, transit.agencies) teal and indigo. All are always
@@ -1516,6 +1516,7 @@ function addMapIcons(map) {
     addBadge(map, `badge-eat-${i}-closed`, k.glyph, FOOD_COLOURS.closed, "#ffffff", ring, { css: 24, glyph: 15 });
     addBadge(map, `badge-eat-${i}-notable`, k.glyph, k.colour, "#ffffff", ring, { css: 32, glyph: 16, halo: NOTABLE_COLOUR });
   });
+  for (const [state, colour] of Object.entries(BEACH_COLOURS)) addBadge(map, `badge-beach-${state}`, "beach", colour, "#ffffff", ring, { css: 26, glyph: 16, hollow: state === "off" });
   for (const [kind, colour] of Object.entries(REC_COLOURS)) {
     addBadge(map, `badge-rec-${kind}`, kind, colour, "#ffffff", ring, { css: 26, glyph: 16 });
     addBadge(map, `badge-rec-${kind}-now`, kind, colour, "#ffffff", ring, { css: 30, glyph: 17, halo: "#16a34a" });
@@ -2277,6 +2278,9 @@ function foodPanel(rerender, view) {
 // hollow once its last session of the day has ended.
 const REC_COLOURS = { skate: "#0284c7", swim: "#0d9488" };
 const REC_LABELS = { skate: "Skating", swim: "Swimming" };
+// Beaches: green when the latest result met Toronto's E. coli standard, red when not, and
+// hollow grey out of season (more than three days since any beach was sampled).
+const BEACH_COLOURS = { safe: "#16a34a", unsafe: "#dc2626", off: "#6b7280" };
 
 function addCityLayers(view) {
   const map = view.map;
@@ -2289,6 +2293,13 @@ function addCityLayers(view) {
     "text-field": ["step", ["zoom"], "", 13, ["get", "label"]], "text-font": ["Noto Sans Medium"], "text-size": 12, "text-anchor": "top", "text-offset": [0, 1.3],
     "text-max-width": 10, "text-optional": true,
   }, paint: { "text-color": prefersDark() ? "#e5e7eb" : "#1f2937", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
+  map.addSource("beaches", { type: "geojson", data: featureCollection([]) });
+  map.addLayer({ id: "beaches", type: "symbol", source: "beaches", layout: {
+    "icon-image": ["concat", "badge-beach-", ["get", "state"]],
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.8, 16, 1], "icon-allow-overlap": true,
+    "text-field": ["step", ["zoom"], "", 12, ["get", "name"]], "text-font": ["Noto Sans Medium"], "text-size": 12, "text-anchor": "top", "text-offset": [0, 1.3],
+    "text-max-width": 10, "text-optional": true,
+  }, paint: { "text-color": prefersDark() ? "#e5e7eb" : "#1f2937", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
   applyLayerToggles(map);
   loadCity(view);
 }
@@ -2298,7 +2309,7 @@ async function loadCity(view) {
   const today = torontoDay(new Date());
   if (!view.rec || view.rec.day !== today) {
     try {
-      view.rec = await api("/api/recreation");
+      [view.rec, view.beaches] = await Promise.all([api("/api/recreation"), api("/api/beaches")]);
     } catch {
       return; /* Tried again the next time the city map opens. */
     }
@@ -2335,6 +2346,30 @@ function showCity(view) {
     features.push(point([p.lon, p.lat], { id: p.id, kind, state, label, rank: on ? 0 : next ? 1 : 2 }));
   }
   view.map.getSource("rec")?.setData(featureCollection(features));
+  const b = view.beaches;
+  view.map.getSource("beaches")?.setData(featureCollection(!b ? [] : b.beaches.filter((x) => x.recent.length).map((x) =>
+    point([x.lon, x.lat], { id: x.id, name: x.name, state: !b.in_season ? "off" : x.recent[0].safe ? "safe" : "unsafe" }))));
+  applyLayerToggles(view.map);
+}
+
+const beachPlace = (view, id) => (view.beaches ? view.beaches.beaches.find((x) => x.id === Number(id)) : null);
+
+function beachSheet(view, id) {
+  const b = view.beaches;
+  const x = beachPlace(view, id);
+  if (!x) return null;
+  const [latest] = x.recent;
+  const verdict = (d) => el("span", { class: `tag ${d.safe ? "ok" : "bad"}` }, d.safe ? "Safe for swimming" : "Unsafe for swimming");
+  return [
+    el("p", { class: "sheet-kicker" }, "Beach water quality"),
+    el("h2", {}, x.name),
+    b.in_season
+      ? el("p", {}, verdict(latest), ` ${inspectedOn(latest.day)}`)
+      : el("p", {}, `The sampling season is over; the last sample was taken on ${inspectedOn(latest.day)}.`),
+    el("ul", { class: "sheet-list" }, x.recent.map((d) => el("li", { class: "arrival-row" }, el("span", {}, inspectedOn(d.day)), el("span", { class: "mins" }, `${numberFmt.format(d.ecoli)} E. coli · `, d.safe ? "met the standard" : "over the standard")))),
+    planHere(view, [x.lon, x.lat], x.name),
+    el("p", { class: "muted small" }, `E. coli per 100 mL, the geometric mean of the beach's sampling sites; Toronto posts a beach as unsafe above ${b.threshold} (Ontario and Canada use 200). Samples are taken in the morning and results arrive the next day. Toronto Public Health, City of Toronto Open Data.`),
+  ];
 }
 
 function clockText(hhmm) {
@@ -2376,6 +2411,7 @@ function cityChips(rerender, view) {
   };
   return [
     ...Object.entries(REC_LABELS).map(([kind, label]) => chip([badgeEl(kind, REC_COLOURS[kind], "#ffffff", { size: 20 }), label], f[kind], toggle(kind), { class: "chip kind-chip" })),
+    chip([badgeEl("beach", BEACH_COLOURS.safe, "#ffffff", { size: 20 }), "Beaches"], f.beach, () => { f.beach = !f.beach; showCity(view); rerender(); }, { class: "chip kind-chip" }),
     chip([badgeEl("clock", "#16a34a", "#ffffff", { size: 20 }), "On now"], f.now, toggle("now"), { class: "chip kind-chip", title: "Only places with a session on now" }),
   ];
 }
@@ -2390,7 +2426,10 @@ function cityPanel(rerender, view) {
       legendRow(badgeEl("skate", REC_COLOURS.skate, "#ffffff", { size: 20 }), "Skating later today"),
       legendRow(badgeEl("swim", REC_COLOURS.swim, "#ffffff", { size: 20 }), "Swimming later today"),
       legendRow(badgeEl("clock", "#16a34a", "#ffffff", { size: 20 }), "Green ring: a session is on now"),
-      legendRow(badgeEl("swim", REC_COLOURS.swim, "#ffffff", { size: 20, hollow: true }), "Hollow: today's sessions are over")),
+      legendRow(badgeEl("swim", REC_COLOURS.swim, "#ffffff", { size: 20, hollow: true }), "Hollow: today's sessions are over"),
+      legendRow(badgeEl("beach", BEACH_COLOURS.safe, "#ffffff", { size: 20 }), "Beach: latest sample met the E. coli standard"),
+      legendRow(badgeEl("beach", BEACH_COLOURS.unsafe, "#ffffff", { size: 20 }), "Beach: latest sample over the standard"),
+      legendRow(badgeEl("beach", BEACH_COLOURS.off, "#ffffff", { size: 20, hollow: true }), "Beach: out of the sampling season")),
   ];
 }
 
@@ -3159,6 +3198,7 @@ function applyLayerToggles(map) {
   const show = (ids, on) => ids.forEach((id) => map.getLayer(id) && map.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
   const layers = mapState.kind !== "transit" ? FOOD_MAP_LAYERS : mapState.layers;
   show(["rec", "rec-label"], mapState.kind === "city");
+  show(["beaches"], mapState.kind === "city" && mapState.city.beach);
   show(["eats-cluster", "eats-count", "eats", "eats-label", "eats-notable"], mapState.kind === "food");
   show(["food-other"], mapState.kind === "food" && mapState.food.other);
   // The food map leaves out the subway lines and stations as well as every transit layer.
@@ -3323,6 +3363,7 @@ function openSheet(view, kind, id) {
     : kind === "food" ? foodSheet()
     : kind === "eat" ? eatSheet(view, id)
     : kind === "rec" ? recSheet(view, id)
+    : kind === "beach" ? beachSheet(view, id)
     : kind === "plan" ? planSheet(view)
     : nearSheet(view);
   if (!content) return closeSheet(view);
@@ -3342,6 +3383,7 @@ function openSheet(view, kind, id) {
     : kind === "food" ? (view.foodCoords && view.foodCoords.get(id)) || null
     : kind === "eat" ? (view.eats && view.eats.places[id] ? view.eats.places[id].slice(0, 2) : null)
     : kind === "rec" ? (() => { const p = recPlace(view, id); return p ? [p.lon, p.lat] : null; })()
+    : kind === "beach" ? (() => { const p = beachPlace(view, id); return p ? [p.lon, p.lat] : null; })()
     : null;
   if (selected) selected.setData(featureCollection(where ? [point(where, {})] : []));
   if (kind === "stop") loadStopSheet(view, id);
@@ -4090,7 +4132,7 @@ async function renderMap(focusKey) {
         }).catch(() => { /* Vehicles stay at their reported positions. */ });
       }).catch(() => fill(status, el("span", { class: "warn" }, "Buses and streetcars are unavailable right now")));
       fill(status, [el("span", { class: "live-dot", "aria-hidden": "true" }), `Live · ${timeFmt.format(new Date())}`]);
-      for (const layer of ["stations", "docks", "dock-icon", "trains", "vehicles", "vehicle-icon", "bus-stops", "regional-trains", "regional-stations", "road-work-line", "road-closure-line", "road-closure-point", "road-icons", "road-icons-point", "lanes", "lanes-trail", "events", "food", "eats", "eats-notable", "eats-cluster", "food-other", "rec", "outages", "entrances", "parking", "parking-entrances", "bike-parking"]) {
+      for (const layer of ["stations", "docks", "dock-icon", "trains", "vehicles", "vehicle-icon", "bus-stops", "regional-trains", "regional-stations", "road-work-line", "road-closure-line", "road-closure-point", "road-icons", "road-icons-point", "lanes", "lanes-trail", "events", "food", "eats", "eats-notable", "eats-cluster", "food-other", "rec", "beaches", "outages", "entrances", "parking", "parking-entrances", "bike-parking"]) {
         map.on("mouseenter", layer, () => { map.getCanvas().style.cursor = "pointer"; });
         map.on("mouseleave", layer, () => { map.getCanvas().style.cursor = ""; });
       }
@@ -4101,7 +4143,7 @@ async function renderMap(focusKey) {
         }
         // A finger-sized box, so small stops and vehicles are easy to hit.
         const box = [[event.point.x - 8, event.point.y - 8], [event.point.x + 8, event.point.y + 8]];
-        const layers = ["trains", "trains-dot", "regional-trains", "events", "rec", "eats-notable", "eats", "eats-cluster", "food", "food-other", "entrances", "stations", "outages", "parking-entrances", "parking", "bike-parking", "regional-stations", "vehicle-icon", "vehicles", "bus-stops", "dock-icon", "docks", "road-icons", "road-icons-point", "road-work-line", "road-closure-line", "road-closure-point", "lanes", "lanes-trail"].filter((l) => map.getLayer(l) && map.getLayoutProperty(l, "visibility") !== "none");
+        const layers = ["trains", "trains-dot", "regional-trains", "events", "rec", "beaches", "eats-notable", "eats", "eats-cluster", "food", "food-other", "entrances", "stations", "outages", "parking-entrances", "parking", "bike-parking", "regional-stations", "vehicle-icon", "vehicles", "bus-stops", "dock-icon", "docks", "road-icons", "road-icons-point", "road-work-line", "road-closure-line", "road-closure-point", "lanes", "lanes-trail"].filter((l) => map.getLayer(l) && map.getLayoutProperty(l, "visibility") !== "none");
         const hit = map.queryRenderedFeatures(box, { layers });
         if (!hit.length) {
           clearRoute(view);
@@ -4123,6 +4165,7 @@ async function renderMap(focusKey) {
         else if (f.layer.id === "events") openSheet(view, "event", f.properties.id);
         else if (f.layer.id === "food" || f.layer.id === "food-other") openSheet(view, "food", f.properties.id);
         else if (f.layer.id === "rec") openSheet(view, "rec", f.properties.id);
+        else if (f.layer.id === "beaches") openSheet(view, "beach", f.properties.id);
         else if (f.layer.id === "eats" || f.layer.id === "eats-notable") f.properties.pid ? openSheet(view, "food", f.properties.pid) : openSheet(view, "eat", f.properties.id);
         else if (f.layer.id === "eats-cluster") {
           map.getSource("eats").getClusterExpansionZoom(f.properties.cluster_id)

@@ -29,6 +29,7 @@ from fastapi.staticfiles import StaticFiles
 
 from transit import (
     air_quality,
+    beaches,
     events,
     findings,
     food_inspections,
@@ -798,6 +799,21 @@ def create_app(
             build,
             "Air Quality Health Index: Environment and Climate Change Canada, Open Government "
             "Licence – Canada.",
+        )
+
+    @app.get("/api/beaches")
+    def beach_status():
+        """Each beach's latest water quality results (transit.beaches)."""
+
+        def build(conn, now):
+            return beaches.status(conn, now.astimezone(regional.TORONTO).date())
+
+        return cached(
+            "beaches",
+            build,
+            "Beach water quality: Toronto Public Health, City of Toronto Open Data, Open "
+            "Government Licence – Toronto.",
+            store=slow,
         )
 
     @app.get("/api/recreation")

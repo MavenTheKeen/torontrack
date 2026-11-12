@@ -1,4 +1,5 @@
-"""Daily load of City of Toronto drop-in skating and swimming and recreation facilities."""
+"""Daily load of City of Toronto drop-in skating and swimming, recreation facilities and
+beach water quality."""
 
 import subprocess
 from datetime import UTC, datetime, timedelta
@@ -27,4 +28,8 @@ with DAG(
     def refresh() -> None:
         subprocess.run([APP, "recreation-refresh"], check=True, timeout=540)
 
-    refresh()
+    @task
+    def beaches() -> None:
+        subprocess.run([APP, "beaches-refresh"], check=True, timeout=540)
+
+    refresh() >> beaches()
