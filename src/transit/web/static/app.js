@@ -2694,14 +2694,14 @@ function startWind(view) {
     canvas.width = container.clientWidth * ratio;
     canvas.height = container.clientHeight * ratio;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    const count = Math.min(1600, Math.round(container.clientWidth * container.clientHeight / 900));
+    const count = Math.min(1600, Math.round(container.clientWidth * container.clientHeight / 2400));
     state.particles = Array.from({ length: count }, () => spawn({}));
   };
   const spawn = (p) => {
     const b = view.map.getBounds();
     p.lon = Math.max(b.getWest(), grid.west) + Math.random() * (Math.min(b.getEast(), grid.west + grid.width * grid.dx) - Math.max(b.getWest(), grid.west));
     p.lat = Math.max(b.getSouth(), grid.north - grid.height * grid.dy) + Math.random() * (Math.min(b.getNorth(), grid.north) - Math.max(b.getSouth(), grid.north - grid.height * grid.dy));
-    p.age = Math.floor(Math.random() * 80);
+    p.age = Math.floor(Math.random() * 140);
     return p;
   };
   // One step of every particle; returns segments by colour.
@@ -2712,7 +2712,7 @@ function startWind(view) {
     const zoom = view.map.getZoom();
     for (const p of state.particles) {
       const wind = windAt(grid, hour, p.lon, p.lat);
-      if (!wind || ++p.age > 90) {
+      if (!wind || ++p.age > 140) {
         spawn(p);
         p.age = 0;
         continue;
@@ -2730,7 +2730,7 @@ function startWind(view) {
     return segments;
   };
   const draw = (segments) => {
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = 1.2;
     ctx.lineCap = "round";
     segments.forEach((list, i) => {
       if (!list.length) return;
@@ -2756,7 +2756,7 @@ function startWind(view) {
     state.last = time;
     ctx.save();
     ctx.globalCompositeOperation = "destination-in";
-    ctx.fillStyle = "rgba(0,0,0,0.9)"; // Fade the trails.
+    ctx.fillStyle = "rgba(0,0,0,0.955)"; // Fade the trails.
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
     draw(step());
@@ -2852,7 +2852,7 @@ function weatherChips(rerender, view) {
       else stopWind(view);
       rerender();
     }, { class: "chip kind-chip", title: "Show the wind as moving particles" }),
-    chip([iconSvg("cloud", { size: 16 }), "Forecast"], false, () => openSheet(view, "weather"), { class: "chip kind-chip" }),
+    chip([iconSvg("cloud", { size: 16 }), "Details"], false, () => openSheet(view, "weather"), { class: "chip kind-chip" }),
   ];
 }
 
