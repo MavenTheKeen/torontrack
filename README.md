@@ -15,69 +15,74 @@ weather, built entirely on open data and tracked continuously since October 2026
 [![Bike Share trips](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.bikeshare_trips&label=Bike%20Share%20trips&color=e8441f)](docs/bikeshare.md)
 [![Food inspections](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.food_inspections&label=food%20inspections&color=e8441f)](docs/food.md)
 
-![Trains and buses moving on the map, the Bloor-Yonge station panel, then the reliability page](docs/screenshots/demo.gif)
+![The transit, food, city and weather maps in turn, then the Findings page](docs/screenshots/demo.gif)
 
 ## Features
 
+| Transit | Food |
+| --- | --- |
+| ![Live transit map](docs/screenshots/site-map.png) | ![Food map](docs/screenshots/map-food.png) |
+| **City** | **Weather** |
+| ![City map with rinks, pools, beaches and today's events](docs/screenshots/map-city.png) | ![Weather map with wind and forecast](docs/screenshots/map-weather.png) |
+
 ### Transit
-- **Live map** of TTC subway trains, buses and streetcars, GO Transit trains, and Brampton
+- A live map of TTC subway trains, buses and streetcars, GO Transit trains, and Brampton
   Transit, MiWay, YRT and Viva buses, and Bike Share stations, with smooth estimated
   motion between feed updates.
-- **Stations and stops** with arrival predictions, elevator and escalator status,
+- Station and stop panels with arrival predictions, elevator and escalator status,
   entrances, and service alerts, including Lines 5 Eglinton and 6 Finch West.
-- **Trip planner** across Toronto, Brampton, Mississauga and York Region, using live trip
+- A trip planner for Toronto, Brampton, Mississauga and York Region, using live trip
   updates and a recommended departure time to arrive on time about nine times in ten.
-- **Reliability** of every subway line and surface route: measured gaps between vehicles,
+- Reliability of every subway line and surface route: measured gaps between vehicles,
   delay incidents ranked by minutes lost, 90th percentile waits, scheduled trips that
   never ran, and a monthly report card.
-- **Status page** with current service problems and saved stations, stops and lines.
+- A Status page with current service problems and saved stations, stops and lines.
 
 ### Food
-- **Food map** of about 14,000 restaurants, cafés, bars and bakeries, filterable by kind,
+- A food map of about 14,000 restaurants, cafés, bars and bakeries, filterable by kind,
   each with its latest Toronto Public Health (DineSafe) inspection results.
-- **Licensed since**: the year each place was first licensed at its address.
-- **Notable places** from Wikidata, marked on the map.
+- The year each place was first licensed at its address.
+- Notable places from Wikidata marked on the map.
 
 ### City
-- **City map** of drop-in skating and swimming today at city rinks, pools and community
+- A City map of drop-in skating and swimming today at city rinks, pools and community
   centres, beach water quality, CaféTO patios, and today's events, with major venues
   highlighted.
-- **Events page** of concerts, games, shows and city festivals, with the nearest station.
-- **My street**: next garbage, Green Bin and recycling collection, road work nearby, and
+- An Events page of concerts, games, shows and city festivals, with the nearest station.
+- Address cards with the next garbage, Green Bin and recycling collection, road work nearby, and
   recent 311 requests in the ward, saved in the browser only.
 
 ### Weather
-- **Weather map** with animated wind, a twelve-hour precipitation forecast, the last hour
+- A weather map with animated wind, a twelve-hour precipitation forecast, the last hour
   of radar, and the Air Quality Health Index at each Toronto station.
-- **Forecast card** with conditions, warnings, and what the data says the coming weather
+- A forecast card with conditions, warnings, and what the data says the coming weather
   tends to do to Bike Share, subway delays, beaches and potholes.
 
 ### Findings
-- **Findings page**: analyses across all collected data, recomputed from the database,
-  such as how rain affects Bike Share, how snow affects subway delays, the main causes of
+- A Findings page with analyses across the collected data, recomputed from the database: how rain affects Bike Share, how snow affects subway delays, the main causes of
   delays, when potholes are reported, beach safety after rain, and inspection results by
   how long a place has been open.
 
 ### Platform
-- Installable progressive web app that opens saved pages offline.
-- Light and dark themes, built for phones, and no third-party requests from the
-  browser: every map tile, font and image is served by the site itself.
-- Open data downloads and a pipeline page showing feed health and validation results.
+- An installable web app that opens saved pages offline.
+- Light and dark themes, a layout built for phones, and no third-party requests from the
+  browser; map tiles, fonts and images are all served by the site itself.
+- Data downloads and a pipeline page showing feed health and validation results.
 
 See the [full feature list](docs/features.md) for details.
 
 ## Engineering highlights
 
-- **Raw first, replayable.** Every feed response is stored before it is parsed.
+- **Raw data stored before parsing.** Every feed response is stored before it is parsed.
   Validation and normalization are a separate step that can be re-run from the stored
   bytes, so a parser fix applies to history without refetching anything.
-- **Validation you can see.** Each TTC snapshot goes through more than a dozen checks that
+- **Visible validation.** Each TTC snapshot goes through more than a dozen checks that
   reject or flag records, and every rejected or flagged record is stored with its reason. The pipeline page shows, per
   feed, how many distinct records were rejected or flagged in the last hour and why.
-- **Health checks that look at the data.** A job that ran five minutes ago can still be
+- **Data-aware health checks.** A job that ran five minutes ago can still be
   loading day-old data or missing a third of its runs. Each check combines time since the
   last success, the share of expected runs completed, and the age of the newest record.
-- **Tested against real responses.** More than 400 tests run on recorded TTC, Bike Share and
+- **Tests on recorded responses.** More than 400 tests run on recorded TTC, Bike Share and
   city responses, including PostgreSQL integration tests and a full dbt build, in GitHub
   Actions on every push.
 
