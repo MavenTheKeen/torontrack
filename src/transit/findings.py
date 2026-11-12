@@ -28,6 +28,20 @@ BAND_C = 5
 MIN_DAYS = 3  # Fewest days behind any compared average.
 
 
+ACRONYMS = {"PAA", "OPTO", "TTC", "ATC", "CBTC", "SRT", "CCTV", "TR", "PA", "EMS", "TPS"}
+
+
+def _cause(text: str) -> str:
+    """'PAA - NO TROUBLE FOUND' -> 'PAA - no trouble found': sentence case, keeping the
+    TTC's acronyms."""
+    words = []
+    for i, word in enumerate(text.split(" ")):
+        letters = "".join(c for c in word if c.isalpha())
+        word = word if letters in ACRONYMS else word.lower()
+        words.append(word[:1].upper() + word[1:] if i == 0 else word)
+    return " ".join(words)
+
+
 def _pct(value: float) -> int:
     return round(100 * value)
 
@@ -175,7 +189,7 @@ def delay_causes(conn) -> dict | None:
     return {
         "id": "delay-causes",
         "topic": "Subway",
-        "title": f"{lead['cause'].capitalize()} costs the subway more time than any other cause",
+        "title": f"{_cause(lead['cause'])} costs the subway more time than any other cause",
         "summary": (
             f"Of {total:,} minutes of subway delay logged, {_pct(lead['minutes'] / total)}% "
             f"were put down to {lead['cause'].lower()} ({lead['delays']:,} delays). The eight "
@@ -183,7 +197,7 @@ def delay_causes(conn) -> dict | None:
         ),
         "chart": {
             "kind": "hbars",
-            "x": [r["cause"].capitalize() for r in top],
+            "x": [_cause(r["cause"]) for r in top],
             "y_label": "Delay minutes",
             "series": [{"name": "Delay minutes", "values": [r["minutes"] for r in top]}],
         },

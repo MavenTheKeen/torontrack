@@ -794,8 +794,8 @@ details.month[open] > summary { color: var(--text); }
 .finding-chart { margin: 14px 0 6px; }
 .chart { width: 100%; height: auto; display: block; overflow: visible; }
 .chart .grid { stroke: var(--border); stroke-width: 1; }
-.chart .tick { fill: var(--muted); font-size: 12px; }
-.chart .axis-label { fill: var(--muted); font-size: 12px; font-weight: 600; }
+.chart .tick { fill: var(--muted); font-size: 19px; }
+.chart .axis-label { fill: var(--muted); font-size: 19px; font-weight: 600; }
 .chart .line { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 .chart .series-0 .line, .chart .bar.series-0 { stroke: var(--accent); }
 .chart .series-1 .line { stroke: #2563eb; }

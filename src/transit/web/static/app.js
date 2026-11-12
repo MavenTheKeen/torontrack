@@ -4317,14 +4317,14 @@ function findingChart(c) {
           el("span", { class: "hbar-value" }, numberFmt.format(v)));
       })));
   }
-  const W = 600, H = 240, L = 52, R = 10, T = 12, B = 44;
+  const W = 600, H = 280, L = 70, R = 10, T = 14, B = 58;
   const x = (i) => L + ((W - L - R) * (i + 0.5)) / c.x.length;
   const y = (v) => T + (H - T - B) * (1 - v / max);
   const grid = [0, 0.25, 0.5, 0.75, 1].map((f) => svgNode("g", {},
     svgNode("line", { x1: L, x2: W - R, y1: y(max * f), y2: y(max * f), class: "grid" }),
     svgNode("text", { x: L - 6, y: y(max * f) + 4, "text-anchor": "end", class: "tick" }, numberFmt.format(Math.round(max * f)))));
-  const every = Math.ceil(c.x.length / 8);
-  const labels = c.x.map((label, i) => (i % every ? null : svgNode("text", { x: x(i), y: H - B + 16, "text-anchor": "middle", class: "tick" }, label)));
+  const every = Math.ceil(c.x.length / 6);
+  const labels = c.x.map((label, i) => (i % every ? null : svgNode("text", { x: x(i), y: H - B + 24, "text-anchor": "middle", class: "tick" }, label)));
   let marks;
   if (c.kind === "bars") {
     const width = ((W - L - R) / c.x.length) * 0.6;
