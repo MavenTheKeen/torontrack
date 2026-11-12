@@ -2539,10 +2539,20 @@ const AQHI_COLOURS = { Low: "#16a34a", Moderate: "#ca8a04", High: "#dc2626", "Ve
 const radarTimeFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", hour: "numeric", minute: "2-digit" });
 const radarUrl = (kind, at) => `/api/radar/${kind}/${Math.round(Date.parse(at) / 1000)}.png`;
 const RADAR_CORNERS = [[-80.1, 44.15], [-78.7, 44.15], [-78.7, 43.25], [-80.1, 43.25]];
+// The forecast: ECCC's HRDPS model, hour by hour for the next twelve hours. Precipitation is
+// drawn as the model's grid cells; wind as particles that drift with it.
+const FORECAST_STEP_MS = 1100;
+const PRECIP_STEPS = [0.1, "#93c5fd", 0.5, "#3b82f6", 2, "#1d4ed8", 5, "#7c3aed", 10, "#be185d"];
+const forecastMode = () => mapState.weatherMode !== "radar";
 
 function addWeatherLayers(view) {
   const map = view.map;
   // Radar layers are added with their first frame (showRadarFrame): an image source needs one.
+  map.addSource("precip-grid", { type: "geojson", data: featureCollection([]) });
+  map.addLayer({ id: "precip-grid", type: "fill", source: "precip-grid", paint: {
+    "fill-color": ["step", ["get", "mm"], ...PRECIP_STEPS.slice(1)],
+    "fill-opacity": 0.5, "fill-antialias": false,
+  } }, "trains-halo");
   map.addSource("aqhi", { type: "geojson", data: featureCollection([]) });
   map.addLayer({ id: "aqhi-dot", type: "circle", source: "aqhi", paint: {
     "circle-radius": 15, "circle-color": ["get", "colour"], "circle-stroke-color": mapCasing(), "circle-stroke-width": 2,
@@ -2557,6 +2567,7 @@ function addWeatherLayers(view) {
 async function loadWeather(view, { open = false } = {}) {
   if (mapState.kind !== "weather" || !view.map) {
     stopRadar(view);
+    stopWind(view);
     return;
   }
   try {
@@ -2574,7 +2585,13 @@ async function loadWeather(view, { open = false } = {}) {
   view.radarFrames = frames.rain.length >= frames.snow.length ? frames.rain : frames.snow;
   for (const kind of ["rain", "snow"]) for (const at of frames[kind]) new Image().src = radarUrl(kind, at); // Preload the loop.
   view.radarIndex = Math.max(0, view.radarFrames.length - 1);
+  const grid = view.weather && view.weather.grid;
+  view.gridHours = grid ? grid.hours.filter((h) => Date.parse(h.at) > Date.now() - 3600e3) : [];
+  view.gridIndex = 0;
+  view.precipCells = new Map();
   showRadarFrame(view);
+  showForecastHour(view);
+  startWind(view);
   if (!reduceMotion() && mapState.weatherPlaying !== false) startRadar(view);
   if (open && view.weather) openSheet(view, "weather");
   if (view.renderChips) view.renderChips();
@@ -2599,11 +2616,197 @@ function showRadarFrame(view) {
     if (view.map.getLayer(id)) view.map.setPaintProperty(id, "raster-opacity", pick ? 0.78 : 0);
   }
   const label = view.page.querySelector(".radar-time");
-  if (label) label.textContent = at ? `Radar ${radarTimeFmt.format(new Date(at))}` : "No radar";
+  if (label && !forecastMode()) label.textContent = at ? `Radar ${radarTimeFmt.format(new Date(at))}` : "No radar";
+}
+
+// The forecast hour on the map: its precipitation cells, and the wind the particles follow.
+function forecastHour(view) {
+  const hours = view.gridHours || [];
+  return forecastMode() ? hours[view.gridIndex] : hours[0];
+}
+
+function showForecastHour(view) {
+  const hour = forecastHour(view);
+  const grid = view.weather && view.weather.grid;
+  if (!grid || !hour) {
+    view.map.getSource("precip-grid")?.setData(featureCollection([]));
+    return;
+  }
+  if (!view.precipCells.has(hour.at)) {
+    const cells = [];
+    hour.precip.forEach((mm, i) => {
+      if (mm < 0.1) return;
+      const x = grid.west + (i % grid.width) * grid.dx;
+      const y = grid.north - Math.floor(i / grid.width) * grid.dy;
+      cells.push({ type: "Feature", properties: { mm }, geometry: { type: "Polygon",
+        coordinates: [[[x, y], [x + grid.dx, y], [x + grid.dx, y - grid.dy], [x, y - grid.dy], [x, y]]] } });
+    });
+    view.precipCells.set(hour.at, featureCollection(cells));
+  }
+  const cells = view.precipCells.get(hour.at);
+  view.map.getSource("precip-grid")?.setData(cells);
+  const label = view.page.querySelector(".radar-time");
+  if (label && forecastMode()) {
+    const dry = view.gridHours.every((h) => !h.precip.some((mm) => mm >= 0.1));
+    label.textContent = `Forecast ${radarTimeFmt.format(new Date(hour.at))}${dry ? " · dry" : ""}`;
+  }
+}
+
+// Wind particles on a canvas over the map. Each particle drifts with the forecast wind at its
+// position (bilinear in the model grid) at a screen speed proportional to the wind speed, and
+// leaves a fading trail; faster wind is drawn in the brand colour. With reduced motion the
+// streaks are drawn once, without moving.
+const WIND_FRAME_MS = 33;
+
+function windAt(grid, hour, lon, lat) {
+  const gx = (lon - grid.west) / grid.dx - 0.5;
+  const gy = (grid.north - lat) / grid.dy - 0.5;
+  if (gx < 0 || gy < 0 || gx > grid.width - 1 || gy > grid.height - 1) return null;
+  const x0 = Math.floor(gx), y0 = Math.floor(gy);
+  const x1 = Math.min(x0 + 1, grid.width - 1), y1 = Math.min(y0 + 1, grid.height - 1);
+  const fx = gx - x0, fy = gy - y0;
+  const mix = (a) => {
+    const i = (x, y) => a[y * grid.width + x];
+    return (i(x0, y0) * (1 - fx) + i(x1, y0) * fx) * (1 - fy) + (i(x0, y1) * (1 - fx) + i(x1, y1) * fx) * fy;
+  };
+  return [mix(hour.u), mix(hour.v)];
+}
+
+function startWind(view) {
+  const grid = view.weather && view.weather.grid;
+  if (!grid || !view.map || mapState.weatherWind === false) return stopWind(view);
+  const container = view.map.getContainer();
+  let canvas = container.querySelector(".wind-canvas");
+  if (!canvas) {
+    canvas = el("canvas", { class: "wind-canvas", "aria-hidden": "true" });
+    container.appendChild(canvas);
+  }
+  canvas.hidden = false;
+  if (view.wind) return; // Already running.
+  const ctx = canvas.getContext("2d");
+  const dark = prefersDark();
+  const colours = dark ? ["rgba(226,232,240,0.55)", "rgba(226,232,240,0.85)", "rgba(255,120,80,0.95)"]
+    : ["rgba(51,65,85,0.45)", "rgba(30,41,59,0.75)", "rgba(204,61,14,0.9)"];
+  const state = { particles: [], last: 0, frame: 0 };
+  view.wind = state;
+  const resize = () => {
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = container.clientWidth * ratio;
+    canvas.height = container.clientHeight * ratio;
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const count = Math.min(1600, Math.round(container.clientWidth * container.clientHeight / 900));
+    state.particles = Array.from({ length: count }, () => spawn({}));
+  };
+  const spawn = (p) => {
+    const b = view.map.getBounds();
+    p.lon = Math.max(b.getWest(), grid.west) + Math.random() * (Math.min(b.getEast(), grid.west + grid.width * grid.dx) - Math.max(b.getWest(), grid.west));
+    p.lat = Math.max(b.getSouth(), grid.north - grid.height * grid.dy) + Math.random() * (Math.min(b.getNorth(), grid.north) - Math.max(b.getSouth(), grid.north - grid.height * grid.dy));
+    p.age = Math.floor(Math.random() * 80);
+    return p;
+  };
+  // One step of every particle; returns segments by colour.
+  const step = () => {
+    const hour = forecastHour(view);
+    const segments = [[], [], []];
+    if (!hour) return segments;
+    const zoom = view.map.getZoom();
+    for (const p of state.particles) {
+      const wind = windAt(grid, hour, p.lon, p.lat);
+      if (!wind || ++p.age > 90) {
+        spawn(p);
+        p.age = 0;
+        continue;
+      }
+      const [u, v] = wind;
+      const speed = Math.hypot(u, v);
+      const metresPerPixel = 40075016 * Math.cos(p.lat * Math.PI / 180) / (512 * 2 ** zoom);
+      const scale = 0.22 * metresPerPixel / 111320;
+      const from = view.map.project([p.lon, p.lat]);
+      p.lon += u * scale / Math.cos(p.lat * Math.PI / 180);
+      p.lat += v * scale;
+      const to = view.map.project([p.lon, p.lat]);
+      segments[speed * 3.6 < 12 ? 0 : speed * 3.6 < 28 ? 1 : 2].push(from.x, from.y, to.x, to.y);
+    }
+    return segments;
+  };
+  const draw = (segments) => {
+    ctx.lineWidth = 1.4;
+    ctx.lineCap = "round";
+    segments.forEach((list, i) => {
+      if (!list.length) return;
+      ctx.strokeStyle = colours[i];
+      ctx.beginPath();
+      for (let k = 0; k < list.length; k += 4) {
+        ctx.moveTo(list[k], list[k + 1]);
+        ctx.lineTo(list[k + 2], list[k + 3]);
+      }
+      ctx.stroke();
+    });
+  };
+  const still = () => { // Reduced motion: short streaks, drawn once.
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const p of state.particles) p.age = 0;
+    for (let i = 0; i < 12; i += 1) draw(step());
+  };
+  const tick = (time) => {
+    if (view.wind !== state) return;
+    if (mapState.kind !== "weather") return stopWind(view);
+    state.raf = requestAnimationFrame(tick);
+    if (document.hidden || time - state.last < WIND_FRAME_MS) return;
+    state.last = time;
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.fillStyle = "rgba(0,0,0,0.9)"; // Fade the trails.
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+    draw(step());
+  };
+  state.onMove = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
+  state.onMoveEnd = () => {
+    for (const p of state.particles) spawn(p);
+    if (reduceMotion()) still();
+  };
+  state.onResize = () => {
+    resize();
+    if (reduceMotion()) still();
+  };
+  view.map.on("move", state.onMove);
+  view.map.on("moveend", state.onMoveEnd);
+  view.map.on("resize", state.onResize);
+  resize();
+  if (reduceMotion()) still();
+  else state.raf = requestAnimationFrame(tick);
+}
+
+function stopWind(view) {
+  const state = view.wind;
+  if (state) {
+    cancelAnimationFrame(state.raf);
+    view.map.off("move", state.onMove);
+    view.map.off("moveend", state.onMoveEnd);
+    view.map.off("resize", state.onResize);
+    view.wind = null;
+  }
+  const canvas = view.map && view.map.getContainer().querySelector(".wind-canvas");
+  if (canvas) {
+    canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+    canvas.hidden = true;
+  }
 }
 
 function startRadar(view) {
   stopRadar(view);
+  if (forecastMode()) {
+    const count = (view.gridHours || []).length;
+    if (count < 2) return;
+    view.radarTimer = setInterval(() => {
+      if (mapState.kind !== "weather") return stopRadar(view);
+      view.gridIndex = (view.gridIndex + 1) % count;
+      showForecastHour(view);
+      if (reduceMotion() && view.wind) view.wind.onMoveEnd();
+    }, FORECAST_STEP_MS);
+    return;
+  }
   if (!view.radarFrames || view.radarFrames.length < 2) return;
   view.radarTimer = setInterval(() => {
     if (mapState.kind !== "weather") return stopRadar(view);
@@ -2630,8 +2833,25 @@ function weatherChips(rerender, view) {
         startRadar(view);
       }
       rerender();
-    }, { class: "chip kind-chip", title: "Play or pause the radar loop" }),
-    el("span", { class: "chip kind-chip radar-time", "aria-live": "off" }, "Radar"),
+    }, { class: "chip kind-chip", title: "Play or pause the loop" }),
+    el("span", { class: "chip kind-chip radar-time", "aria-live": "off" }, forecastMode() ? "Forecast" : "Radar"),
+    ...[["radar", "Past hour", "Rain and snow on the radar over the last hour"], ["forecast", "Next 12 hours", "Forecast precipitation and wind, hour by hour"]].map(([mode, label, title]) =>
+      chip(label, (mode === "radar") !== forecastMode(), () => {
+        mapState.weatherMode = mode;
+        view.gridIndex = 0;
+        applyLayerToggles(view.map);
+        showRadarFrame(view);
+        showForecastHour(view);
+        if (view.radarTimer || (!reduceMotion() && mapState.weatherPlaying !== false)) startRadar(view);
+        if (view.wind && reduceMotion()) view.wind.onMoveEnd();
+        rerender();
+      }, { class: "chip kind-chip", title })),
+    chip("Wind", mapState.weatherWind !== false, () => {
+      mapState.weatherWind = mapState.weatherWind === false;
+      if (mapState.weatherWind) startWind(view);
+      else stopWind(view);
+      rerender();
+    }, { class: "chip kind-chip", title: "Show the wind as moving particles" }),
     chip([iconSvg("cloud", { size: 16 }), "Forecast"], false, () => openSheet(view, "weather"), { class: "chip kind-chip" }),
   ];
 }
@@ -2641,7 +2861,9 @@ function weatherPanel() {
     el("div", { class: "panel-head" },
       el("p", { class: "panel-heading" }, "Weather map"),
       el("button", { type: "button", class: "panel-close", "aria-label": "Close weather map legend" }, iconSvg("close", { size: 18 }))),
-    el("p", { class: "muted small" }, "Rain and snow from Environment Canada's radar over the last hour, every six minutes: blue to red for rain, light to dark blue for snow, stronger colours for heavier precipitation. Circles are the Air Quality Health Index at each Toronto station."),
+    el("p", { class: "muted small" }, "Next 12 hours: precipitation and wind from Environment Canada's high-resolution forecast model, hour by hour. Past hour: rain and snow from the radar, every six minutes, with stronger colours for heavier precipitation. Moving lines follow the forecast wind; the faster the wind, the faster and darker they move, and above about 28 km/h they turn orange. Circles are the Air Quality Health Index at each Toronto station."),
+    el("ul", { class: "legend-list compact" }, [[0.1, "Light, under 0.5 mm an hour"], [0.5, "Moderate, 0.5 to 2 mm"], [2, "Heavy, 2 to 5 mm"], [5, "Very heavy, 5 mm or more"]].map(([mm, text]) =>
+      legendRow(el("span", { class: "legend-dot", style: { background: PRECIP_STEPS[PRECIP_STEPS.indexOf(mm) + 1], borderRadius: "3px" } }), `Forecast precipitation: ${text.charAt(0).toLowerCase()}${text.slice(1)}`))),
     el("ul", { class: "legend-list compact" }, Object.entries(AQHI_COLOURS).map(([risk, colour]) => legendRow(el("span", { class: "legend-dot", style: { background: colour } }), `Air quality: ${risk.toLowerCase()} risk`))),
     el("p", { class: "muted small" }, "Environment and Climate Change Canada (MSC GeoMet), Open Government Licence – Canada. Images are served from this site."),
   ];
@@ -2679,7 +2901,7 @@ function weatherSheet(view) {
     el("div", { class: "weather-now" },
       el("span", { class: "weather-temp" }, round(p.temperature)),
       el("span", {}, el("strong", {}, p.condition || ""), el("br"), el("span", { class: "muted small" },
-        [p.feels_like != null ? `Feels like ${round(p.feels_like)}` : null, p.wind_kmh != null ? `wind ${p.wind_kmh} km/h` : null, p.humidity != null ? `humidity ${p.humidity}%` : null].filter(Boolean).join(" · ")))),
+        [p.feels_like != null ? `Feels like ${round(p.feels_like)}` : null, p.wind_kmh != null ? `wind ${p.wind_dir ? `${p.wind_dir} ` : ""}${p.wind_kmh} km/h${p.gust_kmh ? `, gusts ${p.gust_kmh}` : ""}` : null, p.humidity != null ? `humidity ${p.humidity}%` : null].filter(Boolean).join(" · ")))),
     p.warnings.length ? p.warnings.map((x) => el("p", { class: "notice" }, el("strong", {}, x.description || x.type || "Weather warning"), x.url ? [" ", el("a", { href: x.url, target: "_blank", rel: "noopener" }, "Details")] : null)) : null,
     el("ol", { class: "hour-strip", "aria-label": "Next hours" }, p.hourly.slice(0, 12).map((h) => el("li", {},
       el("span", { class: "muted small" }, hourShortFmt.format(new Date(h.at))),
@@ -3456,7 +3678,9 @@ function applyLayerToggles(map) {
   const show = (ids, on) => ids.forEach((id) => map.getLayer(id) && map.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
   const layers = mapState.kind !== "transit" ? FOOD_MAP_LAYERS : mapState.layers;
   show(["rec", "rec-label"], mapState.kind === "city");
-  show(["radar-rain", "radar-snow", "aqhi-dot", "aqhi-value"], mapState.kind === "weather");
+  show(["radar-rain", "radar-snow"], mapState.kind === "weather" && !forecastMode());
+  show(["precip-grid"], mapState.kind === "weather" && forecastMode());
+  show(["aqhi-dot", "aqhi-value"], mapState.kind === "weather");
   show(["beaches"], mapState.kind === "city" && mapState.city.beach);
   show(["patios"], mapState.kind === "city" && mapState.city.patio);
   show(["agenda"], mapState.kind === "city" && mapState.city.events);

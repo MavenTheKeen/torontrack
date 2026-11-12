@@ -65,3 +65,22 @@ station, and opens a card with the conditions, the next twelve hours, warnings, 
 daily forecast and what the findings say the coming weather tends to do: fewer Bike Share
 trips on wet days, longer subway delays on snowy days, beaches failing after heavy rain in
 summer and pothole reports after freeze-thaw ([findings](findings.md)).
+
+### Wind and precipitation forecast
+
+The same job reads the High Resolution Deterministic Prediction System (HRDPS) for the
+radar's area through GeoMet's WCS: wind speed (`HRDPS.CONTINENTAL_WSPD`) and direction
+(`HRDPS.CONTINENTAL_WD`) at 10 m and accumulated precipitation (`HRDPS.CONTINENTAL_PR`),
+each as a small uncompressed float32 GeoTIFF of about 32 by 27 cells, for this hour and
+the next twelve. Wind is stored as eastward and northward components in m/s and
+precipitation as the hourly amount, the difference between consecutive accumulations.
+The grid is kept in `normalized.weather_grid` and returned with `GET /api/weather`. The
+model's newest run is checked every thirty minutes and read only when it is new, about
+forty small requests every six hours.
+
+The map's "Next 12 hours" mode, the default, plays the forecast hour by hour: cells with
+at least 0.1 mm of precipitation, coloured by amount, and wind particles drawn on a canvas
+over the map, each moving with the wind at its position (bilinear in the grid) and
+leaving a fading trail, darker and faster for stronger wind and orange above about
+28 km/h. "Past hour" switches back to the radar loop, and a Wind chip turns the particles
+off. With reduced motion the wind is drawn as still streaks.
