@@ -19,6 +19,14 @@ HOST = "api.weather.gc.ca"
 BBOX = "-79.65,43.58,-79.10,43.86"
 LOOKBACK = timedelta(days=2)
 MAIN = "FCWYG"  # Toronto Downtown, shown first.
+# Station positions as ECCC publishes them, for the weather map.
+STATIONS = {
+    "FCWYG": (-79.39694, 43.67583),
+    "FDQBU": (-79.23083, 43.75583),
+    "FDQBX": (-79.41026, 43.76205),
+    "FCKTB": (-79.56589, 43.71823),
+    "FEUZB": (-79.37333, 43.74167),
+}
 # ECCC's health risk categories by AQHI value.
 RISKS = ((3, "Low"), (6, "Moderate"), (10, "High"), (float("inf"), "Very high"))
 
@@ -134,7 +142,8 @@ def current(conn, now: datetime) -> dict | None:
     return {
         "stations": [
             {"id": s["location_id"], "name": s["location_name"], "observed_at": s["observed_at"],
-             "aqhi": float(s["aqhi"]), "risk": risk(float(s["aqhi"]))}
+             "aqhi": float(s["aqhi"]), "risk": risk(float(s["aqhi"])),
+             "point": STATIONS.get(s["location_id"])}
             for s in stations
         ],
         "forecast": [

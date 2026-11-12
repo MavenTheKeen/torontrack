@@ -90,6 +90,7 @@ def bikeshare_rain(conn) -> dict | None:
     last = max(r["last"] for r in rows)
     return {
         "id": "bikeshare-weather",
+        "numbers": {"wet_fewer_pct": fewer},
         "topic": "Bike Share",
         "title": f"A wet day costs Bike Share about {fewer}% of its trips",
         "summary": (
@@ -140,6 +141,7 @@ def snow_delays(conn) -> dict | None:
     more = _pct(float(snowy["minutes"] / other["minutes"]) - 1)
     return {
         "id": "snow-delays",
+        "numbers": {"snow_more_minutes_pct": more},
         "topic": "Subway",
         "title": f"Snow makes subway delays longer, not more frequent: {more}% more delay time",
         "summary": (
@@ -249,6 +251,7 @@ def potholes(conn) -> dict | None:
     names = [date(2000, m, 1).strftime("%b") for m in months]
     return {
         "id": "potholes",
+        "numbers": {"peak_month": peak, "correlation": round(r, 2)},
         "topic": "Streets",
         "title": f"Pothole reports peak in {date(2000, peak, 1):%B}, after the freeze-thaw",
         "summary": (
@@ -298,6 +301,7 @@ def beach_rain(conn) -> dict | None:
     shares = [groups[label][1] / groups[label][0] for label in labels]
     return {
         "id": "beach-rain",
+        "numbers": {"dry_unsafe_pct": _pct(shares[0]), "wet_unsafe_pct": _pct(shares[-1])},
         "topic": "Beaches",
         "title": (
             f"After 10 mm of rain, {_pct(shares[-1])}% of beach days fail the E. coli "

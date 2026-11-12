@@ -28,6 +28,7 @@ from transit import (
     ticketmaster,
     waste,
     weather,
+    weather_now,
 )
 from transit.bikeshare import trips as bikeshare_trips
 from transit.bikeshare.ingestion import CollectionBusy, run
@@ -99,6 +100,9 @@ def main():
         "recreation-refresh", help="Load City of Toronto drop-in skating and swimming"
     )
     commands.add_parser("air-quality-refresh", help="Load the AQHI for Toronto from ECCC")
+    commands.add_parser(
+        "weather-now-refresh", help="Load ECCC's Toronto city page weather and radar images"
+    )
     commands.add_parser("beaches-refresh", help="Load Toronto beach water quality samples")
     commands.add_parser("patios-refresh", help="Load CaféTO patio locations")
     commands.add_parser(
@@ -272,6 +276,14 @@ def main():
                     client.close()
                 if result["status"] == "failed":
                     raise FetchError(f"Beaches refresh failed: {result['error']}")
+            elif args.command == "weather-now-refresh":
+                client = FeedClient()
+                try:
+                    result = weather_now.refresh(settings.database_url, client)
+                finally:
+                    client.close()
+                if result["status"] == "failed":
+                    raise FetchError(f"Weather now refresh failed: {result['error']}")
             elif args.command == "air-quality-refresh":
                 client = FeedClient()
                 try:

@@ -45,6 +45,7 @@ Other DAGs, each also paused until unpaused, include:
 | --- | --- | --- |
 | `ttc_static_gtfs` | 09:00 | `ttc-gtfs-refresh`: loads TTC's static schedule as a new version only if the zip changed |
 | `ttc_official_delays` | 10:00 | `ttc-delays-refresh`: loads TTC's official delay log when a new month is published |
+| `weather_now` | every 6 min | `weather-now-refresh`: ECCC's Toronto city page and new radar frames for the weather map ([weather map](weather.md#weather-map)) |
 | `weather_hourly` | hourly at :20 | `weather-refresh`: loads Environment Canada's hourly weather, re-reading two days so revisions and missed runs are caught up, then `air-quality-refresh`: the AQHI for Toronto stations ([weather](weather.md)) |
 | `open_data_export` | 09:30 | `export`: writes completed days as [open-data files](datasets.md), catching up any missed days |
 | `food_inspections` | 10:10 | `food-inspections-refresh` then `food-licences-refresh`: loads City of Toronto food inspections (DineSafe) and food business licences, each when its export changed ([food inspections](food.md)) |

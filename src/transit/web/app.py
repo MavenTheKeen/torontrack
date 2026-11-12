@@ -41,6 +41,7 @@ from transit import (
     recreation,
     roads,
     waste,
+    weather_now,
 )
 from transit.agencies import AGENCIES
 from transit.config import Settings
@@ -787,6 +788,32 @@ def create_app(
                 }
             )
         )
+
+    @app.get("/api/weather")
+    def weather_map():
+        """The weather map: ECCC's city page for Toronto and the radar frames available."""
+
+        def build(conn, now):
+            return {"weather": weather_now.current(conn)}
+
+        return cached(
+            "weather-now",
+            build,
+            "Weather and radar: Environment and Climate Change Canada, Open Government "
+            "Licence – Canada.",
+        )
+
+    @app.get("/api/radar/{kind}/{epoch}.png")
+    def radar_frame(kind: str, epoch: int):
+        """One stored radar image; a frame never changes, so it may be cached for good."""
+        if kind not in weather_now.LAYERS or not 1_500_000_000 < epoch < 4_000_000_000:
+            raise HTTPException(status_code=404, detail="No such radar frame")
+        at = datetime.fromtimestamp(epoch, UTC)
+        png = with_conn(lambda conn: weather_now.frame(conn, kind, at))
+        if png is None:
+            raise HTTPException(status_code=404, detail="No such radar frame")
+        return Response(png, media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400, immutable"})  # fmt: skip
 
     @app.get("/api/air")
     def air():

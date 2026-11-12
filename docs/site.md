@@ -39,6 +39,8 @@ about 2 h 30 min after collection started.
 | `/api/food/search?q=` | Food premises whose name contains every word of `q`, with the latest result; `near=lat,lon` puts the nearest first. |
 | `/api/food/{premises ID}` | One premises with its latest 10 inspections, newest first, and the infractions of each. |
 | `/api/findings` | The Findings page: sources compared, each with headline, chart data, method and period ([findings](findings.md)). |
+| `/api/weather` | The weather map: ECCC's city page summary and the radar frames available ([weather map](weather.md#weather-map)). |
+| `/api/radar/{rain or snow}/{epoch}.png` | One stored radar frame. |
 | `/api/air` | The Air Quality Health Index at Toronto stations and Downtown's forecast ([weather](weather.md#air-quality)). |
 | `/api/beaches` | Each beach's latest water quality results ([beaches](recreation.md#beaches)). |
 | `/api/patios` | CaféTO patios ([CaféTO patios](recreation.md#cafeto-patios)). |

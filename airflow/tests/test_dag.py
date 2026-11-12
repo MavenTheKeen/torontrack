@@ -39,6 +39,7 @@ def dag_bag():
         "waste_collection",
         "service_requests",
         "recreation",
+        "weather_now",
     }
     return bag
 

@@ -1206,7 +1206,7 @@ const MAP_KIND_KEY = "torontrack-map-kind";
 function savedMapKind() {
   try {
     const kind = localStorage.getItem(MAP_KIND_KEY);
-    return kind === "food" || kind === "city" ? kind : "transit";
+    return ["food", "city", "weather"].includes(kind) ? kind : "transit";
   } catch {
     return "transit";
   }
@@ -2457,6 +2457,166 @@ function cityPanel(rerender, view) {
   ];
 }
 
+// The weather map: ECCC's rain and snow radar for the last hour, played as a loop, the
+// Air Quality Health Index at each Toronto station, and a card with the conditions,
+// forecast, warnings and what the findings say this weather tends to do.
+const RADAR_STEP_MS = 650;
+const AQHI_COLOURS = { Low: "#16a34a", Moderate: "#ca8a04", High: "#dc2626", "Very high": "#7f1d1d" };
+const radarTimeFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", hour: "numeric", minute: "2-digit" });
+const radarUrl = (kind, at) => `/api/radar/${kind}/${Math.round(Date.parse(at) / 1000)}.png`;
+const RADAR_CORNERS = [[-80.1, 44.15], [-78.7, 44.15], [-78.7, 43.25], [-80.1, 43.25]];
+
+function addWeatherLayers(view) {
+  const map = view.map;
+  // Radar layers are added with their first frame (showRadarFrame): an image source needs one.
+  map.addSource("aqhi", { type: "geojson", data: featureCollection([]) });
+  map.addLayer({ id: "aqhi-dot", type: "circle", source: "aqhi", paint: {
+    "circle-radius": 15, "circle-color": ["get", "colour"], "circle-stroke-color": mapCasing(), "circle-stroke-width": 2,
+  } }, "trains-halo");
+  map.addLayer({ id: "aqhi-value", type: "symbol", source: "aqhi", layout: {
+    "text-field": ["get", "value"], "text-font": ["Noto Sans Medium"], "text-size": 13, "text-allow-overlap": true,
+  }, paint: { "text-color": "#ffffff" } }, "trains-halo");
+  applyLayerToggles(map);
+  if (mapState.kind === "weather") loadWeather(view, { open: true });
+}
+
+async function loadWeather(view, { open = false } = {}) {
+  if (mapState.kind !== "weather" || !view.map) {
+    stopRadar(view);
+    return;
+  }
+  try {
+    const [w, air, found] = await Promise.all([api("/api/weather"), api("/api/air").catch(() => null), api("/api/findings").catch(() => null)]);
+    view.weather = w.weather;
+    view.air = air && air.air;
+    view.findings = found ? found.findings : [];
+  } catch {
+    return; /* Tried again the next time the weather map opens. */
+  }
+  const stations = (view.air && view.air.stations) || [];
+  view.map.getSource("aqhi")?.setData(featureCollection(stations.filter((s) => s.point).map((s) =>
+    point(s.point, { value: String(Math.round(s.aqhi)), colour: AQHI_COLOURS[s.risk] || "#6b7280", name: s.name }))));
+  const frames = (view.weather && view.weather.radar.frames) || { rain: [], snow: [] };
+  view.radarFrames = frames.rain.length >= frames.snow.length ? frames.rain : frames.snow;
+  for (const kind of ["rain", "snow"]) for (const at of frames[kind]) new Image().src = radarUrl(kind, at); // Preload the loop.
+  view.radarIndex = Math.max(0, view.radarFrames.length - 1);
+  showRadarFrame(view);
+  if (!reduceMotion() && mapState.weatherPlaying !== false) startRadar(view);
+  if (open && view.weather) openSheet(view, "weather");
+  if (view.renderChips) view.renderChips();
+}
+
+// Shows frame `view.radarIndex` of each kind: the frame at that time, or the nearest earlier.
+function showRadarFrame(view) {
+  const frames = (view.weather && view.weather.radar.frames) || { rain: [], snow: [] };
+  const at = view.radarFrames && view.radarFrames[view.radarIndex];
+  for (const kind of ["rain", "snow"]) {
+    const list = frames[kind].filter((t) => !at || Date.parse(t) <= Date.parse(at) + 1000);
+    const pick = list[list.length - 1];
+    const id = `radar-${kind}`;
+    const source = view.map.getSource(id);
+    if (pick && !source) {
+      view.map.addSource(id, { type: "image", url: radarUrl(kind, pick), coordinates: RADAR_CORNERS });
+      view.map.addLayer({ id, type: "raster", source: id, paint: { "raster-opacity": 0.78, "raster-fade-duration": 0 } }, "trains-halo");
+      applyLayerToggles(view.map);
+    } else if (pick) {
+      source.updateImage({ url: radarUrl(kind, pick) });
+    }
+    if (view.map.getLayer(id)) view.map.setPaintProperty(id, "raster-opacity", pick ? 0.78 : 0);
+  }
+  const label = view.page.querySelector(".radar-time");
+  if (label) label.textContent = at ? `Radar ${radarTimeFmt.format(new Date(at))}` : "No radar";
+}
+
+function startRadar(view) {
+  stopRadar(view);
+  if (!view.radarFrames || view.radarFrames.length < 2) return;
+  view.radarTimer = setInterval(() => {
+    if (mapState.kind !== "weather") return stopRadar(view);
+    // Hold the newest frame a little longer, so the loop reads as "up to now".
+    view.radarIndex = view.radarIndex >= view.radarFrames.length - 1 ? 0 : view.radarIndex + 1;
+    showRadarFrame(view);
+  }, RADAR_STEP_MS);
+}
+
+function stopRadar(view) {
+  if (view.radarTimer) clearInterval(view.radarTimer);
+  view.radarTimer = null;
+}
+
+function weatherChips(rerender, view) {
+  const playing = Boolean(view.radarTimer);
+  return [
+    chip([iconSvg(playing ? "close" : "right", { size: 16 }), playing ? "Pause" : "Play"], playing, () => {
+      if (view.radarTimer) {
+        stopRadar(view);
+        mapState.weatherPlaying = false;
+      } else {
+        mapState.weatherPlaying = true;
+        startRadar(view);
+      }
+      rerender();
+    }, { class: "chip kind-chip", title: "Play or pause the radar loop" }),
+    el("span", { class: "chip kind-chip radar-time", "aria-live": "off" }, "Radar"),
+    chip([iconSvg("cloud", { size: 16 }), "Forecast"], false, () => openSheet(view, "weather"), { class: "chip kind-chip" }),
+  ];
+}
+
+function weatherPanel() {
+  return [
+    el("div", { class: "panel-head" },
+      el("p", { class: "panel-heading" }, "Weather map"),
+      el("button", { type: "button", class: "panel-close", "aria-label": "Close weather map legend" }, iconSvg("close", { size: 18 }))),
+    el("p", { class: "muted small" }, "Rain and snow from Environment Canada's radar over the last hour, every six minutes: blue to red for rain, light to dark blue for snow, stronger colours for heavier precipitation. Circles are the Air Quality Health Index at each Toronto station."),
+    el("ul", { class: "legend-list compact" }, Object.entries(AQHI_COLOURS).map(([risk, colour]) => legendRow(el("span", { class: "legend-dot", style: { background: colour } }), `Air quality: ${risk.toLowerCase()} risk`))),
+    el("p", { class: "muted small" }, "Environment and Climate Change Canada (MSC GeoMet), Open Government Licence – Canada. Images are served from this site."),
+  ];
+}
+
+const hourShortFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", hour: "numeric" });
+
+// What the findings say this weather tends to do, for the coming day.
+function weatherEffects(page, findings) {
+  const by = Object.fromEntries((findings || []).map((f) => [f.id, f]));
+  const soon = page.hourly.slice(0, 18);
+  const daily = page.daily.slice(0, 2);
+  const wet = soon.some((h) => (h.precip_chance || 0) >= 60) || daily.some((d) => d.precip.length);
+  const snow = daily.some((d) => d.precip.some((p) => /snow|flurr/i.test(p))) || soon.some((h) => /snow|flurr/i.test(h.condition || ""));
+  const temps = soon.map((h) => h.temperature).filter((t) => t != null);
+  const freezeThaw = temps.length && Math.min(...temps) < 0 && Math.max(...temps) > 0;
+  const month = new Date().getMonth() + 1;
+  const effects = [];
+  const add = (id, text) => by[id] && effects.push(el("li", {}, text, " ", el("a", { href: `#/findings` }, "Finding")));
+  if (wet && !snow) add("bikeshare-weather", `Rain is likely. On wet days Bike Share has about ${by["bikeshare-weather"]?.numbers.wet_fewer_pct}% fewer trips than on dry days at the same temperature.`);
+  if (snow) add("snow-delays", `Snow is possible. On snowy winter days, subway delays have added up to about ${by["snow-delays"]?.numbers.snow_more_minutes_pct}% more delay time.`);
+  if (wet && month >= 6 && month <= 9) add("beach-rain", `After heavy rain, beaches fail the E. coli standard far more often (${by["beach-rain"]?.numbers.wet_unsafe_pct}% of beach days after 10 mm, against ${by["beach-rain"]?.numbers.dry_unsafe_pct}% after a dry day).`);
+  if (freezeThaw) add("potholes", "Temperatures cross zero: freeze-thaw days are followed by more pothole reports.");
+  return effects;
+}
+
+function weatherSheet(view) {
+  const w = view.weather;
+  if (!w || !w.page) return [el("p", { class: "sheet-kicker" }, "Weather"), el("p", {}, "The forecast is not available right now.")];
+  const p = w.page;
+  const round = (t) => (t == null ? "–" : `${Math.round(t)}°`);
+  const effects = weatherEffects(p, view.findings);
+  return [
+    el("p", { class: "sheet-kicker" }, "Weather in Toronto"),
+    el("div", { class: "weather-now" },
+      el("span", { class: "weather-temp" }, round(p.temperature)),
+      el("span", {}, el("strong", {}, p.condition || ""), el("br"), el("span", { class: "muted small" },
+        [p.feels_like != null ? `Feels like ${round(p.feels_like)}` : null, p.wind_kmh != null ? `wind ${p.wind_kmh} km/h` : null, p.humidity != null ? `humidity ${p.humidity}%` : null].filter(Boolean).join(" · ")))),
+    p.warnings.length ? p.warnings.map((x) => el("p", { class: "notice" }, el("strong", {}, x.description || x.type || "Weather warning"), x.url ? [" ", el("a", { href: x.url, target: "_blank", rel: "noopener" }, "Details")] : null)) : null,
+    el("ol", { class: "hour-strip", "aria-label": "Next hours" }, p.hourly.slice(0, 12).map((h) => el("li", {},
+      el("span", { class: "muted small" }, hourShortFmt.format(new Date(h.at))),
+      el("strong", {}, round(h.temperature)),
+      el("span", { class: "small" }, h.precip_chance ? `${h.precip_chance}%` : "")))),
+    effects.length ? [el("p", { class: "sheet-label" }, "What this weather tends to do"), el("ul", { class: "plain small effects" }, effects)] : null,
+    el("ul", { class: "plain small daily" }, p.daily.slice(0, 4).map((d) => el("li", {}, el("strong", {}, `${d.name}: `), d.summary))),
+    el("p", { class: "muted small" }, "Environment and Climate Change Canada city page forecast for Toronto; precipitation percentages are its chance of precipitation."),
+  ];
+}
+
 // The food map's kind chips under the search. With every kind shown, a tap shows only that
 // kind; after that, taps add or remove kinds, and removing the last shows them all again.
 function foodKindChips(rerender, view) {
@@ -3222,6 +3382,7 @@ function applyLayerToggles(map) {
   const show = (ids, on) => ids.forEach((id) => map.getLayer(id) && map.setLayoutProperty(id, "visibility", on ? "visible" : "none"));
   const layers = mapState.kind !== "transit" ? FOOD_MAP_LAYERS : mapState.layers;
   show(["rec", "rec-label"], mapState.kind === "city");
+  show(["radar-rain", "radar-snow", "aqhi-dot", "aqhi-value"], mapState.kind === "weather");
   show(["beaches"], mapState.kind === "city" && mapState.city.beach);
   show(["patios"], mapState.kind === "city" && mapState.city.patio);
   show(["eats-cluster", "eats-count", "eats", "eats-label", "eats-notable"], mapState.kind === "food");
@@ -3388,6 +3549,7 @@ function openSheet(view, kind, id) {
     : kind === "food" ? foodSheet()
     : kind === "eat" ? eatSheet(view, id)
     : kind === "rec" ? recSheet(view, id)
+    : kind === "weather" ? weatherSheet(view)
     : kind === "beach" ? beachSheet(view, id)
     : kind === "patio" ? patioSheet(view, id)
     : kind === "plan" ? planSheet(view)
@@ -3755,11 +3917,11 @@ async function renderMap(focusKey) {
   const safetyButton = el("button", { type: "button", class: "map-tool", "aria-label": "Safety", "aria-expanded": "false", "aria-controls": "map-safety", title: "Safety" }, iconSvg("shield", { size: 22 }));
   const safetyPanelEl = el("aside", { class: "map-panel safety", id: "map-safety", "aria-label": "Safety", hidden: "hidden" });
   // The transit map and the food map, switched like the light and dark themes.
-  const kindButtons = { transit: ["subway", "Transit"], food: ["food", "Food"], city: ["park", "City"] };
+  const kindButtons = { transit: ["subway", "Transit"], food: ["food", "Food"], city: ["park", "City"], weather: ["cloud", "Weather"] };
   for (const [kind, [glyph, label]] of Object.entries(kindButtons)) {
     kindButtons[kind] = el("button", { type: "button", class: "map-kind-option", "aria-pressed": "false", "data-kind": kind }, iconSvg(glyph, { size: 18 }), label);
   }
-  const kindSwitch = el("div", { class: "map-kind", role: "group", "aria-label": "Map" }, kindButtons.transit, kindButtons.food, kindButtons.city);
+  const kindSwitch = el("div", { class: "map-kind", role: "group", "aria-label": "Map" }, kindButtons.transit, kindButtons.food, kindButtons.city, kindButtons.weather);
   const search = el("input", { type: "search", id: "map-search", name: "q", class: "map-search", placeholder: "Stations, routes, places", "aria-label": "Search stations, stops, routes, addresses, places or restaurants", autocomplete: "off", enterkeyhint: "go" });
   const results = el("ul", { class: "map-results" });
   const modeGroup = el("span", { class: "chip-group", role: "group", "aria-label": "Show Bike Share" });
@@ -3782,7 +3944,7 @@ async function renderMap(focusKey) {
     for (const [kind, button] of Object.entries(kindButtons)) button.setAttribute("aria-pressed", String(mapState.kind === kind));
     safetyButton.hidden = !transit;
     search.placeholder = food ? "Restaurants, places" : transit ? "Stations, routes, places" : "Places, addresses";
-    layersButton.setAttribute("aria-label", food ? "Food map filters" : transit ? "Layers and legend" : "City map filters");
+    layersButton.setAttribute("aria-label", food ? "Food map filters" : transit ? "Layers and legend" : mapState.kind === "weather" ? "Weather map legend" : "City map filters");
     layersButton.title = transit ? "Layers and legend" : "Filters";
   };
   kindSwitch.addEventListener("click", (event) => {
@@ -3804,12 +3966,20 @@ async function renderMap(focusKey) {
       loadFood(view);
       loadCity(view);
       if (view.selected) closeSheet(view);
+      loadWeather(view, { open: true });
     }
   });
   renderKind();
 
   const renderChips = () => {
+    view.renderChips = renderChips;
     kindChips.hidden = mapState.kind === "transit";
+    if (mapState.kind === "weather") {
+      fill(kindChips, weatherChips(renderChips, view));
+      fill(layersPanel, weatherPanel());
+      layersPanel.querySelector(".panel-close").addEventListener("click", () => setLayersOpen(false));
+      return;
+    }
     if (mapState.kind === "city") {
       fill(kindChips, cityChips(renderChips, view));
       fill(layersPanel, cityPanel(renderChips, view));
@@ -4106,6 +4276,7 @@ async function renderMap(focusKey) {
       addEventLayers(view);
       addFoodLayers(view);
       addCityLayers(view);
+      addWeatherLayers(view);
       addPlanLayers(view);
       addGuideLayers(view);
       // Panning by hand stops the camera following the traveller until Recenter.
@@ -4159,7 +4330,7 @@ async function renderMap(focusKey) {
         }).catch(() => { /* Vehicles stay at their reported positions. */ });
       }).catch(() => fill(status, el("span", { class: "warn" }, "Buses and streetcars are unavailable right now")));
       fill(status, [el("span", { class: "live-dot", "aria-hidden": "true" }), `Live · ${timeFmt.format(new Date())}`]);
-      for (const layer of ["stations", "docks", "dock-icon", "trains", "vehicles", "vehicle-icon", "bus-stops", "regional-trains", "regional-stations", "road-work-line", "road-closure-line", "road-closure-point", "road-icons", "road-icons-point", "lanes", "lanes-trail", "events", "food", "eats", "eats-notable", "eats-cluster", "food-other", "rec", "beaches", "patios", "outages", "entrances", "parking", "parking-entrances", "bike-parking"]) {
+      for (const layer of ["stations", "docks", "dock-icon", "trains", "vehicles", "vehicle-icon", "bus-stops", "regional-trains", "regional-stations", "road-work-line", "road-closure-line", "road-closure-point", "road-icons", "road-icons-point", "lanes", "lanes-trail", "events", "food", "eats", "eats-notable", "eats-cluster", "food-other", "rec", "beaches", "patios", "aqhi-dot", "outages", "entrances", "parking", "parking-entrances", "bike-parking"]) {
         map.on("mouseenter", layer, () => { map.getCanvas().style.cursor = "pointer"; });
         map.on("mouseleave", layer, () => { map.getCanvas().style.cursor = ""; });
       }
@@ -4170,7 +4341,7 @@ async function renderMap(focusKey) {
         }
         // A finger-sized box, so small stops and vehicles are easy to hit.
         const box = [[event.point.x - 8, event.point.y - 8], [event.point.x + 8, event.point.y + 8]];
-        const layers = ["trains", "trains-dot", "regional-trains", "events", "rec", "beaches", "patios", "eats-notable", "eats", "eats-cluster", "food", "food-other", "entrances", "stations", "outages", "parking-entrances", "parking", "bike-parking", "regional-stations", "vehicle-icon", "vehicles", "bus-stops", "dock-icon", "docks", "road-icons", "road-icons-point", "road-work-line", "road-closure-line", "road-closure-point", "lanes", "lanes-trail"].filter((l) => map.getLayer(l) && map.getLayoutProperty(l, "visibility") !== "none");
+        const layers = ["trains", "trains-dot", "regional-trains", "events", "rec", "beaches", "patios", "aqhi-dot", "eats-notable", "eats", "eats-cluster", "food", "food-other", "entrances", "stations", "outages", "parking-entrances", "parking", "bike-parking", "regional-stations", "vehicle-icon", "vehicles", "bus-stops", "dock-icon", "docks", "road-icons", "road-icons-point", "road-work-line", "road-closure-line", "road-closure-point", "lanes", "lanes-trail"].filter((l) => map.getLayer(l) && map.getLayoutProperty(l, "visibility") !== "none");
         const hit = map.queryRenderedFeatures(box, { layers });
         if (!hit.length) {
           clearRoute(view);
@@ -4192,6 +4363,7 @@ async function renderMap(focusKey) {
         else if (f.layer.id === "events") openSheet(view, "event", f.properties.id);
         else if (f.layer.id === "food" || f.layer.id === "food-other") openSheet(view, "food", f.properties.id);
         else if (f.layer.id === "rec") openSheet(view, "rec", f.properties.id);
+        else if (f.layer.id === "aqhi-dot") openSheet(view, "weather");
         else if (f.layer.id === "beaches") openSheet(view, "beach", f.properties.id);
         else if (f.layer.id === "patios") openSheet(view, "patio", f.properties.id);
         else if (f.layer.id === "eats" || f.layer.id === "eats-notable") f.properties.pid ? openSheet(view, "food", f.properties.pid) : openSheet(view, "eat", f.properties.id);
@@ -4547,7 +4719,7 @@ function findingChart(c) {
       el("ul", { class: "hbars", "aria-label": c.y_label }, c.x.map((label, i) => {
         const v = c.series[0].values[i];
         return el("li", {}, el("span", { class: "hbar-label" }, label),
-          el("span", { class: "hbar-track" }, el("span", { class: "hbar", style: { width: `${(100 * v) / max}%` } })),
+          el("span", { class: "hbar-track" }, hbarFill((100 * v) / max)),
           el("span", { class: "hbar-value" }, numberFmt.format(v)));
       })));
   }
@@ -4573,7 +4745,7 @@ function findingChart(c) {
       });
       if (run.length) runs.push(run);
       return svgNode("g", { class: `series-${k}` },
-        runs.map((r) => svgNode("polyline", { points: r.join(" "), class: "line" })),
+        runs.map((r) => svgNode("polyline", { points: r.join(" "), class: "line", pathLength: 1 })),
         s.values.map((v, i) => (v == null ? null : svgNode("circle", { cx: x(i), cy: y(v), r: 3.5, class: "dot" }, svgNode("title", {}, `${s.name}, ${c.x[i]}: ${numberFmt.format(v)}`)))));
     });
   }
@@ -4583,9 +4755,26 @@ function findingChart(c) {
   return el("div", { class: "finding-chart" }, el("p", { class: "muted small chart-y" }, c.y_label), svg, legend);
 }
 
+function hbarFill(percent) {
+  const bar = el("span", { class: "hbar", style: { width: `${percent}%` } });
+  bar.style.setProperty("--w", `${percent}%`);
+  return bar;
+}
+
+const findingsSeen = new Set(); // Drawn once per visit; a refresh does not replay them.
+
+const findingObserver = "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => entries.forEach((e) => {
+      if (e.isIntersecting) {
+        e.target.classList.add("in-view");
+        findingObserver.unobserve(e.target);
+      }
+    }), { threshold: 0.25 })
+  : null;
+
 function findingCard(f) {
   const [first, last] = f.period.map((d) => findingDayFmt.format(new Date(`${String(d).slice(0, 10)}T00:00:00Z`)));
-  return el("article", { class: "card finding", id: f.id },
+  const card = el("article", { class: "card finding", id: f.id },
     el("p", { class: "sheet-kicker" }, f.topic),
     el("h2", {}, f.title),
     el("p", {}, f.summary),
@@ -4594,6 +4783,11 @@ function findingCard(f) {
       el("summary", {}, "How this was worked out"),
       el("p", {}, f.method),
       el("p", { class: "muted small" }, `${first} to ${last}. Sources: ${f.sources.join("; ")}.`)));
+  if (findingObserver && !findingsSeen.has(f.id)) {
+    findingsSeen.add(f.id);
+    findingObserver.observe(card);
+  } else card.classList.add("in-view");
+  return card;
 }
 
 async function renderFindings() {

@@ -1,6 +1,7 @@
 # Findings
 
-The Findings page (`#/findings`, `GET /api/findings`) compares the sources collected here
+The Findings page (`#/findings`, `GET /api/findings`; charts draw in as they scroll into
+view unless motion is reduced) compares the sources collected here
 and states what they show, each with its method, period and sources. Findings are
 computed from the database by `transit.findings` and cached for an hour. A finding whose
 data is missing or too thin is left out rather than shown with a weak number, and the

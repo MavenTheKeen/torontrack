@@ -55,6 +55,10 @@ def settings():
         )
         conn.execute("TRUNCATE normalized.beach_samples, ops.beach_refreshes")
         conn.execute("TRUNCATE normalized.cafeto_patios, ops.cafeto_refreshes")
+        conn.execute(
+            """TRUNCATE normalized.weather_citypage, normalized.radar_frames,
+               ops.weather_now_refreshes"""
+        )
         conn.execute("TRUNCATE normalized.ticketed_events, ops.ticketed_event_refreshes")
         conn.execute(
             """TRUNCATE normalized.agency_versions, normalized.agency_vehicles,

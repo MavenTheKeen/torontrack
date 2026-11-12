@@ -119,6 +119,12 @@ time. Large arena and stadium events are flagged because they crowd nearby stati
 City construction zones and road closures are drawn on the map with the bus and streetcar
 routes they affect ([road restrictions](roads.md)).
 
+## Weather map
+
+The map's fourth kind plays the last hour of rain and snow radar, shows the air quality at
+each Toronto station, and opens the forecast with what the findings say the coming weather
+tends to do ([weather map](weather.md#weather-map)).
+
 ## Air quality
 
 The Status page shows Downtown's Air Quality Health Index and the highest forecast for the
