@@ -2306,7 +2306,7 @@ function addCityLayers(view) {
     "icon-image": ["case", ["get", "major"], "badge-agenda-major", "badge-agenda"],
     "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.8, 16, 1], "icon-allow-overlap": true,
     "symbol-sort-key": ["case", ["get", "major"], 0, 1],
-    "text-field": ["case", ["get", "major"], ["get", "name"], ["step", ["zoom"], "", 15, ["get", "name"]]],
+    "text-field": ["step", ["zoom"], ["case", ["get", "major"], ["get", "name"], ""], 15, ["get", "name"]],
     "text-font": ["Noto Sans Medium"], "text-size": ["case", ["get", "major"], 12.5, 11.5], "text-anchor": "top", "text-offset": [0, 1.4],
     "text-max-width": 10, "text-optional": true,
   }, paint: { "text-color": prefersDark() ? "#e5e7eb" : "#1f2937", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
@@ -2338,6 +2338,7 @@ async function loadCity(view) {
     }
   }
   showCity(view);
+  if (view.renderChips) view.renderChips(); // The Today chip needs the agenda.
 }
 
 const minutesOf = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
@@ -2660,7 +2661,7 @@ function weatherEffects(page, findings) {
   const month = new Date().getMonth() + 1;
   const effects = [];
   const add = (id, text) => by[id] && effects.push(el("li", {}, text, " ", el("a", { href: `#/findings` }, "Finding")));
-  if (wet && !snow) add("bikeshare-weather", `Rain is likely. On wet days Bike Share has about ${by["bikeshare-weather"]?.numbers.wet_fewer_pct}% fewer trips than on dry days at the same temperature.`);
+  if (wet && !snow) add("bikeshare-weather", `Rain is in the forecast. On wet days Bike Share has about ${by["bikeshare-weather"]?.numbers.wet_fewer_pct}% fewer trips than on dry days at the same temperature.`);
   if (snow) add("snow-delays", `Snow is possible. On snowy winter days, subway delays have added up to about ${by["snow-delays"]?.numbers.snow_more_minutes_pct}% more delay time.`);
   if (wet && month >= 6 && month <= 9) add("beach-rain", `After heavy rain, beaches fail the E. coli standard far more often (${by["beach-rain"]?.numbers.wet_unsafe_pct}% of beach days after 10 mm, against ${by["beach-rain"]?.numbers.dry_unsafe_pct}% after a dry day).`);
   if (freezeThaw) add("potholes", "Temperatures cross zero: freeze-thaw days are followed by more pothole reports.");
