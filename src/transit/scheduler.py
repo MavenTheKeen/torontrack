@@ -60,6 +60,7 @@ JOBS = (
         (("food-inspections-refresh",), ("food-licences-refresh",), ("food-notable-refresh",)),
         timeout_min=20,
     ),
+    Job("waste_collection", "40 10 * * *", (("waste-refresh",),)),
     Job("planner_data", "20 10 * * *", (("planner-data", "--out", PLANNER_DIR),)),
 )
 

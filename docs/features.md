@@ -119,6 +119,12 @@ time. Large arena and stadium events are flagged because they crowd nearby stati
 City construction zones and road closures are drawn on the map with the bus and streetcar
 routes they affect ([road restrictions](roads.md)).
 
+## Curbside collection
+
+An address or place card on the map lists its next garbage, Green Bin, recycling and yard
+waste collections, from the city's collection areas and pickup schedule
+([curbside collection](waste.md)).
+
 ## Food inspections
 
 Toronto Public Health's inspection results for every restaurant and food shop can be shown

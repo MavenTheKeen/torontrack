@@ -1971,9 +1971,32 @@ function placeSheet(view, index) {
   return [
     el("p", { class: "sheet-kicker" }, item.detail || "Place"),
     el("h2", {}, item.name),
+    wasteBlock(view, item.coord),
     planHere(view, item.coord, item.name),
     el("p", { class: "muted small" }, "From OpenStreetMap."),
   ];
+}
+
+const wasteDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", weekday: "long", month: "short", day: "numeric" });
+
+// Curbside collection at a place: filled in when /api/waste answers; empty outside the city.
+function wasteBlock(view, [lon, lat]) {
+  const block = el("div", { class: "sheet-block waste" });
+  api(`/api/waste?at=${lat.toFixed(5)},${lon.toFixed(5)}`)
+    .then(({ collection: c }) => {
+      if (!c) return;
+      const day = (d) => wasteDayFmt.format(new Date(`${d}T00:00:00Z`));
+      fill(block,
+        el("p", { class: "sheet-label" }, "Curbside collection"),
+        c.calendar
+          ? el("ul", { class: "sheet-list" }, c.upcoming.map((u) => el("li", { class: "arrival-row" }, el("span", {}, day(u.collected_on)), el("span", { class: "mins" }, u.items.join(", ")))))
+          : el("p", {}, "Night collection area: the city's daytime calendar does not apply here."),
+        el("p", { class: "muted small" }, c.calendar
+          ? `Calendar ${c.calendar.replace(/(\d)$/, " $1")} for houses on curbside collection; apartments and businesses may differ. City of Toronto Open Data.`
+          : "City of Toronto Open Data."));
+    })
+    .catch(() => {});
+  return block;
 }
 
 function bikeParkingText(b) {

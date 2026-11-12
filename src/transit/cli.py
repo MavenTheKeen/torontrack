@@ -21,6 +21,7 @@ from transit import (
     roads,
     scheduler,
     ticketmaster,
+    waste,
     weather,
 )
 from transit.bikeshare import trips as bikeshare_trips
@@ -83,6 +84,9 @@ def main():
     )
     commands.add_parser("roads-refresh", help="Load City of Toronto road restrictions")
     commands.add_parser("events-refresh", help="Load the City of Toronto events calendar")
+    commands.add_parser(
+        "waste-refresh", help="Load City of Toronto curbside collection areas and schedule"
+    )
     commands.add_parser(
         "food-inspections-refresh", help="Load City of Toronto food inspections (DineSafe)"
     )
@@ -230,6 +234,14 @@ def main():
                     client.close()
                 if result["status"] == "failed":
                     raise FetchError(f"Events refresh failed: {result['error']}")
+            elif args.command == "waste-refresh":
+                client = FeedClient()
+                try:
+                    result = waste.refresh(settings.database_url, client)
+                finally:
+                    client.close()
+                if result["status"] == "failed":
+                    raise FetchError(f"Waste collection refresh failed: {result['error']}")
             elif args.command == "food-inspections-refresh":
                 client = FeedClient()
                 try:

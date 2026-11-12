@@ -27,7 +27,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from transit import events, food_inspections, food_licences, food_notable, places, roads
+from transit import events, food_inspections, food_licences, food_notable, places, roads, waste
 from transit.agencies import AGENCIES
 from transit.config import Settings
 from transit.db import connect
@@ -754,6 +754,25 @@ def create_app(
                 raise HTTPException(status_code=422, detail="near must be lat,lon") from None
         found = with_conn(lambda conn: food_inspections.search(conn, q, point))
         return JSONResponse(jsonable_encoder({"premises": found, "attribution": FOOD_ATTRIBUTION}))
+
+    @app.get("/api/waste")
+    def waste_collection(at: str = Query(max_length=40)):
+        """The curbside collection calendar at `at` (lat,lon) and its next collections."""
+        try:
+            lat, lon = (float(part) for part in at.split(","))
+        except ValueError:
+            raise HTTPException(status_code=422, detail="at must be lat,lon") from None
+        today = clock().astimezone(regional.TORONTO).date()
+        found = with_conn(lambda conn: waste.collection(conn, lat, lon, today))
+        return JSONResponse(
+            jsonable_encoder(
+                {
+                    "collection": found,
+                    "attribution": "Curbside collection areas and pickup schedule: City of "
+                    "Toronto Open Data, Open Government Licence – Toronto.",
+                }
+            )
+        )
 
     @app.get("/api/food/{premises_id}")
     def food_premises(premises_id: str):
