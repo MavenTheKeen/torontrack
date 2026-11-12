@@ -21,7 +21,7 @@ def test_cron_expressions_match_their_minutes():
 
 def test_every_airflow_dag_has_a_job_with_its_schedule():
     jobs = {j.name: j.cron for j in scheduler.JOBS}
-    assert len(jobs) == 14
+    assert len(jobs) == 15
     assert jobs["planner_data"] == "20 10 * * *" and jobs["road_restrictions"] == "*/10 * * * *"
 
 

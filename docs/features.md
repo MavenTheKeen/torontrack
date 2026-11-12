@@ -119,11 +119,12 @@ time. Large arena and stadium events are flagged because they crowd nearby stati
 City construction zones and road closures are drawn on the map with the bus and streetcar
 routes they affect ([road restrictions](roads.md)).
 
-## Curbside collection
+## My street
 
 An address or place card on the map lists its next garbage, Green Bin, recycling and yard
-waste collections, from the city's collection areas and pickup schedule
-([curbside collection](waste.md)).
+waste collections ([curbside collection](waste.md)), road work within 500 m, and the most
+common 311 requests in its ward over the last 30 days ([wards and 311](neighbourhood.md)).
+Saving it, on this device only, adds it to the Status page.
 
 ## Food inspections
 

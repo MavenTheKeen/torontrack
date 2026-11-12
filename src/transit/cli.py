@@ -15,6 +15,7 @@ from transit import (
     food_licences,
     food_notable,
     maptiles,
+    neighbourhood,
     planner,
     regional,
     regional_live,
@@ -86,6 +87,9 @@ def main():
     commands.add_parser("events-refresh", help="Load the City of Toronto events calendar")
     commands.add_parser(
         "waste-refresh", help="Load City of Toronto curbside collection areas and schedule"
+    )
+    commands.add_parser(
+        "neighbourhood-refresh", help="Load City of Toronto wards and 311 service requests"
     )
     commands.add_parser(
         "food-inspections-refresh", help="Load City of Toronto food inspections (DineSafe)"
@@ -242,6 +246,14 @@ def main():
                     client.close()
                 if result["status"] == "failed":
                     raise FetchError(f"Waste collection refresh failed: {result['error']}")
+            elif args.command == "neighbourhood-refresh":
+                client = FeedClient()
+                try:
+                    result = neighbourhood.refresh(settings.database_url, client)
+                finally:
+                    client.close()
+                if result["status"] == "failed":
+                    raise FetchError(f"311 requests refresh failed: {result['error']}")
             elif args.command == "food-inspections-refresh":
                 client = FeedClient()
                 try:

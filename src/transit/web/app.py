@@ -27,7 +27,16 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from transit import events, food_inspections, food_licences, food_notable, places, roads, waste
+from transit import (
+    events,
+    food_inspections,
+    food_licences,
+    food_notable,
+    neighbourhood,
+    places,
+    roads,
+    waste,
+)
 from transit.agencies import AGENCIES
 from transit.config import Settings
 from transit.db import connect
@@ -773,6 +782,33 @@ def create_app(
                 }
             )
         )
+
+    @app.get("/api/street")
+    def street(at: str = Query(max_length=40)):
+        """My street: at `at` (lat,lon), the next curbside collections, road work within
+        500 m, and the ward's most common 311 requests in the last 30 days."""
+        try:
+            lat, lon = (float(part) for part in at.split(","))
+        except ValueError:
+            raise HTTPException(status_code=422, detail="at must be lat,lon") from None
+        now = clock()
+        today = now.astimezone(regional.TORONTO).date()
+
+        def build(conn):
+            ward = neighbourhood.ward_at(conn, lat, lon)
+            return {
+                "ward": ward,
+                "requests": neighbourhood.ward_requests(conn, ward["number"]) if ward else None,
+                "collection": waste.collection(conn, lat, lon, today),
+                "road_work": neighbourhood.nearby_restrictions(roads.active(conn, now), lat, lon),
+            }
+
+        found = with_conn(build)
+        found["attribution"] = (
+            "City of Toronto Open Data (wards, 311 service requests, curbside collection, "
+            "road restrictions), Open Government Licence – Toronto."
+        )
+        return JSONResponse(jsonable_encoder(found))
 
     @app.get("/api/food/{premises_id}")
     def food_premises(premises_id: str):

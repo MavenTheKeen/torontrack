@@ -219,7 +219,7 @@ const SAVED_MAX = 12;
 function savedItems() {
   try {
     const items = JSON.parse(localStorage.getItem(SAVED_KEY) || "[]");
-    return Array.isArray(items) ? items.filter((i) => i && ["station", "stop", "line"].includes(i.kind) && i.id) : [];
+    return Array.isArray(items) ? items.filter((i) => i && ["station", "stop", "line", "street"].includes(i.kind) && i.id) : [];
   } catch {
     return [];
   }
@@ -272,6 +272,19 @@ async function savedStation(item) {
   ];
 }
 
+// A saved street: its next collection, road work nearby and the ward's top 311 request.
+async function savedStreet(item) {
+  const s = await api(`/api/street?at=${encodeURIComponent(item.id)}`);
+  const next = s.collection?.upcoming?.[0];
+  const top = s.requests?.top?.[0];
+  return [
+    el("span", { class: "name" }, item.name),
+    el("p", { class: "saved-times" }, next ? `Next collection ${wasteDay(next.collected_on)}: ${next.items.join(", ")}` : s.collection ? "Night collection area" : "No curbside collection listed"),
+    s.road_work.length ? el("p", { class: "saved-times" }, `${plural(s.road_work.length, "road work", "road works")} within 500 m`) : null,
+    top ? el("p", { class: "muted saved-times" }, `Ward ${s.ward.number}, ${s.ward.name}: most 311 requests are ${top.type.toLowerCase()} (${top.requests} in ${s.requests.days} days)`) : null,
+  ];
+}
+
 // The next three vehicles at a saved stop.
 async function savedStop(item) {
   const data = await api(`/api/stops/${encodeURIComponent(item.id)}`);
@@ -290,7 +303,7 @@ async function savedRow(item, lines) {
       if (!line) return null;
       return el("li", { class: "saved-row" }, el("div", {}, el("a", { class: "name", href: `#/line/${item.id}` }, line.status.name), el("p", { class: "status-line" }, statusPill(line.status.status, line.status.label))));
     }
-    return el("li", { class: "saved-row" }, el("div", {}, await (item.kind === "station" ? savedStation(item) : savedStop(item))));
+    return el("li", { class: "saved-row" }, el("div", {}, await (item.kind === "station" ? savedStation(item) : item.kind === "street" ? savedStreet(item) : savedStop(item))));
   } catch {
     return el("li", { class: "saved-row" }, el("div", {}, el("span", { class: "name" }, item.name || item.id), el("p", { class: "muted" }, "Not available right now.")));
   }
@@ -1971,29 +1984,40 @@ function placeSheet(view, index) {
   return [
     el("p", { class: "sheet-kicker" }, item.detail || "Place"),
     el("h2", {}, item.name),
-    wasteBlock(view, item.coord),
+    saveButton("street", `${item.coord[1].toFixed(3)},${item.coord[0].toFixed(3)}`, item.name),
+    streetBlock(view, item.coord),
     planHere(view, item.coord, item.name),
     el("p", { class: "muted small" }, "From OpenStreetMap."),
   ];
 }
 
 const wasteDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", weekday: "long", month: "short", day: "numeric" });
+const wasteDay = (d) => (d === torontoDay(new Date()) ? "today" : wasteDayFmt.format(new Date(`${d}T00:00:00Z`)));
+const roadEndFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", month: "short", day: "numeric", year: "numeric" });
 
-// Curbside collection at a place: filled in when /api/waste answers; empty outside the city.
-function wasteBlock(view, [lon, lat]) {
-  const block = el("div", { class: "sheet-block waste" });
-  api(`/api/waste?at=${lat.toFixed(5)},${lon.toFixed(5)}`)
-    .then(({ collection: c }) => {
-      if (!c) return;
-      const day = (d) => wasteDayFmt.format(new Date(`${d}T00:00:00Z`));
+// My street at a place: curbside collection, road work within 500 m and the ward's most
+// common 311 requests, filled in when /api/street answers.
+function streetBlock(view, [lon, lat]) {
+  const block = el("div", { class: "street" });
+  api(`/api/street?at=${lat.toFixed(5)},${lon.toFixed(5)}`)
+    .then((s) => {
+      const c = s.collection;
+      const r = s.requests;
       fill(block,
-        el("p", { class: "sheet-label" }, "Curbside collection"),
-        c.calendar
-          ? el("ul", { class: "sheet-list" }, c.upcoming.map((u) => el("li", { class: "arrival-row" }, el("span", {}, day(u.collected_on)), el("span", { class: "mins" }, u.items.join(", ")))))
-          : el("p", {}, "Night collection area: the city's daytime calendar does not apply here."),
-        el("p", { class: "muted small" }, c.calendar
-          ? `Calendar ${c.calendar.replace(/(\d)$/, " $1")} for houses on curbside collection; apartments and businesses may differ. City of Toronto Open Data.`
-          : "City of Toronto Open Data."));
+        c ? el("div", { class: "sheet-block" },
+          el("p", { class: "sheet-label" }, "Curbside collection"),
+          c.calendar
+            ? el("ul", { class: "sheet-list" }, c.upcoming.map((u) => el("li", { class: "arrival-row" }, el("span", {}, wasteDay(u.collected_on)), el("span", { class: "mins" }, u.items.join(", ")))))
+            : el("p", {}, "Night collection area: the city's daytime calendar does not apply here."),
+          c.calendar ? el("p", { class: "muted small" }, `Calendar ${c.calendar.replace(/(\d)$/, " $1")} for houses on curbside collection; apartments and businesses may differ.`) : null) : null,
+        s.road_work.length ? el("div", { class: "sheet-block" },
+          el("p", { class: "sheet-label" }, "Road work within 500 m"),
+          el("ul", { class: "sheet-list" }, s.road_work.slice(0, 4).map((w) => el("li", { class: "arrival-row" }, el("span", {}, w.name), el("span", { class: "mins" }, `${w.metres} m · until ${roadEndFmt.format(new Date(w.ends_at))}`))))) : null,
+        s.ward && r && r.top.length ? el("div", { class: "sheet-block" },
+          el("p", { class: "sheet-label" }, `311 requests in Ward ${s.ward.number}, ${s.ward.name}`),
+          el("p", { class: "muted small" }, `${numberFmt.format(r.total)} in the ${r.days} days to ${inspectedOn(r.through)}; the most common:`),
+          el("ul", { class: "sheet-list" }, r.top.map((t) => el("li", { class: "arrival-row" }, el("span", {}, t.type), el("span", { class: "mins" }, numberFmt.format(t.requests)))))) : null,
+        s.ward || c ? el("p", { class: "muted small" }, "City of Toronto Open Data. Saving keeps this place, rounded to about 100 m, on this device only.") : null);
     })
     .catch(() => {});
   return block;

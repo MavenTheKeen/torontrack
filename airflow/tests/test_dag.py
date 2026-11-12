@@ -37,6 +37,7 @@ def dag_bag():
         "agency_schedules",
         "food_inspections",
         "waste_collection",
+        "service_requests",
     }
     return bag
 
