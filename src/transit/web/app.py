@@ -36,6 +36,7 @@ from transit import (
     food_licences,
     food_notable,
     neighbourhood,
+    patios,
     places,
     recreation,
     roads,
@@ -813,6 +814,20 @@ def create_app(
             build,
             "Beach water quality: Toronto Public Health, City of Toronto Open Data, Open "
             "Government Licence – Toronto.",
+            store=slow,
+        )
+
+    @app.get("/api/patios")
+    def patio_list():
+        """CaféTO patios (transit.patios): [lon, lat, operator, address, kind]."""
+
+        def build(conn, now):
+            return {"patios": patios.listed(conn)}
+
+        return cached(
+            "patios",
+            build,
+            "CaféTO: City of Toronto Open Data, Open Government Licence – Toronto.",
             store=slow,
         )
 

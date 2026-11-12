@@ -36,3 +36,11 @@ stricter than the 200 used by Ontario and Canada; the site applies the same thre
 the season is on (a sample within the last three days). On the city map a beach is green
 or red by its latest result in season and hollow grey out of season; its card lists the
 recent results. The same samples feed the beach and rain finding ([findings](findings.md)).
+
+## CaféTO patios
+
+`transit patios-refresh` runs last in the same job and loads the CaféTO patio locations
+(`cafeto-curb-lane-parklet-cafe-locations`, refreshed monthly): operator, address, kind of
+patio (curb lane, sidewalk, parklet, private property) and position, replaced on each load
+(`normalized.cafeto_patios`). `GET /api/patios` lists them; the city map shows them from
+zoom 13 behind a Patios chip, with names from zoom 16.

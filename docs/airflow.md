@@ -48,7 +48,7 @@ Other DAGs, each also paused until unpaused, include:
 | `weather_hourly` | hourly at :20 | `weather-refresh`: loads Environment Canada's hourly weather, re-reading two days so revisions and missed runs are caught up, then `air-quality-refresh`: the AQHI for Toronto stations ([weather](weather.md)) |
 | `open_data_export` | 09:30 | `export`: writes completed days as [open-data files](datasets.md), catching up any missed days |
 | `food_inspections` | 10:10 | `food-inspections-refresh` then `food-licences-refresh`: loads City of Toronto food inspections (DineSafe) and food business licences, each when its export changed ([food inspections](food.md)) |
-| `recreation` | 11:00 | `recreation-refresh` then `beaches-refresh`: loads City of Toronto drop-in skating and swimming, recreation facilities and beach water quality ([skating, swimming and beaches](recreation.md)) |
+| `recreation` | 11:00 | `recreation-refresh`, `beaches-refresh` and `patios-refresh`: loads City of Toronto drop-in skating and swimming, recreation facilities, beach water quality and CaféTO patios ([skating, swimming and beaches](recreation.md)) |
 | `service_requests` | 10:50 | `neighbourhood-refresh`: loads City of Toronto wards and 311 service requests, skipping unchanged years ([wards and 311](neighbourhood.md)) |
 | `waste_collection` | 10:40 | `waste-refresh`: loads City of Toronto curbside collection areas and pickup schedule ([curbside collection](waste.md)) |
 | `ticketed_events` | every 6 h at :20 | `ticketed-events-refresh`: loads Ticketmaster concerts, games and shows for the next 14 days ([events](events.md#concerts-games-and-shows-ticketmaster)) |
