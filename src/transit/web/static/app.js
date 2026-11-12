@@ -2504,7 +2504,7 @@ function cityChips(rerender, view) {
     chip([badgeEl("event", EVENT_COLOUR, "#ffffff", { size: 20 }), "Events"], f.events, () => { f.events = !f.events; showCity(view); rerender(); }, { class: "chip kind-chip", title: "Today's events" }),
     (() => {
       const today = todaysEvents(view);
-      const major = today.filter((e) => e.major).length;
+      const major = today.filter((e) => e.major || e.featured).length; // As in the Today list.
       return today.length ? chip([badgeEl("event", EVENT_COLOUR, "#ffffff", { size: 20 }), major ? `Today: ${plural(major, "big event", "big events")}` : `Today: ${today.length}`], false, () => openSheet(view, "today"), { class: "chip kind-chip", title: "What is on today" }) : null;
     })(),
     chip([badgeEl("patio", PATIO_COLOUR, "#ffffff", { size: 20 }), "Patios"], f.patio, () => { f.patio = !f.patio; showCity(view); rerender(); }, { class: "chip kind-chip", title: "CaféTO patios, from zoom 13" }),
