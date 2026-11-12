@@ -1,13 +1,8 @@
 # Torontrack
 
-A free, ad-free live map and reliability tracker for Toronto transit, built on the TTC's
-GTFS-Realtime feeds, for riders who want to know where their train is and for anyone who
-wants to know how reliable the service really is.
-
-A second map, one switch away, covers places to eat: about 14,000 restaurants, cafés, bars
-and bakeries from OpenStreetMap, each with its latest Toronto Public Health inspection,
-how long it has been licensed at its address, and a mark for notable places listed on
-Wikidata ([food map](docs/food.md)).
+A free, ad-free live map of Toronto: transit in real time and how reliable it really is,
+places to eat with their health inspections, what is on in the city today, and the
+weather, built entirely on open data and tracked continuously since October 2026.
 
 [![Try it live](https://img.shields.io/badge/Try_it_live-torontrack.skynetlab.duckdns.org-e8441f?style=for-the-badge)](https://torontrack.skynetlab.duckdns.org)
 [![Verify pipeline](https://github.com/MavenTheKeen/torontrack/actions/workflows/ci.yml/badge.svg)](https://github.com/MavenTheKeen/torontrack/actions/workflows/ci.yml)
@@ -21,6 +16,55 @@ Wikidata ([food map](docs/food.md)).
 [![Food inspections](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.food_inspections&label=food%20inspections&color=e8441f)](docs/food.md)
 
 ![Trains and buses moving on the map, the Bloor-Yonge station panel, then the reliability page](docs/screenshots/demo.gif)
+
+## Features
+
+### Transit
+- **Live map** of TTC subway trains, buses and streetcars, GO Transit trains, and Brampton
+  Transit, MiWay, YRT and Viva buses, and Bike Share stations, with smooth estimated
+  motion between feed updates.
+- **Stations and stops** with arrival predictions, elevator and escalator status,
+  entrances, and service alerts, including Lines 5 Eglinton and 6 Finch West.
+- **Trip planner** across Toronto, Brampton, Mississauga and York Region, using live trip
+  updates and a recommended departure time to arrive on time about nine times in ten.
+- **Reliability** of every subway line and surface route: measured gaps between vehicles,
+  delay incidents ranked by minutes lost, 90th percentile waits, scheduled trips that
+  never ran, and a monthly report card.
+- **Status page** with current service problems and saved stations, stops and lines.
+
+### Food
+- **Food map** of about 14,000 restaurants, cafés, bars and bakeries, filterable by kind,
+  each with its latest Toronto Public Health (DineSafe) inspection results.
+- **Licensed since**: the year each place was first licensed at its address.
+- **Notable places** from Wikidata, marked on the map.
+
+### City
+- **City map** of drop-in skating and swimming today at city rinks, pools and community
+  centres, beach water quality, CaféTO patios, and today's events, with major venues
+  highlighted.
+- **Events page** of concerts, games, shows and city festivals, with the nearest station.
+- **My street**: next garbage, Green Bin and recycling collection, road work nearby, and
+  recent 311 requests in the ward, saved in the browser only.
+
+### Weather
+- **Weather map** with animated wind, a twelve-hour precipitation forecast, the last hour
+  of radar, and the Air Quality Health Index at each Toronto station.
+- **Forecast card** with conditions, warnings, and what the data says the coming weather
+  tends to do to Bike Share, subway delays, beaches and potholes.
+
+### Findings
+- **Findings page**: analyses across all collected data, recomputed from the database,
+  such as how rain affects Bike Share, how snow affects subway delays, the main causes of
+  delays, when potholes are reported, beach safety after rain, and inspection results by
+  how long a place has been open.
+
+### Platform
+- Installable progressive web app that opens saved pages offline.
+- Light and dark themes, built for phones, and no third-party requests from the
+  browser: every map tile, font and image is served by the site itself.
+- Open data downloads and a pipeline page showing feed health and validation results.
+
+See the [full feature list](docs/features.md) for details.
 
 ## Engineering highlights
 
