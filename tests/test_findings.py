@@ -19,7 +19,7 @@ def seed(conn, days: int = 120) -> None:
         """INSERT INTO raw.weather_responses (fetched_at, url, payload)
            VALUES (now(), 'test', '{}') RETURNING response_id"""
     ).fetchone()["response_id"]
-    start = date(2025, 1, 1)
+    start = date(2025, 4, 1)  # No daylight-saving change in the 120 days.
     with conn.cursor() as cur:
         for i in range(days):
             day = start + timedelta(days=i)
@@ -31,7 +31,12 @@ def seed(conn, days: int = 120) -> None:
                     """INSERT INTO normalized.weather_hourly (climate_id, observed_at,
                            station_name, temp_c, precip_mm, response_id)
                        VALUES ('6158355', %s, 'TORONTO CITY', %s, %s, %s)""",
-                    (midnight + timedelta(hours=hour), temp, 0.1 if wet else 0, response),
+                    (
+                        midnight.astimezone(UTC) + timedelta(hours=hour),
+                        temp,
+                        0.1 if wet else 0,
+                        response,
+                    ),
                 )
             trips = (1000 if temp == 2 else 3000) * (0.75 if wet else 1)
             cur.execute(
