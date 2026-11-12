@@ -316,13 +316,35 @@ async function savedSection(lineData) {
   return [el("h2", {}, "Saved"), el("ul", { class: "status-list saved-list" }, rows)];
 }
 
+// Air quality on the Status page: Downtown's AQHI now and the highest forecast for the
+// rest of today and for tomorrow, in ECCC's risk categories.
+const aqhiHourFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", hour: "numeric" });
+const AQHI_CLASS = { Low: "ok", Moderate: "warn", High: "bad", "Very high": "bad" };
+
+function airLine(air) {
+  if (!air || !air.stations.length) return null;
+  const main = air.stations[0];
+  const today = torontoDay(new Date());
+  const peak = (items) => items.reduce((a, b) => (!a || b.aqhi > a.aqhi ? b : a), null);
+  const rest = peak(air.forecast.filter((f) => torontoDay(new Date(f.at)) === today));
+  const tomorrow = peak(air.forecast.filter((f) => torontoDay(new Date(f.at)) > today));
+  const level = (x) => `${Math.round(x.aqhi)} ${x.risk.toLowerCase()}`;
+  return el("details", { class: "card air", "data-key": "home-air" },
+    el("summary", {}, "Air quality: ", el("span", { class: `tag ${AQHI_CLASS[main.risk] || ""}` }, `${Math.round(main.aqhi)} · ${main.risk} risk`),
+      el("span", { class: "muted small" }, ` ${main.name}, ${aqhiHourFmt.format(new Date(main.observed_at))}`)),
+    el("p", { class: "small" }, [rest ? `Later today up to ${level(rest)}` : null, tomorrow ? `tomorrow up to ${level(tomorrow)}` : null].filter(Boolean).join("; ") || "No forecast published."),
+    el("ul", { class: "plain small" }, air.stations.slice(1).map((s) => el("li", {}, `${s.name}: ${Math.round(s.aqhi)} (${s.risk.toLowerCase()})`))),
+    el("p", { class: "muted small" }, "Air Quality Health Index from 1 (low risk) to 10 and above (very high), Environment and Climate Change Canada."));
+}
+
 async function renderHome() {
-  const [lineData, alertData] = await Promise.all([api("/api/lines"), api("/api/alerts")]);
+  const [lineData, alertData, airData] = await Promise.all([api("/api/lines"), api("/api/alerts"), api("/api/air").catch(() => null)]);
   const accessibility = alertData.accessibility;
   const saved = await savedSection(lineData);
   return [
     networkSummary(lineData, alertData),
     staleNotice(alertData.alerts_as_of, "TTC alerts"),
+    airData ? airLine(airData.air) : null,
     saved,
     el("h2", {}, "Lines"),
     el("ul", { class: "status-list" }, lineData.lines.map((l) => statusRow(l.status))),

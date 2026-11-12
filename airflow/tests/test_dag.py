@@ -103,8 +103,10 @@ def test_weather_loads_hourly(dag_bag, monkeypatch):
         refresh.__globals__["subprocess"], "run", lambda args, **kw: calls.append((args, kw))
     )
     refresh()
+    dag.get_task("air_quality").python_callable()
     assert calls == [
-        (["/opt/app-venv/bin/transit", "weather-refresh"], {"check": True, "timeout": 540})
+        (["/opt/app-venv/bin/transit", "weather-refresh"], {"check": True, "timeout": 540}),
+        (["/opt/app-venv/bin/transit", "air-quality-refresh"], {"check": True, "timeout": 240}),
     ]
 
 

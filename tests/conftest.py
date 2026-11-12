@@ -49,6 +49,10 @@ def settings():
         conn.execute(
             "TRUNCATE normalized.rec_facilities, normalized.rec_sessions, ops.rec_refreshes"
         )
+        conn.execute(
+            """TRUNCATE normalized.aqhi_observations, normalized.aqhi_forecasts,
+               ops.aqhi_refreshes"""
+        )
         conn.execute("TRUNCATE normalized.ticketed_events, ops.ticketed_event_refreshes")
         conn.execute(
             """TRUNCATE normalized.agency_versions, normalized.agency_vehicles,

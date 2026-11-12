@@ -45,7 +45,12 @@ def _collection_steps(identity: str) -> tuple:
 JOBS = (
     Job("reliability", "*/15 * * * *", (), timeout_min=12),  # Steps built per run.
     Job("road_restrictions", "*/10 * * * *", (("roads-refresh",),), timeout_min=5),
-    Job("weather_hourly", "20 * * * *", (("weather-refresh",),), timeout_min=10),
+    Job(
+        "weather_hourly",
+        "20 * * * *",
+        (("weather-refresh",), ("air-quality-refresh",)),
+        timeout_min=10,
+    ),
     Job("ticketed_events", "20 */6 * * *", (("ticketed-events-refresh",),)),
     Job("ttc_static_gtfs", "0 9 * * *", (("ttc-gtfs-refresh",),)),
     Job("regional_schedule", "10 9 * * *", (("regional-refresh",),)),

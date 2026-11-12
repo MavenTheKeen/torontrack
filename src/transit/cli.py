@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime, time
 
 from transit import (
     agencies,
+    air_quality,
     alerts,
     bike_lanes,
     events,
@@ -95,6 +96,7 @@ def main():
     commands.add_parser(
         "recreation-refresh", help="Load City of Toronto drop-in skating and swimming"
     )
+    commands.add_parser("air-quality-refresh", help="Load the AQHI for Toronto from ECCC")
     commands.add_parser(
         "food-inspections-refresh", help="Load City of Toronto food inspections (DineSafe)"
     )
@@ -250,6 +252,14 @@ def main():
                     client.close()
                 if result["status"] == "failed":
                     raise FetchError(f"Waste collection refresh failed: {result['error']}")
+            elif args.command == "air-quality-refresh":
+                client = FeedClient()
+                try:
+                    result = air_quality.refresh(settings.database_url, client)
+                finally:
+                    client.close()
+                if result["status"] == "failed":
+                    raise FetchError(f"Air quality refresh failed: {result['error']}")
             elif args.command == "recreation-refresh":
                 client = FeedClient()
                 try:

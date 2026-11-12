@@ -27,4 +27,8 @@ with DAG(
     def refresh() -> None:
         subprocess.run([APP, "weather-refresh"], check=True, timeout=540)
 
-    refresh()
+    @task
+    def air_quality() -> None:
+        subprocess.run([APP, "air-quality-refresh"], check=True, timeout=240)
+
+    refresh() >> air_quality()

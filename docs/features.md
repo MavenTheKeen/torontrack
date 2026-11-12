@@ -119,6 +119,12 @@ time. Large arena and stadium events are flagged because they crowd nearby stati
 City construction zones and road closures are drawn on the map with the bus and streetcar
 routes they affect ([road restrictions](roads.md)).
 
+## Air quality
+
+The Status page shows Downtown's Air Quality Health Index and the highest forecast for the
+rest of today and for tomorrow, with the other Toronto stations on request
+([air quality](weather.md#air-quality)).
+
 ## City map
 
 The map's third kind shows drop-in skating and swimming today at city rinks, pools and

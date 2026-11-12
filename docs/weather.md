@@ -32,3 +32,15 @@ stored times come from the response's UTC field, so they are exact.
 
 Contains information licensed under the
 [Open Government Licence – Canada](https://open.canada.ca/en/open-government-licence-canada).
+
+## Air quality
+
+`transit air-quality-refresh` runs after the weather in the same hourly job. It reads the
+Air Quality Health Index from ECCC's MSC GeoMet API for the stations in Toronto's bounding
+box (Downtown, East, North, West and a Toronto-wide value): observations of the last two
+days are upserted into `normalized.aqhi_observations`, which grows into a history, and
+each station's newest forecast replaces its previous one in `normalized.aqhi_forecasts`.
+`GET /api/air` returns each station's latest reading within six hours, Downtown first,
+and Downtown's forecast, with ECCC's risk categories (1 to 3 low, 4 to 6 moderate, 7 to 10
+high, above 10 very high). The Status page shows Downtown's reading and the highest
+forecast for the rest of today and for tomorrow.

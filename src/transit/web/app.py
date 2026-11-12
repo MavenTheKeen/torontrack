@@ -28,6 +28,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Res
 from fastapi.staticfiles import StaticFiles
 
 from transit import (
+    air_quality,
     events,
     findings,
     food_inspections,
@@ -783,6 +784,20 @@ def create_app(
                     "Toronto Open Data, Open Government Licence – Toronto.",
                 }
             )
+        )
+
+    @app.get("/api/air")
+    def air():
+        """The Air Quality Health Index at Toronto stations and Downtown's forecast."""
+
+        def build(conn, now):
+            return {"air": air_quality.current(conn, now)}
+
+        return cached(
+            "air",
+            build,
+            "Air Quality Health Index: Environment and Climate Change Canada, Open Government "
+            "Licence – Canada.",
         )
 
     @app.get("/api/recreation")
