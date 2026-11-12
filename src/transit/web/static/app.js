@@ -421,6 +421,7 @@ function lineDiagram(data) {
     strip.append(el("div", {
       class: `train d${train.direction_id}${train.at_station ? " at" : ""}`,
       "aria-hidden": "true",
+      "data-move": `${train.train_id}-${train.direction_id}`,
       style: { top: `${train.position * ROW + ROW / 2}px`, translate: `${outward}px 0` },
       title: `Train ${train.train_id}: ${train.at_station ? "at" : "approaching"} ${train.station}`,
     }));
@@ -489,7 +490,7 @@ function arrivalsCard(d) {
       ? el(
           "ul",
           { class: "arrivals" },
-          d.arrivals.map((a) => el("li", {}, el("span", { class: "mins" }, a.minutes === 0 ? "Due" : `${a.minutes} min`), el("span", { class: "muted" }, timeFmt.format(new Date(a.arrival)), a.scheduled ? " scheduled" : ""))),
+          d.arrivals.map((a, i) => el("li", {}, arrivalMins(a.minutes, null, `${d.line}-${d.platform}-${i}`), el("span", { class: "muted" }, timeFmt.format(new Date(a.arrival)), a.scheduled ? " scheduled" : ""))),
         )
       : el("p", { class: "muted" }, scheduledLine(d.line) ? "No scheduled trains right now." : "No predictions right now."),
     scheduledLine(d.line) ? el("p", { class: "muted small" }, "Timetable times: TTC publishes no live data for this line.") : null,
@@ -1683,7 +1684,7 @@ function stopArrivals(data) {
             "li",
             { class: "arrival-row" },
             el("span", { class: "with-badge" }, el("span", { class: `route-pill ${a.mode || "bus"}` }, a.short_name), el("span", {}, a.towards)),
-            el("span", { class: "mins" }, a.seconds < 60 ? "Due" : `${Math.round(a.seconds / 60)} min`, a.source === "estimate" ? el("span", { class: "muted small" }, " est.") : null),
+            arrivalMins(a.seconds < 60 ? 0 : Math.round(a.seconds / 60), a.source === "estimate" ? el("span", { class: "muted small" }, " est.") : null),
           ),
         ),
       )
@@ -3868,6 +3869,7 @@ function nearSheet(view) {
 }
 
 function openSheet(view, kind, id) {
+  const fresh = !view.selected || view.selected.kind !== kind || view.selected.id !== id;
   view.selected = { kind, id };
   const content =
     kind === "station" ? stationSheet(view, id)
@@ -3916,6 +3918,7 @@ function openSheet(view, kind, id) {
     : kind === "agenda" ? (() => { const e = todaysEvents(view).find((x) => x.id === id); return e && e.lat != null ? [e.lon, e.lat] : null; })()
     : null;
   if (selected) selected.setData(featureCollection(where ? [point(where, {})] : []));
+  if (where && fresh) requestAnimationFrame(() => revealPoint(view, where));
   if (kind === "stop") loadStopSheet(view, id);
   if (kind === "regional-station") loadRegionalStationSheet(view, id);
   const flows = view.map.getSource("flows");
@@ -3924,7 +3927,60 @@ function openSheet(view, kind, id) {
   if (kind === "food") loadFoodSheet(view, id);
 }
 
+function sheetDrag(sheet) {
+  const grip = sheet.querySelector(".sheet-grip");
+  let drag = null;
+  grip.addEventListener("pointerdown", (e) => {
+    if (window.innerWidth >= 720) return;
+    drag = { y: e.clientY, last: e.clientY, at: performance.now(), v: 0, height: sheet.offsetHeight };
+    grip.setPointerCapture(e.pointerId);
+    sheet.classList.add("dragging");
+  });
+  grip.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const now = performance.now();
+    drag.v = (e.clientY - drag.last) / Math.max(1, now - drag.at);
+    drag.last = e.clientY;
+    drag.at = now;
+    const dy = e.clientY - drag.y;
+    sheet.style.transform = dy > 0 ? `translateY(${dy}px)` : "";
+    sheet.style.maxHeight = dy < 0 ? `${drag.height - dy}px` : "";
+  });
+  const end = (e) => {
+    if (!drag) return;
+    const dy = e.clientY - drag.y;
+    const v = drag.v;
+    drag = null;
+    sheet.classList.remove("dragging");
+    sheet.style.transform = "";
+    sheet.style.maxHeight = "";
+    if (dy > 90 || v > 0.6) {
+      if (sheet.classList.contains("full")) sheet.classList.remove("full");
+      else if (mapState.view) closeSheet(mapState.view);
+    } else if (dy < -50 || v < -0.6) sheet.classList.add("full");
+  };
+  grip.addEventListener("pointerup", end);
+  grip.addEventListener("pointercancel", end);
+}
+
+// Brings a selected place into the part of the map the sheet does not cover, only when it
+// is hidden, so the map never moves needlessly.
+function revealPoint(view, coord) {
+  const map = view.map;
+  const box = map.getContainer().getBoundingClientRect();
+  const phone = window.innerWidth < 720;
+  const pad = phone
+    ? { top: 160, bottom: Math.min(view.sheet.offsetHeight, box.height * 0.62) + 24, left: 24, right: 24 }
+    : { top: 170, bottom: 40, left: 412, right: 70 };
+  const p = map.project(coord);
+  if (p.x > pad.left && p.x < box.width - pad.right && p.y > pad.top && p.y < box.height - pad.bottom) return;
+  const target = [(pad.left + box.width - pad.right) / 2, (pad.top + box.height - pad.bottom) / 2];
+  const center = map.unproject([box.width / 2 + p.x - target[0], box.height / 2 + p.y - target[1]]);
+  map.easeTo({ center, duration: reduceMotion() ? 0 : 650, essential: false });
+}
+
 function closeSheet(view) {
+  view.sheet.classList.remove("full");
   if (view.selected && view.selected.kind === "plan") {
     view.plan = null;
     drawPlan(view);
@@ -4250,6 +4306,7 @@ async function renderMap(focusKey) {
   const sheetBody = el("div", { class: "sheet-body", "aria-live": "polite" });
   const closeButton = el("button", { type: "button", class: "sheet-close", "aria-label": "Close" }, "×");
   const sheet = el("aside", { class: "map-sheet", "aria-hidden": "true" }, el("div", { class: "sheet-grip", "aria-hidden": "true" }), closeButton, sheetBody);
+  sheetDrag(sheet);
   const status = el("p", { class: "map-status", "aria-live": "polite" });
   const locateButton = el("button", { type: "button", class: "map-fab locate", "aria-label": "Show where I am and what is nearest", title: "Near me" }, iconSvg("locate", { size: 22 }));
   const planButton = el("button", { type: "button", class: "map-fab plan", "aria-label": "Directions", title: "Directions", hidden: "hidden" }, iconSvg("directions", { size: 22 }));
@@ -4974,6 +5031,8 @@ function captureState() {
     focusId: focused ? focused.id : null,
     selection: focused && typeof focused.selectionStart === "number" ? [focused.selectionStart, focused.selectionEnd] : null,
     scroll: window.scrollY,
+    counts: new Map([...main.querySelectorAll("[data-count]")].map((n) => [n.dataset.count, [n.textContent, n.querySelector(".ring-fill")?.style.strokeDashoffset]])),
+    moves: new Map([...main.querySelectorAll("[data-move]")].map((n) => [n.dataset.move, n.style.top])),
   };
 }
 
@@ -4990,6 +5049,26 @@ function restoreState(state) {
     if (state.selection) focused.setSelectionRange(...state.selection);
   }
   window.scrollTo(0, state.scroll);
+  if (reduceMotion()) return;
+  for (const n of main.querySelectorAll("[data-count]")) {
+    const old = state.counts.get(n.dataset.count);
+    if (!old || old[0] === n.textContent) continue;
+    n.classList.add("tick");
+    const fill = n.querySelector(".ring-fill");
+    if (fill && old[1]) {
+      const to = fill.style.strokeDashoffset;
+      fill.style.strokeDashoffset = old[1];
+      requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.strokeDashoffset = to; }));
+    }
+  }
+  for (const n of main.querySelectorAll("[data-move]")) {
+    const old = state.moves.get(n.dataset.move);
+    if (!old || old === n.style.top) continue;
+    const to = n.style.top;
+    n.style.top = old;
+    n.classList.add("moved");
+    requestAnimationFrame(() => requestAnimationFrame(() => { n.style.top = to; }));
+  }
 }
 
 // ---- Events page ---------------------------------------------------------------------
@@ -5053,6 +5132,16 @@ function agendaItem(e, categories) {
 
 // Findings: what the collected data shows when sources are compared (transit.findings).
 const findingDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "short", year: "numeric" });
+
+function arrivalMins(minutes, extra = null, key = null) {
+  const share = Math.max(0, Math.min(1, minutes / 10));
+  const fill = svgNode("circle", { class: "ring-fill", cx: 10, cy: 10, r: 7.5, pathLength: 1 });
+  fill.style.strokeDashoffset = (1 - share).toFixed(3); // Through the CSSOM: the CSP allows no style attributes.
+  return el("span", { class: `mins countdown${minutes === 0 ? " due" : ""}`, "data-count": key },
+    svgNode("svg", { class: "ring", viewBox: "0 0 20 20", "aria-hidden": "true" },
+      svgNode("circle", { class: "ring-track", cx: 10, cy: 10, r: 7.5 }), fill),
+    el("span", { class: "count" }, minutes === 0 ? "Due" : `${minutes} min`), extra);
+}
 
 function svgNode(name, attrs = {}, ...children) {
   const node = document.createElementNS(SVG_NS, name);
@@ -5257,20 +5346,48 @@ function skeleton() {
 
 // Swap in new content. Navigations cross-fade (View Transitions, where supported) and
 // stagger their sections in; periodic refreshes replace content without any motion.
+let heroFrom = null; // The badge a visitor clicked, which glides into the next page's heading.
+
+document.addEventListener("click", (event) => {
+  const link = event.target.closest && event.target.closest('main a[href^="#/line/"]');
+  if (heroFrom) heroFrom.style.viewTransitionName = "";
+  heroFrom = null;
+  const row = link && link.closest("li, .card");
+  const from = row && row.querySelector(".badge");
+  if (from && document.startViewTransition && !reduceMotion()) {
+    from.style.viewTransitionName = "line-hero";
+    heroFrom = from;
+  }
+}, true);
+
 function show(content, { refresh }) {
   const nodes = [content].flat(Infinity).filter(Boolean);
+  let heroTo = null;
   const swap = () => {
     main.classList.toggle("entering", !refresh);
     nodes.forEach((node, i) => node.style && node.style.setProperty("--i", Math.min(i, 10)));
     main.replaceChildren(...nodes);
     for (const node of nodes) if (typeof node.mount === "function") node.mount();
+    if (heroFrom) {
+      heroTo = main.querySelector("h1 .badge");
+      if (heroTo) heroTo.style.viewTransitionName = "line-hero";
+    }
   };
   if (!refresh && document.startViewTransition && !reduceMotion() && !document.body.classList.contains("map-mode")) {
     // A transition is skipped when another navigation starts first; its `ready` promise
     // then rejects with an AbortError that is expected and needs no handling.
-    document.startViewTransition(swap).ready.catch(() => {});
+    const transition = document.startViewTransition(swap);
+    transition.ready.catch(() => {});
+    transition.finished.finally(() => {
+      if (heroTo) heroTo.style.viewTransitionName = "";
+      if (heroFrom) heroFrom.style.viewTransitionName = "";
+      heroFrom = null;
+    });
   } else {
     swap();
+    if (heroTo) heroTo.style.viewTransitionName = "";
+    if (heroFrom) heroFrom.style.viewTransitionName = "";
+    heroFrom = null;
   }
 }
 

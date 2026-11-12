@@ -390,6 +390,21 @@ input[type="search"]:focus { border-color: var(--accent); box-shadow: inset 0 0 
 .arrivals li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .arrivals li:last-child { border-bottom: 0; }
 .mins { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.countdown { display: inline-flex; align-items: center; gap: 6px; }
+.countdown .count { display: inline-block; }
+.ring { width: 16px; height: 16px; flex: none; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 2.6; }
+.ring-track { stroke: var(--surface-2); }
+.ring-fill { stroke: var(--accent); stroke-dasharray: 1; stroke-linecap: round; }
+.countdown.due .ring-track { stroke: var(--accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .ring-fill { transition: stroke-dashoffset 1s var(--ease); }
+  .countdown.tick .count { animation: count-roll 0.45s var(--ease); }
+  .countdown.due .ring { animation: due-pulse 1.6s ease-in-out infinite; }
+  .train.moved { transition: top 1.4s var(--ease); }
+}
+@keyframes count-roll { from { transform: translateY(-70%); opacity: 0; } }
+@keyframes due-pulse { 50% { opacity: 0.35; } }
 .bike-stats { display: flex; flex-wrap: wrap; gap: 2px 14px; }
 .bike-stats b { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 
@@ -650,6 +665,12 @@ body.map-mode footer.site, body.map-mode .updated { display: none; }
   .map-sheet { left: 12px; right: auto; bottom: 12px; top: auto; width: 380px; max-height: calc(100% - 210px); border-radius: var(--radius); transform: translateY(calc(100% + 24px)); }
 }
 .sheet-grip { width: 38px; height: 4px; background: var(--border); margin: 2px auto 10px; }
+@media (max-width: 719px) {
+  .sheet-grip { box-sizing: content-box; padding: 12px 60px; margin: -10px auto 0; background-clip: content-box; touch-action: none; cursor: grab; }
+  .map-sheet { transition: transform 0.38s var(--ease), max-height 0.32s var(--ease); }
+  .map-sheet.full { max-height: calc(100% - 8px); }
+  .map-sheet.dragging { transition: none; }
+}
 .sheet-close {
   position: absolute; top: 10px; right: 12px; width: 32px; height: 32px; border-radius: var(--radius-sm); border: 0;
   background: var(--surface-2); color: var(--muted); font-size: 1.3rem; line-height: 1; cursor: pointer;
@@ -730,6 +751,7 @@ main > .eyebrow:first-child { margin-top: 26px; }
   .map-fab.busy .icon { animation: spin 1s linear infinite; }
   ::view-transition-old(root) { animation: 0.16s ease-out both fade-out; }
   ::view-transition-new(root) { animation: 0.24s var(--ease) both fade-in; }
+  ::view-transition-group(line-hero) { animation-duration: 0.42s; animation-timing-function: var(--ease); }
   .theme-flip::view-transition-old(root), .theme-flip::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
   /* Press feedback: controls give a little under a finger or click. */
   .chip, .button, .map-kind-option, .map-fab, .sheet-close, button.route-pill, #theme-switch { transition: transform 0.12s var(--ease); }
