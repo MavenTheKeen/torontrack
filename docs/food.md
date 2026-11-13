@@ -118,7 +118,7 @@ load). The request names the site in its User-Agent, as Wikidata asks of automat
 The food map shows a notable place only where it matches an OpenStreetMap place to eat
 within 150 m sharing at least half the words of the shorter name (`food_notable.match`);
 this also leaves out places that closed without Wikidata recording it. Matched places are
-drawn larger with a gold ring, are never grouped into clusters, and show their names from
+drawn larger with a yellow ring, are never grouped into clusters, and show their names from
 zoom 13. The "Notable" chip and the filter panel limit the map to them, and their card
 links to the Wikipedia article. In November 2026, 36 of the 60 notable places matched. The
 Michelin Guide publishes no open data; Wikidata records an award for few Toronto places.

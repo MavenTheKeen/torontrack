@@ -18,6 +18,18 @@ opens it on a station), `#/events` (what's on, `#/events/2026-10-17` for one day
 Screenshots were captured from real data on 2026-10-09 at about noon Toronto time,
 about 2 h 30 min after collection started.
 
+## Design
+
+The site follows a transit-at-night design language. The top bar, the tab bar and night
+mode use navy (`#141d3b`); pages are pale paper (`#f3f5f8`). Raspberry (`#e8336d`) is the
+brand colour: the logo, link underlines and the header rule. Other colours act like a
+route map: yellow for what is happening now and the main action, and sea, sky, yellow,
+orange and raspberry, in that order, for grades from best to worst. TTC line colours are
+kept as published. Fills are flat, with 1px rules and no shadows for depth. Text is set in
+Barlow and headings and figures in Barlow Condensed, both served from this site under the
+SIL Open Font License. Motion animates only transforms, opacity and SVG strokes, and stops
+entirely when the device asks for reduced motion.
+
 ## Endpoints
 
 | Path | Returns |

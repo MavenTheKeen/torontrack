@@ -143,7 +143,7 @@ community centres, with what is on now and next, beach water quality in season a
 patios, and today's events with major venues highlighted
 ([skating, swimming and beaches](recreation.md)).
 
-![The city map: rinks, pools, beaches and today's events, with major venues ringed in gold](screenshots/map-city.png)
+![The city map: rinks, pools, beaches and today's events, with major venues ringed in yellow](screenshots/map-city.png)
 
 ## Findings
 

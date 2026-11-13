@@ -4,16 +4,16 @@ A free, ad-free live map of Toronto: transit in real time and how reliable it re
 places to eat with their health inspections, what is on in the city today, and the
 weather, built entirely on open data and tracked continuously since October 2026.
 
-[![Try it live](https://img.shields.io/badge/Try_it_live-torontrack.skynetlab.duckdns.org-e8441f?style=for-the-badge)](https://torontrack.skynetlab.duckdns.org)
+[![Try it live](https://img.shields.io/badge/Try_it_live-torontrack.skynetlab.duckdns.org-e8336d?style=for-the-badge)](https://torontrack.skynetlab.duckdns.org)
 [![Verify pipeline](https://github.com/MavenTheKeen/torontrack/actions/workflows/ci.yml/badge.svg)](https://github.com/MavenTheKeen/torontrack/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-[![Days collecting](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.days_collecting&label=days%20collecting&color=e8441f)](https://torontrack.skynetlab.duckdns.org/#/pipeline)
-[![Feed polls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.feed_polls&label=TTC%20feed%20polls&color=e8441f)](https://torontrack.skynetlab.duckdns.org/#/pipeline)
-[![Train gaps measured](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.train_gaps&label=train%20gaps%20measured&color=e8441f)](https://torontrack.skynetlab.duckdns.org/#/reliability)
-[![Bus and streetcar gaps measured](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.surface_gaps&label=bus%20and%20streetcar%20gaps&color=e8441f)](https://torontrack.skynetlab.duckdns.org/#/reliability)
-[![Bike Share trips](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.bikeshare_trips&label=Bike%20Share%20trips&color=e8441f)](docs/bikeshare.md)
-[![Food inspections](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.food_inspections&label=food%20inspections&color=e8441f)](docs/food.md)
+[![Days collecting](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.days_collecting&label=days%20collecting&color=e8336d)](https://torontrack.skynetlab.duckdns.org/#/pipeline)
+[![Feed polls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.feed_polls&label=TTC%20feed%20polls&color=e8336d)](https://torontrack.skynetlab.duckdns.org/#/pipeline)
+[![Train gaps measured](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.train_gaps&label=train%20gaps%20measured&color=e8336d)](https://torontrack.skynetlab.duckdns.org/#/reliability)
+[![Bus and streetcar gaps measured](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.surface_gaps&label=bus%20and%20streetcar%20gaps&color=e8336d)](https://torontrack.skynetlab.duckdns.org/#/reliability)
+[![Bike Share trips](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.bikeshare_trips&label=Bike%20Share%20trips&color=e8336d)](docs/bikeshare.md)
+[![Food inspections](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ftorontrack.skynetlab.duckdns.org%2Fapi%2Fstats&query=%24.display.food_inspections&label=food%20inspections&color=e8336d)](docs/food.md)
 
 ![The transit, food, city and weather maps in turn, then the Findings page](docs/screenshots/demo.gif)
 

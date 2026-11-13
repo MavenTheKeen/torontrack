@@ -41,7 +41,7 @@ recent results. The same samples feed the beach and rain finding ([findings](fin
 
 The city map also shows the day's events from the Events page's agenda (`/api/agenda`:
 city festivals and events and Ticketmaster events). Events at a major venue, an arena or
-stadium, are drawn larger with a gold ring and named at every zoom; others are named from
+stadium, are drawn larger with a yellow ring and named at every zoom; others are named from
 zoom 15. A "Today" chip opens the day's major and featured events, and an event's card
 gives its time, venue, nearest station and a link to its page.
 

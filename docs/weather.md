@@ -81,6 +81,6 @@ forty small requests every six hours.
 The map's "Next 12 hours" mode, the default, plays the forecast hour by hour: cells with
 at least 0.1 mm of precipitation, coloured by amount, and wind particles drawn on a canvas
 over the map, each moving with the wind at its position (bilinear in the grid) and
-leaving a fading trail, darker and faster for stronger wind and orange above about
+leaving a fading trail, darker and faster for stronger wind and raspberry above about
 28 km/h. "Past hour" switches back to the radar loop, and a Wind chip turns the particles
 off. With reduced motion the wind is drawn as still streaks.

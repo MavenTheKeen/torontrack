@@ -20,13 +20,17 @@ PHONE = {"width": 390, "height": 844}
 GIF_SIZE = (960, 600)
 GIF_FRAME_MS = 140
 SOCIAL = """<!doctype html><html><head><style>
+@font-face {{ font-family: Barlow; src: url('{body}'); }}
+@font-face {{ font-family: "Barlow Condensed"; font-weight: 700; src: url('{display}'); }}
 body {{ margin: 0; height: 640px; overflow: hidden; display: grid;
-  grid-template-columns: 520px 1fr; font-family: "Segoe UI", Arial, sans-serif; }}
+  grid-template-columns: 520px 1fr; font-family: Barlow, Arial, sans-serif;
+  background: #f3f5f8; color: #141d3b; }}
 .text {{ padding: 72px 48px; display: flex; flex-direction: column; justify-content: center;
-  gap: 22px; border-right: 6px solid #f2471a; }}
-.name {{ display: flex; align-items: center; gap: 18px; font-size: 58px; font-weight: 800; }}
-.what {{ margin: 0; font-size: 28px; line-height: 1.3; color: #333; }}
-.url {{ margin: 0; font-size: 20px; color: #767676; }}
+  gap: 22px; border-right: 6px solid #e8336d; }}
+.name {{ display: flex; align-items: center; gap: 18px;
+  font-family: "Barlow Condensed"; font-size: 76px; font-weight: 700; line-height: 0.95; }}
+.what {{ margin: 0; font-size: 28px; line-height: 1.3; color: #141d3b; }}
+.url {{ margin: 0; font-size: 20px; color: #4c5775; }}
 .shot {{ background: url('{shot}') 80% 60% / auto 150%; }}
 </style></head><body><div class="text">
 <div class="name"><img src="{logo}" width="72" height="72">Torontrack</div>
@@ -84,7 +88,14 @@ def capture_social(browser) -> None:
     icon = OUT.parent.parent / "src" / "transit" / "web" / "static" / "icon.svg"
     logo = "data:image/svg+xml;base64," + base64.b64encode(icon.read_bytes()).decode()
     page = browser.new_page(viewport={"width": 1280, "height": 640})
-    page.set_content(SOCIAL.format(logo=logo, shot=shot))
+    fonts = OUT.parent.parent / "src" / "transit" / "web" / "static" / "fonts"
+
+    def font(name: str) -> str:
+        return "data:font/woff2;base64," + base64.b64encode((fonts / name).read_bytes()).decode()
+
+    body = font("barlow-latin-400-normal.woff2")
+    display = font("barlow-condensed-latin-700-normal.woff2")
+    page.set_content(SOCIAL.format(logo=logo, shot=shot, body=body, display=display))
     page.wait_for_timeout(800)
     page.screenshot(path=OUT / "social-preview.png")
     page.close()
