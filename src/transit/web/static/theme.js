@@ -16,7 +16,7 @@
   const apply = (theme) => {
     document.documentElement.dataset.theme = theme;
     for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
-      meta.content = theme === "dark" ? "#0f1630" : "#141d3b"; // The top bar is night in both themes.
+      meta.content = theme === "dark" ? "#0b0d13" : "#141d3b"; // The top bar is night in both themes.
     }
   };
   apply(saved() || (system.matches ? "dark" : "light"));
