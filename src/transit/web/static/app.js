@@ -1253,7 +1253,7 @@ function savedMapKind() {
 }
 const mapState = { view: null, kind: savedMapKind(), food: { kinds: [true, true, true, true, true], clean: false, long: false, notable: false, other: false }, city: { skate: true, swim: true, beach: true, patio: true, events: true, now: false }, mode: "bikes", layers: { trains: true, regional: true, buses: true, bikes: true, access: true, entrances: true, roads: false, lanes: false, events: false, food: false, parking: false, bikeParking: false } };
 // Buses and streetcars. TTC's subway lines own yellow, green and purple and the site's
-// brand is red-orange, so TTC buses take blue and streetcars crimson, and neighbouring
+// brand is raspberry, so TTC buses take blue and streetcars crimson, and neighbouring
 // agencies' buses (mode = agency key, transit.agencies) teal and indigo. All are always
 // labelled, never told apart by colour alone.
 const SURFACE_COLOURS = { bus: "#2563eb", streetcar: "#e11d48", br: "#0f766e", mi: "#4f46e5", yr: "#a21caf" };
@@ -1304,8 +1304,8 @@ const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)")
 // basemap schema (v4) that the extract uses.
 function basemapColours(dark) {
   return dark
-    ? { water: "#0f1c28", land: "#151515", park: "#16231b", building: "#1d1d1d", road: "#262626", major: "#2f2f2f", highway: "#3a3a3a", casing: "#0f0f0f", label: "#8c8c8c", halo: "#0a0a0a", rail: "#3a3a3a" }
-    : { water: "#cbdcea", land: "#f3f4f1", park: "#dbe9d3", building: "#e7e7e3", road: "#ffffff", major: "#ffffff", highway: "#fdfdfb", casing: "#d9dad3", label: "#6b7280", halo: "#ffffff", rail: "#c9cbc4" };
+    ? { water: "#0c1330", land: "#141d3b", park: "#17304a", building: "#1a2550", road: "#24315c", major: "#2b3a6b", highway: "#34457a", casing: "#10183a", label: "#a9b4d2", halo: "#141d3b", rail: "#3a4a7a" }
+    : { water: "#c6d4e8", land: "#eef1f6", park: "#d6e8e1", building: "#e1e6ee", road: "#ffffff", major: "#ffffff", highway: "#fbfcfd", casing: "#cfd5e1", label: "#4c5775", halo: "#f3f5f8", rail: "#a5aec2" };
 }
 
 function mapStyle(hasBasemap) {
@@ -1505,32 +1505,32 @@ function stopFeatures(surface) {
   return featureCollection(surface.stops.map(([id, code, name, lat, lon, routes]) => point([lon, lat], { id, name, routes: routes.join(" ") })));
 }
 
-const DOCK_COLOURS = { ok: "#16a34a", few: "#e59a00", none: "#dc2626", unknown: "#9aa1ab" };
+const DOCK_COLOURS = { ok: "#2bb39a", few: "#f08a3c", none: "#e8336d", unknown: "#9aa5bf" };
 const DOCK_LEVEL_LABELS = { ok: "3 or more", few: "1 or 2", none: "None", unknown: "No recent report" };
-const OUTAGE_COLOUR = "#f59e0b";
+const OUTAGE_COLOUR = "#ffc83d";
 const ENTRANCE_COLOUR = "#57534e";
 const STEP_FREE_COLOUR = "#0369a1";
 const PARKING_COLOUR = "#4338ca";
 const BIKE_PARKING_COLOUR = "#0f766e";
 // Food premises by latest inspection result, in the order of /api/food's result codes.
 const FOOD_LEVELS = ["pass", "conditional", "closed", "other"];
-const FOOD_COLOURS = { pass: "#15803d", conditional: "#d97706", closed: "#b91c1c", other: "#6b7280" };
+const FOOD_COLOURS = { pass: "#1f9a83", conditional: "#ffc83d", closed: "#e8336d", other: "#9aa5bf" };
 const FOOD_LABELS = { pass: "Pass", conditional: "Conditional pass", closed: "Closed", other: "Other result" };
 // The food map's places to eat, in the order of /api/food/places' kind codes. Each kind has
 // its own icon and colour; amber and red are kept for failed inspections.
 const EAT_KINDS = [
-  { glyph: "food", label: "Restaurants", short: "Restaurants", one: "Restaurant", colour: "#2563eb" },
-  { glyph: "cafe", label: "Cafés", short: "Cafés", one: "Café", colour: "#7c4a21" },
-  { glyph: "fastfood", label: "Fast food", short: "Fast food", one: "Fast food", colour: "#0f766e" },
-  { glyph: "drink", label: "Bars and pubs", short: "Bars", one: "Bar or pub", colour: "#7c3aed" },
-  { glyph: "dessert", label: "Bakeries and desserts", short: "Sweets", one: "Bakery or dessert shop", colour: "#db2777" },
+  { glyph: "food", label: "Restaurants", short: "Restaurants", one: "Restaurant", colour: "#2f6fb8" },
+  { glyph: "cafe", label: "Cafés", short: "Cafés", one: "Café", colour: "#8a5a3c" },
+  { glyph: "fastfood", label: "Fast food", short: "Fast food", one: "Fast food", colour: "#1f9a83" },
+  { glyph: "drink", label: "Bars and pubs", short: "Bars", one: "Bar or pub", colour: "#1d2a52" },
+  { glyph: "dessert", label: "Bakeries and desserts", short: "Sweets", one: "Bakery or dessert shop", colour: "#e8336d" },
 ];
-const EAT_COLOUR = "#475569";
-// Notable places (Wikidata): a gold ring, drawn on top and never clustered.
-const NOTABLE_COLOUR = "#ca8a04";
+const EAT_COLOUR = "#4c5775";
+// Notable places (Wikidata): a yellow ring, drawn on top and never clustered.
+const NOTABLE_COLOUR = "#ffc83d";
 
 function mapCasing() {
-  return prefersDark() ? "#0a0a0a" : "#ffffff";
+  return prefersDark() ? "#141d3b" : "#ffffff";
 }
 
 // Every icon the map draws, from icons.js. Subway trains take their line's colour.
@@ -1542,9 +1542,9 @@ function addMapIcons(map) {
   for (const [level, colour] of Object.entries(DOCK_COLOURS)) addBadge(map, `badge-dock-${level}`, "bike", colour, "#ffffff", ring, { css: 24, glyph: 15 });
   addBadge(map, "badge-event-today", "event", EVENT_COLOUR, "#ffffff", ring, { css: 24, glyph: 14 });
   addBadge(map, "badge-event-week", "event", prefersDark() ? "#94a3b8" : EVENT_COLOUR, "#ffffff", ring, { css: 24, glyph: 14, hollow: true });
-  addBadge(map, "badge-construction", "roadwork", ROAD_COLOURS.construction, "#111418", ring, { css: 24, glyph: 15 });
+  addBadge(map, "badge-construction", "roadwork", ROAD_COLOURS.construction, "#141d3b", ring, { css: 24, glyph: 15 });
   addBadge(map, "badge-closure", "closure", ROAD_COLOURS.closure, "#ffffff", ring, { css: 24, glyph: 15 });
-  addBadge(map, "badge-elevator", "elevator", OUTAGE_COLOUR, "#111418", ring, { css: 20, glyph: 13 });
+  addBadge(map, "badge-elevator", "elevator", OUTAGE_COLOUR, "#141d3b", ring, { css: 20, glyph: 13 });
   addBadge(map, "badge-entrance", "entrance", ENTRANCE_COLOUR, "#ffffff", ring, { css: 22, glyph: 14 });
   addBadge(map, "badge-entrance-free", "stepfree", STEP_FREE_COLOUR, "#ffffff", ring, { css: 22, glyph: 15 });
   addBadge(map, "badge-parking", "parking", PARKING_COLOUR, "#ffffff", ring, { css: 22, glyph: 14 });
@@ -1552,7 +1552,7 @@ function addMapIcons(map) {
   addBadge(map, "badge-rack", "rack", BIKE_PARKING_COLOUR, "#ffffff", ring, { css: 20, glyph: 13 });
   EAT_KINDS.forEach((k, i) => {
     addBadge(map, `badge-eat-${i}`, k.glyph, k.colour, "#ffffff", ring, { css: 22, glyph: 14 });
-    addBadge(map, `badge-eat-${i}-conditional`, k.glyph, FOOD_COLOURS.conditional, "#111418", ring, { css: 24, glyph: 15 });
+    addBadge(map, `badge-eat-${i}-conditional`, k.glyph, FOOD_COLOURS.conditional, "#141d3b", ring, { css: 24, glyph: 15 });
     addBadge(map, `badge-eat-${i}-closed`, k.glyph, FOOD_COLOURS.closed, "#ffffff", ring, { css: 24, glyph: 15 });
     addBadge(map, `badge-eat-${i}-notable`, k.glyph, k.colour, "#ffffff", ring, { css: 32, glyph: 16, halo: NOTABLE_COLOUR });
   });
@@ -1565,12 +1565,12 @@ function addMapIcons(map) {
     addBadge(map, `badge-rec-${kind}-now`, kind, colour, "#ffffff", ring, { css: 30, glyph: 17, halo: "#16a34a" });
     addBadge(map, `badge-rec-${kind}-done`, kind, colour, "#ffffff", ring, { css: 22, glyph: 13, hollow: true });
   }
-  for (const level of FOOD_LEVELS) addBadge(map, `badge-food-${level}`, "food", FOOD_COLOURS[level], level === "conditional" ? "#111418" : "#ffffff", ring, { css: 20, glyph: 13 });
+  for (const level of FOOD_LEVELS) addBadge(map, `badge-food-${level}`, "food", FOOD_COLOURS[level], level === "conditional" ? "#141d3b" : "#ffffff", ring, { css: 20, glyph: 13 });
   addHeadingImage(map);
 }
 
 function addSurfaceLayers(map) {
-  const c = prefersDark() ? { stop: "#151515", stopStroke: "#8c8c8c", halo: "#0a0a0a", casing: "#0a0a0a" } : { stop: "#ffffff", stopStroke: "#64748b", halo: "#ffffff", casing: "#ffffff" };
+  const c = prefersDark() ? { stop: "#1d2a52", stopStroke: "#8c8c8c", halo: "#141d3b", casing: "#141d3b" } : { stop: "#ffffff", stopStroke: "#4c5775", halo: "#ffffff", casing: "#ffffff" };
   const modeColour = ["match", ["get", "mode"], ...Object.entries(SURFACE_COLOURS).filter(([m]) => m !== "bus").flat(), SURFACE_COLOURS.bus];
   map.addSource("route-path", { type: "geojson", data: featureCollection([]) });
   map.addSource("bus-stops", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM, buffer: 0 });
@@ -1746,7 +1746,7 @@ function addRegionalPill(map) {
 }
 
 function addRegionalLayers(map) {
-  const c = prefersDark() ? { casing: "#0a0a0a", fill: "#151515", label: "#f0f0f0", halo: "#0a0a0a" } : { casing: "#ffffff", fill: "#ffffff", label: "#111418", halo: "#ffffff" };
+  const c = prefersDark() ? { casing: "#141d3b", fill: "#1d2a52", label: "#eef1f8", halo: "#141d3b" } : { casing: "#ffffff", fill: "#ffffff", label: "#141d3b", halo: "#ffffff" };
   map.addSource("regional-lines", { type: "geojson", data: featureCollection([]) });
   map.addSource("regional-stations", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM, buffer: 0 });
   addRegionalPill(map);
@@ -1930,7 +1930,7 @@ const OSM_SOURCES = { parking: ["parking", "parking.geojson", "Parking"], bikePa
 
 function addOsmLayers(view) {
   const map = view.map;
-  const c = prefersDark() ? { label: "#f0f0f0", halo: "#0a0a0a" } : { label: "#111418", halo: "#ffffff" };
+  const c = prefersDark() ? { label: "#eef1f8", halo: "#141d3b" } : { label: "#141d3b", halo: "#ffffff" };
   map.addSource("parking", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM, buffer: 0 });
   map.addSource("bike-parking", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM, buffer: 0 });
   map.addLayer({ id: "bike-parking", type: "symbol", source: "bike-parking", minzoom: 14.5, layout: {
@@ -2154,7 +2154,7 @@ async function loadDockTrips(view, id) {
 
 // City of Toronto festivals and events: today's in a solid marker, the rest of the week
 // hollow. The city's calendar has no professional sports and few arena concerts.
-const EVENT_COLOUR = "#334155";
+const EVENT_COLOUR = "#141d3b";
 const eventDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", weekday: "short", month: "short", day: "numeric" });
 const NEARBY_EVENT_M = 700;
 
@@ -2229,7 +2229,7 @@ function addFoodLayers(view) {
   map.addLayer({ id: "eats-label", type: "symbol", source: "eats", minzoom: 16, filter: ["!", ["has", "point_count"]], layout: {
     "text-field": ["get", "label"], "text-font": ["Noto Sans Medium"], "text-size": 11.5, "text-anchor": "top", "text-offset": [0, 1.2],
     "text-max-width": 9, "text-optional": true,
-  }, paint: { "text-color": prefersDark() ? "#e5e7eb" : "#1f2937", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
+  }, paint: { "text-color": prefersDark() ? "#eef1f8" : "#141d3b", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
   applyLayerToggles(map);
   loadFood(view);
 }
@@ -2295,7 +2295,7 @@ function foodPanel(rerender, view) {
   const row = (icon, label, note, on, change) => el("li", { class: on ? "layer on" : "layer" }, icon,
     el("span", { class: "layer-text" }, el("span", { class: "layer-label" }, label), note ? el("span", { class: "muted small" }, note) : null),
     layerSwitch(on, label, () => { change(); showEats(view); applyLayerToggles(view.map); rerender(); }));
-  const result = (level, size) => badgeEl("food", FOOD_COLOURS[level], level === "conditional" ? "#111418" : "#ffffff", size ? { size } : undefined);
+  const result = (level, size) => badgeEl("food", FOOD_COLOURS[level], level === "conditional" ? "#141d3b" : "#ffffff", size ? { size } : undefined);
   return [
     el("div", { class: "panel-head" },
       el("p", { class: "panel-heading" }, "Food map"),
@@ -2306,7 +2306,7 @@ function foodPanel(rerender, view) {
     el("p", { class: "panel-subheading" }, "Inspections"),
     el("ul", { class: "layer-list" },
       row(result("pass"), "Clean record only", CLEAN_RECORD, f.clean, () => { f.clean = !f.clean; }),
-      row(badgeEl("notable", NOTABLE_COLOUR, "#ffffff"), "Notable only", "Places with a Wikipedia article or a Michelin Guide award, from Wikidata; always shown, with a gold ring", f.notable, () => { f.notable = !f.notable; }),
+      row(badgeEl("notable", NOTABLE_COLOUR, "#141d3b"), "Notable only", "Places with a Wikipedia article or a Michelin Guide award, from Wikidata; always shown, with a gold ring", f.notable, () => { f.notable = !f.notable; }),
       row(badgeEl("clock", EAT_KINDS[0].colour, "#ffffff"), "Long-running only", `Licensed at the same address under the same name for ${LONG_RUNNING} years or more; their names show the year`, f.long, () => { f.long = !f.long; }),
       row(result("other"), "Other inspected premises", "Grocers, institutional kitchens and places not on the map, close up", f.other, () => { f.other = !f.other; })),
     el("ul", { class: "legend-list compact" },
@@ -2319,16 +2319,16 @@ function foodPanel(rerender, view) {
 // The city map: drop-in skating and swimming today at city rinks, pools and community
 // centres (transit.recreation). A place is ringed in green while a session is on, and drawn
 // hollow once its last session of the day has ended.
-const REC_COLOURS = { skate: "#0284c7", swim: "#0d9488" };
+const REC_COLOURS = { skate: "#2f6fb8", swim: "#1f9a83" };
 const REC_LABELS = { skate: "Skating", swim: "Swimming" };
 // Beaches: green when the latest result met Toronto's E. coli standard, red when not, and
 // hollow grey out of season (more than three days since any beach was sampled).
-const BEACH_COLOURS = { safe: "#16a34a", unsafe: "#dc2626", off: "#6b7280" };
-const PATIO_COLOUR = "#b45309";
+const BEACH_COLOURS = { safe: "#2bb39a", unsafe: "#e8336d", off: "#9aa5bf" };
+const PATIO_COLOUR = "#f08a3c";
 // Today's events on the city map: city festivals and events and ticketed events from the
-// Events page's agenda. Events at a major venue (arenas and stadiums) are ringed in gold
+// Events page's agenda. Events at a major venue (arenas and stadiums) are ringed in yellow
 // and named at every zoom.
-const MAJOR_COLOUR = "#ca8a04";
+const MAJOR_COLOUR = "#ffc83d";
 
 function addCityLayers(view) {
   const map = view.map;
@@ -2340,7 +2340,7 @@ function addCityLayers(view) {
     "icon-allow-overlap": true, "symbol-sort-key": ["get", "rank"],
     "text-field": ["step", ["zoom"], "", 13, ["get", "label"]], "text-font": ["Noto Sans Medium"], "text-size": 12, "text-anchor": "top", "text-offset": [0, 1.3],
     "text-max-width": 10, "text-optional": true,
-  }, paint: { "text-color": prefersDark() ? "#e5e7eb" : "#1f2937", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
+  }, paint: { "text-color": prefersDark() ? "#eef1f8" : "#141d3b", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
   map.addSource("agenda", { type: "geojson", data: featureCollection([]) });
   map.addLayer({ id: "agenda", type: "symbol", source: "agenda", layout: {
     "icon-image": ["case", ["get", "major"], "badge-agenda-major", "badge-agenda"],
@@ -2349,20 +2349,20 @@ function addCityLayers(view) {
     "text-field": ["step", ["zoom"], ["case", ["get", "major"], ["get", "name"], ""], 15, ["get", "name"]],
     "text-font": ["Noto Sans Medium"], "text-size": ["case", ["get", "major"], 12.5, 11.5], "text-anchor": "top", "text-offset": [0, 1.4],
     "text-max-width": 10, "text-optional": true,
-  }, paint: { "text-color": prefersDark() ? "#e5e7eb" : "#1f2937", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
+  }, paint: { "text-color": prefersDark() ? "#eef1f8" : "#141d3b", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
   map.addSource("patios", { type: "geojson", data: featureCollection([]) });
   map.addLayer({ id: "patios", type: "symbol", source: "patios", minzoom: 13, layout: {
     "icon-image": "badge-patio", "icon-size": ["interpolate", ["linear"], ["zoom"], 13, 0.7, 17, 1], "icon-allow-overlap": true,
     "text-field": ["step", ["zoom"], "", 16, ["get", "name"]], "text-font": ["Noto Sans Medium"], "text-size": 11.5, "text-anchor": "top", "text-offset": [0, 1.2],
     "text-max-width": 9, "text-optional": true,
-  }, paint: { "text-color": prefersDark() ? "#e5e7eb" : "#1f2937", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
+  }, paint: { "text-color": prefersDark() ? "#eef1f8" : "#141d3b", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
   map.addSource("beaches", { type: "geojson", data: featureCollection([]) });
   map.addLayer({ id: "beaches", type: "symbol", source: "beaches", layout: {
     "icon-image": ["concat", "badge-beach-", ["get", "state"]],
     "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.8, 16, 1], "icon-allow-overlap": true,
     "text-field": ["step", ["zoom"], "", 12, ["get", "name"]], "text-font": ["Noto Sans Medium"], "text-size": 12, "text-anchor": "top", "text-offset": [0, 1.3],
     "text-max-width": 10, "text-optional": true,
-  }, paint: { "text-color": prefersDark() ? "#e5e7eb" : "#1f2937", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
+  }, paint: { "text-color": prefersDark() ? "#eef1f8" : "#141d3b", "text-halo-color": c.halo, "text-halo-width": 1.6 } }, "trains-halo");
   applyLayerToggles(map);
   loadCity(view);
 }
@@ -2567,7 +2567,7 @@ function cityPanel(rerender, view) {
       legendRow(badgeEl("beach", BEACH_COLOURS.unsafe, "#ffffff", { size: 20 }), "Beach: latest sample over the standard"),
       legendRow(badgeEl("beach", BEACH_COLOURS.off, "#ffffff", { size: 20, hollow: true }), "Beach: out of the sampling season"),
       legendRow(badgeEl("patio", PATIO_COLOUR, "#ffffff", { size: 20 }), "CaféTO patio, shown when zoomed in"),
-      legendRow(badgeEl("event", EVENT_COLOUR, "#ffffff", { size: 20 }), "Event today; a gold ring marks a major venue")),
+      legendRow(badgeEl("event", EVENT_COLOUR, "#ffffff", { size: 20 }), "Event today; a yellow ring marks a major venue")),
   ];
 }
 
@@ -2575,14 +2575,14 @@ function cityPanel(rerender, view) {
 // Air Quality Health Index at each Toronto station, and a card with the conditions,
 // forecast, warnings and what the findings say this weather tends to do.
 const RADAR_STEP_MS = 650;
-const AQHI_COLOURS = { Low: "#16a34a", Moderate: "#ca8a04", High: "#dc2626", "Very high": "#7f1d1d" };
+const AQHI_COLOURS = { Low: "#1f9a83", Moderate: "#d9a21b", High: "#f08a3c", "Very high": "#e8336d" };
 const radarTimeFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", hour: "numeric", minute: "2-digit" });
 const radarUrl = (kind, at) => `/api/radar/${kind}/${Math.round(Date.parse(at) / 1000)}.png`;
 const RADAR_CORNERS = [[-80.1, 44.15], [-78.7, 44.15], [-78.7, 43.25], [-80.1, 43.25]];
 // The forecast: ECCC's HRDPS model, hour by hour for the next twelve hours. Precipitation is
 // drawn as the model's grid cells; wind as particles that drift with it.
 const FORECAST_STEP_MS = 1100;
-const PRECIP_STEPS = [0.1, "#93c5fd", 0.5, "#3b82f6", 2, "#1d4ed8", 5, "#7c3aed", 10, "#be185d"];
+const PRECIP_STEPS = [0.1, "#a9d0f6", 0.5, "#58a6f0", 2, "#2f6fb8", 5, "#1d2a52", 10, "#e8336d"];
 const forecastMode = () => mapState.weatherMode !== "radar";
 
 function addWeatherLayers(view) {
@@ -2725,8 +2725,8 @@ function startWind(view) {
   if (view.wind) return; // Already running.
   const ctx = canvas.getContext("2d");
   const dark = prefersDark();
-  const colours = dark ? ["rgba(226,232,240,0.55)", "rgba(226,232,240,0.85)", "rgba(255,120,80,0.95)"]
-    : ["rgba(51,65,85,0.45)", "rgba(30,41,59,0.75)", "rgba(204,61,14,0.9)"];
+  const colours = dark ? ["rgba(238,241,248,0.5)", "rgba(238,241,248,0.85)", "rgba(255,111,154,0.95)"]
+    : ["rgba(76,87,117,0.45)", "rgba(20,29,59,0.75)", "rgba(232,51,109,0.9)"];
   const state = { particles: [], last: 0, frame: 0 };
   view.wind = state;
   const resize = () => {
@@ -2901,7 +2901,7 @@ function weatherPanel() {
     el("div", { class: "panel-head" },
       el("p", { class: "panel-heading" }, "Weather map"),
       el("button", { type: "button", class: "panel-close", "aria-label": "Close weather map legend" }, iconSvg("close", { size: 18 }))),
-    el("p", { class: "muted small" }, "Next 12 hours: precipitation and wind from Environment Canada's high-resolution forecast model, hour by hour. Past hour: rain and snow from the radar, every six minutes, with stronger colours for heavier precipitation. Moving lines follow the forecast wind; the faster the wind, the faster and darker they move, and above about 28 km/h they turn orange. Circles are the Air Quality Health Index at each Toronto station."),
+    el("p", { class: "muted small" }, "Next 12 hours: precipitation and wind from Environment Canada's high-resolution forecast model, hour by hour. Past hour: rain and snow from the radar, every six minutes, with stronger colours for heavier precipitation. Moving lines follow the forecast wind; the faster the wind, the faster and darker they move, and above about 28 km/h they turn raspberry. Circles are the Air Quality Health Index at each Toronto station."),
     el("ul", { class: "legend-list compact" }, [[0.1, "Light, under 0.5 mm an hour"], [0.5, "Moderate, 0.5 to 2 mm"], [2, "Heavy, 2 to 5 mm"], [5, "Very heavy, 5 mm or more"]].map(([mm, text]) =>
       legendRow(el("span", { class: "legend-dot", style: { background: PRECIP_STEPS[PRECIP_STEPS.indexOf(mm) + 1], borderRadius: "3px" } }), `Forecast precipitation: ${text.charAt(0).toLowerCase()}${text.slice(1)}`))),
     el("ul", { class: "legend-list compact" }, Object.entries(AQHI_COLOURS).map(([risk, colour]) => legendRow(el("span", { class: "legend-dot", style: { background: colour } }), `Air quality: ${risk.toLowerCase()} risk`))),
@@ -3012,7 +3012,7 @@ function foodKindChips(rerender, view) {
     showEats(view);
     rerender();
   }, { class: "chip kind-chip", title: k.label })).concat(
-    chip([badgeEl("notable", NOTABLE_COLOUR, "#ffffff", { size: 20 }), "Notable"], mapState.food.notable, () => {
+    chip([badgeEl("notable", NOTABLE_COLOUR, "#141d3b", { size: 20 }), "Notable"], mapState.food.notable, () => {
       mapState.food.notable = !mapState.food.notable;
       showEats(view);
       rerender();
@@ -3111,7 +3111,7 @@ function foodSheetBody(view, p) {
 function notableBlock(n) {
   const facts = [n.awards, n.opened ? `Opened ${n.opened}` : null].filter(Boolean).join(" · ");
   return el("div", { class: "sheet-block notable" },
-    el("p", { class: "sheet-label" }, badgeEl("notable", NOTABLE_COLOUR, "#ffffff", { size: 20 }), " Notable place", facts ? ` · ${facts}` : ""),
+    el("p", { class: "sheet-label" }, badgeEl("notable", NOTABLE_COLOUR, "#141d3b", { size: 20 }), " Notable place", facts ? ` · ${facts}` : ""),
     n.wikipedia ? el("p", {}, el("a", { href: n.wikipedia, target: "_blank", rel: "noopener" }, "Read about it on Wikipedia")) : null);
 }
 
@@ -3268,7 +3268,7 @@ function suggestPlanPlaces(view, key, text) {
 
 function textOn(hex) {
   const n = parseInt(hex.slice(1), 16);
-  return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) > 160 ? "#111418" : "#ffffff";
+  return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) > 160 ? "#141d3b" : "#ffffff";
 }
 
 function durationText(seconds) {
@@ -3296,7 +3296,7 @@ function planPlace(view, coord) {
 
 function addPlanLayers(view) {
   const map = view.map;
-  const c = prefersDark() ? { fill: "#151515", ink: "#f0f0f0" } : { fill: "#ffffff", ink: "#111418" };
+  const c = prefersDark() ? { fill: "#1d2a52", ink: "#eef1f8" } : { fill: "#ffffff", ink: "#141d3b" };
   const transit = ["all", ["==", ["geometry-type"], "LineString"], ["!", ["get", "walk"]]];
   map.addSource("plan", { type: "geojson", data: featureCollection([]) });
   // An ink outline sets the trip apart from the network lines it runs along.
@@ -3535,7 +3535,7 @@ function addGuideLayers(view) {
   ctx.fill();
   ctx.beginPath();
   ctx.arc(size / 2, size / 2, size / 2 - 4.5 * ratio, 0, 2 * Math.PI);
-  ctx.fillStyle = "#3b6cf6";
+  ctx.fillStyle = "#58a6f0";
   ctx.fill();
   ctx.beginPath();
   ctx.moveTo(size / 2, 7 * ratio);
@@ -3697,7 +3697,7 @@ function lineColour(id) {
 
 function addOverlayLayers(map, data) {
   const { lines: lineFc, stations, entrances } = networkFeatures(data);
-  const c = prefersDark() ? { casing: "#0a0a0a", stationFill: "#151515", stationStroke: "#f0f0f0", label: "#f0f0f0", halo: "#0a0a0a", trainStroke: "#ffffff" } : { casing: "#ffffff", stationFill: "#ffffff", stationStroke: "#111418", label: "#111418", halo: "#ffffff", trainStroke: "#111418" };
+  const c = prefersDark() ? { casing: "#141d3b", stationFill: "#1d2a52", stationStroke: "#eef1f8", label: "#eef1f8", halo: "#141d3b", trainStroke: "#ffffff" } : { casing: "#ffffff", stationFill: "#ffffff", stationStroke: "#141d3b", label: "#141d3b", halo: "#ffffff", trainStroke: "#141d3b" };
   map.addSource("lines", { type: "geojson", data: lineFc });
   map.addSource("stations", { type: "geojson", data: stations, maxzoom: POINTS_MAXZOOM, buffer: 0 });
   map.addSource("docks", { type: "geojson", data: dockFeatures(data, mapState.mode), maxzoom: POINTS_MAXZOOM, buffer: 0 });
@@ -3754,10 +3754,10 @@ function addOverlayLayers(map, data) {
     "text-field": ["get", "name"], "text-font": ["Noto Sans Medium"], "text-size": ["interpolate", ["linear"], ["zoom"], 11, 11, 16, 14],
     "text-anchor": "left", "text-offset": [0.9, 0], "text-optional": true, "text-max-width": 9,
   }, paint: { "text-color": c.label, "text-halo-color": c.halo, "text-halo-width": 2 } });
-  map.addLayer({ id: "me-accuracy", type: "fill", source: "me", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#3b6cf6", "fill-opacity": 0.12 } });
-  map.addLayer({ id: "me-pulse", type: "circle", source: "me", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 9, "circle-color": "#3b6cf6", "circle-opacity": 0.25 } });
-  map.addLayer({ id: "me", type: "circle", source: "me", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 7, "circle-color": "#3b6cf6", "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
-  map.addLayer({ id: "selected", type: "circle", source: "selected", paint: { "circle-radius": 16, "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#3b6cf6", "circle-stroke-width": 3 } });
+  map.addLayer({ id: "me-accuracy", type: "fill", source: "me", filter: ["==", ["geometry-type"], "Polygon"], paint: { "fill-color": "#58a6f0", "fill-opacity": 0.12 } });
+  map.addLayer({ id: "me-pulse", type: "circle", source: "me", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 9, "circle-color": "#58a6f0", "circle-opacity": 0.25 } });
+  map.addLayer({ id: "me", type: "circle", source: "me", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-radius": 7, "circle-color": "#58a6f0", "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 } });
+  map.addLayer({ id: "selected", type: "circle", source: "selected", paint: { "circle-radius": 16, "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": "#58a6f0", "circle-stroke-width": 3 } });
   applyLayerToggles(map);
 }
 
@@ -4211,9 +4211,9 @@ const MAP_LAYERS = [
   { key: "regional", label: "Regional trains", note: "Live where reported", icon: () => badgeEl("regional", "#4b5563", "#ffffff") },
   { key: "buses", label: "Buses and streetcars", note: "Live positions and stops", icon: () => badgeEl("bus", SURFACE_COLOURS.bus, "#ffffff") },
   { key: "bikes", label: "Bike Share", note: "Live bikes or open docks", icon: () => badgeEl("bike", DOCK_COLOURS.ok, "#ffffff") },
-  { key: "access", label: "Elevator outages", note: "Stations with an elevator or escalator out", icon: () => badgeEl("elevator", OUTAGE_COLOUR, "#111418") },
+  { key: "access", label: "Elevator outages", note: "Stations with an elevator or escalator out", icon: () => badgeEl("elevator", OUTAGE_COLOUR, "#141d3b") },
   { key: "entrances", label: "Station entrances", note: "Close up; step-free ones in blue", icon: () => badgeEl("entrance", ENTRANCE_COLOUR, "#ffffff") },
-  { key: "roads", label: "Roadwork", note: "Construction and road closures", icon: () => badgeEl("roadwork", ROAD_COLOURS.construction, "#111418") },
+  { key: "roads", label: "Roadwork", note: "Construction and road closures", icon: () => badgeEl("roadwork", ROAD_COLOURS.construction, "#141d3b") },
   { key: "events", label: "Events", note: "Festivals and events this week", icon: () => badgeEl("event", EVENT_COLOUR, "#ffffff") },
   { key: "food", label: "Food inspections", note: "Latest result at each restaurant and food shop", icon: () => badgeEl("food", FOOD_COLOURS.pass, "#ffffff") },
   { key: "lanes", label: "Bike lanes", note: "City cycling network", icon: () => badgeEl("lane", LANE_COLOURS.protected, "#ffffff") },
@@ -4240,7 +4240,7 @@ function mapLegend() {
       surface.map(([mode, label]) => legendRow(badgeEl(surfaceGlyph(mode), SURFACE_COLOURS[mode], "#ffffff", { size: 22 }), `${label}, with the pointer showing its heading`)),
       legendRow(el("span", { class: "swatch-pill" }, "LW"), "Regional train, live where Metrolinx reports it, else by timetable"),
       legendRow(el("span", { class: "swatch-station", "aria-hidden": "true" }), "Station"),
-      legendRow(badgeEl("elevator", OUTAGE_COLOUR, "#111418", { size: 20 }), "Elevator or escalator out of service"),
+      legendRow(badgeEl("elevator", OUTAGE_COLOUR, "#141d3b", { size: 20 }), "Elevator or escalator out of service"),
     ),
     el("p", { class: "muted small" }, "Between updates, trains, buses and streetcars move along their routes by estimate: subway trains to TTC's predicted arrival, buses at their route's usual pace from their last report, regional trains along their timetable from their last live report. A faded bus or streetcar has not reported for over two and a half minutes."),
     el("p", { class: "panel-subheading" }, "Entrances and parking"),
@@ -4262,9 +4262,9 @@ function mapLegend() {
     el("ul", { class: "legend-list compact" },
       legendRow(badgeEl("event", EVENT_COLOUR, "#ffffff", { size: 20 }), "Event today"),
       legendRow(badgeEl("event", prefersDark() ? "#94a3b8" : EVENT_COLOUR, "#ffffff", { size: 20, hollow: true }), "Event later this week"),
-      FOOD_LEVELS.slice(0, 3).map((level) => legendRow(badgeEl("food", FOOD_COLOURS[level], level === "conditional" ? "#111418" : "#ffffff", { size: 20 }), `Food inspection: ${FOOD_LABELS[level].toLowerCase()}`)),
+      FOOD_LEVELS.slice(0, 3).map((level) => legendRow(badgeEl("food", FOOD_COLOURS[level], level === "conditional" ? "#141d3b" : "#ffffff", { size: 20 }), `Food inspection: ${FOOD_LABELS[level].toLowerCase()}`)),
       legendRow(el("span", { class: "swatch-me", "aria-hidden": "true" }), "Your location"),
-      legendRow(lineSwatch(prefersDark() ? "#f0f0f0" : "#111418"), "Planned trip")),
+      legendRow(lineSwatch(prefersDark() ? "#eef1f8" : "#141d3b"), "Planned trip")),
   );
 }
 
