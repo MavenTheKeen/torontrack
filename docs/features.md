@@ -116,14 +116,19 @@ concerts, games and shows from Ticketmaster, each with the nearest station and w
 time. Large arena and stadium events are flagged because they crowd nearby stations
 ([events](events.md)).
 
+![The events page: today's events with their stations, and a day picker for two weeks](screenshots/site-events.png)
+
 City construction zones and road closures are drawn on the map with the bus and streetcar
 routes they affect ([road restrictions](roads.md)).
 
 ## Weather map
 
-The map's fourth kind plays the last hour of rain and snow radar, shows the air quality at
-each Toronto station, and opens the forecast with what the findings say the coming weather
-tends to do ([weather map](weather.md#weather-map)).
+The map's fourth kind plays the next twelve hours of forecast precipitation and wind, with
+the wind drawn as moving particles, or the last hour of rain and snow radar. It shows the
+air quality at each Toronto station and opens the forecast, with an hourly chart and what
+the findings say the coming weather tends to do ([weather map](weather.md#weather-map)).
+
+![The weather map: wind particles over Toronto and the air quality at a station](screenshots/map-weather.png)
 
 ## Air quality
 
@@ -138,12 +143,16 @@ community centres, with what is on now and next, beach water quality in season a
 patios, and today's events with major venues highlighted
 ([skating, swimming and beaches](recreation.md)).
 
+![The city map: rinks, pools, beaches and today's events, with major venues ringed in gold](screenshots/map-city.png)
+
 ## Findings
 
 A Findings page compares the sources side by side: rain and Bike Share use, snow and
-subway delays, the causes of subway delay, potholes after freeze-thaw, and inspection
-results by how long a place has been open. Each finding shows its chart, method and period
-([findings](findings.md)).
+subway delays, the causes of subway delay, potholes after freeze-thaw, beach water quality
+after rain, and inspection results by how long a place has been open. Each finding shows
+its chart, method and period ([findings](findings.md)).
+
+![The findings page: Bike Share trips on wet and dry days by temperature](screenshots/site-findings.png)
 
 ## My street
 
@@ -156,8 +165,10 @@ Saving it, on this device only, adds it to the Status page.
 
 Toronto Public Health's inspection results for every restaurant and food shop can be shown
 on the map and found by name in the map search. A premises panel gives the latest result
-with its date and infractions, and the earlier inspections
+with its date and infractions, a timeline of earlier results, and the earlier inspections
 ([food inspections](food.md)).
+
+![The food map: places to eat by kind, clustered when zoomed out](screenshots/map-food.png)
 
 ## Pipeline status
 
