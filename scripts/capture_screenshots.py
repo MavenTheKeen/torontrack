@@ -5,6 +5,7 @@ Usage: python scripts/capture_screenshots.py [base URL]
 Requires Playwright with Chromium and Pillow. Images are written to docs/screenshots.
 """
 
+import base64
 import io
 import sys
 from pathlib import Path
@@ -18,6 +19,20 @@ DESKTOP = {"width": 1280, "height": 800}
 PHONE = {"width": 390, "height": 844}
 GIF_SIZE = (960, 600)
 GIF_FRAME_MS = 140
+SOCIAL = """<!doctype html><html><head><style>
+body {{ margin: 0; height: 640px; overflow: hidden; display: grid;
+  grid-template-columns: 520px 1fr; font-family: "Segoe UI", Arial, sans-serif; }}
+.text {{ padding: 72px 48px; display: flex; flex-direction: column; justify-content: center;
+  gap: 22px; border-right: 6px solid #f2471a; }}
+.name {{ display: flex; align-items: center; gap: 18px; font-size: 58px; font-weight: 800; }}
+.what {{ margin: 0; font-size: 28px; line-height: 1.3; color: #333; }}
+.url {{ margin: 0; font-size: 20px; color: #767676; }}
+.shot {{ background: url('{shot}') 80% 60% / auto 150%; }}
+</style></head><body><div class="text">
+<div class="name"><img src="{logo}" width="72" height="72">Torontrack</div>
+<p class="what">Live transit, food inspections, city services, weather and findings for
+Toronto, from open data.</p>
+<p class="url">torontrack.skynetlab.duckdns.org</p></div><div class="shot"></div></body></html>"""
 
 
 def open_map(page, kind: str) -> None:
@@ -35,8 +50,11 @@ def capture_pages(browser) -> None:
     for name, route, wait in (
         ("site-home", "#/", ".card"),
         ("site-reliability", "#/reliability", "main h1"),
+        ("site-report", "#/reliability/report", "main h1"),
         ("site-findings", "#/findings", ".finding-chart"),
         ("site-events", "#/events", "main h1"),
+        ("site-line1", "#/line/1", "h1 .badge"),
+        ("site-station", "#/station/bloor-yonge", "main h1"),
     ):
         page.goto(f"{BASE}/{route}")
         page.wait_for_selector(wait, timeout=40000)
@@ -51,11 +69,25 @@ def capture_pages(browser) -> None:
         page.screenshot(path=OUT / f"map-{kind}.png")
     page.close()
     phone = browser.new_page(viewport=PHONE, color_scheme="light", device_scale_factor=2)
-    phone.goto(f"{BASE}/#/")
-    phone.wait_for_selector(".card", timeout=40000)
-    phone.wait_for_timeout(2500)
-    phone.screenshot(path=OUT / "phone-status.png")
+    for name, route in (("phone-status", "#/"), ("phone-station", "#/station/union")):
+        phone.goto(f"{BASE}/{route}")
+        phone.wait_for_selector("main h1", timeout=40000)
+        phone.wait_for_timeout(2500)
+        phone.screenshot(path=OUT / f"{name}.png")
     phone.close()
+
+
+def capture_social(browser) -> None:
+    """GitHub's social preview, 1280 by 640: the name, a line on what the site does, and
+    the city map."""
+    shot = "data:image/png;base64," + base64.b64encode((OUT / "map-city.png").read_bytes()).decode()
+    icon = OUT.parent.parent / "src" / "transit" / "web" / "static" / "icon.svg"
+    logo = "data:image/svg+xml;base64," + base64.b64encode(icon.read_bytes()).decode()
+    page = browser.new_page(viewport={"width": 1280, "height": 640})
+    page.set_content(SOCIAL.format(logo=logo, shot=shot))
+    page.wait_for_timeout(800)
+    page.screenshot(path=OUT / "social-preview.png")
+    page.close()
 
 
 def capture_demo(browser) -> None:
@@ -96,6 +128,7 @@ def main() -> None:
     with sync_playwright() as p:
         browser = p.chromium.launch()
         capture_pages(browser)
+        capture_social(browser)
         capture_demo(browser)
         browser.close()
 
