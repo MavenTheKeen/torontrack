@@ -1304,7 +1304,7 @@ const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)")
 // basemap schema (v4) that the extract uses.
 function basemapColours(dark) {
   return dark
-    ? { water: "#0f1417", land: "#151515", park: "#152019", building: "#1c1c1c", road: "#272727", major: "#2f2f2f", highway: "#393939", casing: "#0e0e0e", label: "#a8a8a8", halo: "#141414", rail: "#3d3d3d" }
+    ? { water: "#0f151c", land: "#15171c", park: "#15201c", building: "#1c1f25", road: "#272b33", major: "#2f343d", highway: "#3a3f49", casing: "#0e1014", label: "#a6aab3", halo: "#14161b", rail: "#3e4450" }
     : { water: "#c6d4e8", land: "#eef1f6", park: "#d6e8e1", building: "#e1e6ee", road: "#ffffff", major: "#ffffff", highway: "#fbfcfd", casing: "#cfd5e1", label: "#4c5775", halo: "#f3f5f8", rail: "#a5aec2" };
 }
 
@@ -1530,7 +1530,7 @@ const EAT_COLOUR = "#4c5775";
 const NOTABLE_COLOUR = "#ffc83d";
 
 function mapCasing() {
-  return prefersDark() ? "#141414" : "#ffffff";
+  return prefersDark() ? "#14161b" : "#ffffff";
 }
 
 // Every icon the map draws, from icons.js. Subway trains take their line's colour.
@@ -1570,7 +1570,7 @@ function addMapIcons(map) {
 }
 
 function addSurfaceLayers(map) {
-  const c = prefersDark() ? { stop: "#1c1c1c", stopStroke: "#8c8c8c", halo: "#141414", casing: "#141414" } : { stop: "#ffffff", stopStroke: "#4c5775", halo: "#ffffff", casing: "#ffffff" };
+  const c = prefersDark() ? { stop: "#1c1f25", stopStroke: "#8c8c8c", halo: "#14161b", casing: "#14161b" } : { stop: "#ffffff", stopStroke: "#4c5775", halo: "#ffffff", casing: "#ffffff" };
   const modeColour = ["match", ["get", "mode"], ...Object.entries(SURFACE_COLOURS).filter(([m]) => m !== "bus").flat(), SURFACE_COLOURS.bus];
   map.addSource("route-path", { type: "geojson", data: featureCollection([]) });
   map.addSource("bus-stops", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM, buffer: 0 });
@@ -1746,7 +1746,7 @@ function addRegionalPill(map) {
 }
 
 function addRegionalLayers(map) {
-  const c = prefersDark() ? { casing: "#141414", fill: "#1c1c1c", label: "#eef1f8", halo: "#141414" } : { casing: "#ffffff", fill: "#ffffff", label: "#141d3b", halo: "#ffffff" };
+  const c = prefersDark() ? { casing: "#14161b", fill: "#1c1f25", label: "#eef1f8", halo: "#14161b" } : { casing: "#ffffff", fill: "#ffffff", label: "#141d3b", halo: "#ffffff" };
   map.addSource("regional-lines", { type: "geojson", data: featureCollection([]) });
   map.addSource("regional-stations", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM, buffer: 0 });
   addRegionalPill(map);
@@ -1930,7 +1930,7 @@ const OSM_SOURCES = { parking: ["parking", "parking.geojson", "Parking"], bikePa
 
 function addOsmLayers(view) {
   const map = view.map;
-  const c = prefersDark() ? { label: "#eef1f8", halo: "#141414" } : { label: "#141d3b", halo: "#ffffff" };
+  const c = prefersDark() ? { label: "#eef1f8", halo: "#14161b" } : { label: "#141d3b", halo: "#ffffff" };
   map.addSource("parking", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM, buffer: 0 });
   map.addSource("bike-parking", { type: "geojson", data: featureCollection([]), maxzoom: POINTS_MAXZOOM, buffer: 0 });
   map.addLayer({ id: "bike-parking", type: "symbol", source: "bike-parking", minzoom: 14.5, layout: {
@@ -3296,7 +3296,7 @@ function planPlace(view, coord) {
 
 function addPlanLayers(view) {
   const map = view.map;
-  const c = prefersDark() ? { fill: "#1c1c1c", ink: "#eef1f8" } : { fill: "#ffffff", ink: "#141d3b" };
+  const c = prefersDark() ? { fill: "#1c1f25", ink: "#eef1f8" } : { fill: "#ffffff", ink: "#141d3b" };
   const transit = ["all", ["==", ["geometry-type"], "LineString"], ["!", ["get", "walk"]]];
   map.addSource("plan", { type: "geojson", data: featureCollection([]) });
   // An ink outline sets the trip apart from the network lines it runs along.
@@ -3697,7 +3697,7 @@ function lineColour(id) {
 
 function addOverlayLayers(map, data) {
   const { lines: lineFc, stations, entrances } = networkFeatures(data);
-  const c = prefersDark() ? { casing: "#141414", stationFill: "#1c1c1c", stationStroke: "#eef1f8", label: "#eef1f8", halo: "#141414", trainStroke: "#ffffff" } : { casing: "#ffffff", stationFill: "#ffffff", stationStroke: "#141d3b", label: "#141d3b", halo: "#ffffff", trainStroke: "#141d3b" };
+  const c = prefersDark() ? { casing: "#14161b", stationFill: "#1c1f25", stationStroke: "#eef1f8", label: "#eef1f8", halo: "#14161b", trainStroke: "#ffffff" } : { casing: "#ffffff", stationFill: "#ffffff", stationStroke: "#141d3b", label: "#141d3b", halo: "#ffffff", trainStroke: "#141d3b" };
   map.addSource("lines", { type: "geojson", data: lineFc });
   map.addSource("stations", { type: "geojson", data: stations, maxzoom: POINTS_MAXZOOM, buffer: 0 });
   map.addSource("docks", { type: "geojson", data: dockFeatures(data, mapState.mode), maxzoom: POINTS_MAXZOOM, buffer: 0 });

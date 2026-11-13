@@ -143,19 +143,19 @@
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #141414;
-  --surface: #1c1c1c;
-  --surface-2: #262626;
+  --bg: #14161b;
+  --surface: #1c1f25;
+  --surface-2: #262a31;
   --text: #eef1f8;
-  --muted: #acacac;
+  --muted: #aaaeb6;
   --faint: #8f8f8f;
-  --border: #333333;
+  --border: #343943;
   --rule: #eef1f8;
   --accent: #ff6f9a;
   --accent-soft: rgba(255, 111, 154, 0.14);
-  --on-accent: #141414;
+  --on-accent: #14161b;
   --selected: #eef1f8;
-  --on-selected: #141414;
+  --on-selected: #14161b;
   --ok: #4fd1b5;
   --ok-bg: rgba(43, 179, 154, 0.16);
   --warn: #ffc83d;
@@ -165,28 +165,28 @@
   --gap: rgba(255, 111, 154, 0.16);
   --bar: #58a6f0;
   --grey: #707070;
-  --map-bg: #141414;
+  --map-bg: #14161b;
   --control-bg: #1e1e1e;
   --control-edge: #4d4d4d;
-  --sign: #0e0e0e;
-  --sign-muted: #acacac;
+  --sign: #0e1014;
+  --sign-muted: #aaaeb6;
 }
 /* Before theme.js runs (or without it), follow the device. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --bg: #141414;
-    --surface: #1c1c1c;
-    --surface-2: #262626;
+    --bg: #14161b;
+    --surface: #1c1f25;
+    --surface-2: #262a31;
     --text: #eef1f8;
-    --muted: #acacac;
+    --muted: #aaaeb6;
     --faint: #8f8f8f;
-    --border: #333333;
+    --border: #343943;
     --rule: #eef1f8;
     --accent: #ff6f9a;
     --accent-soft: rgba(255, 111, 154, 0.14);
-    --on-accent: #141414;
+    --on-accent: #14161b;
     --selected: #eef1f8;
-    --on-selected: #141414;
+    --on-selected: #14161b;
     --ok: #4fd1b5;
     --ok-bg: rgba(43, 179, 154, 0.16);
     --warn: #ffc83d;
@@ -196,11 +196,11 @@
     --gap: rgba(255, 111, 154, 0.16);
     --bar: #58a6f0;
     --grey: #707070;
-    --map-bg: #141414;
+    --map-bg: #14161b;
     --control-bg: #1e1e1e;
     --control-edge: #4d4d4d;
-    --sign: #0e0e0e;
-    --sign-muted: #acacac;
+    --sign: #0e1014;
+    --sign-muted: #aaaeb6;
   }
 }
 * { box-sizing: border-box; }
