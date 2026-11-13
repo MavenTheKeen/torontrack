@@ -21,8 +21,8 @@ about 2 h 30 min after collection started.
 ## Design
 
 The site follows a transit-at-night design language. The top bar and the tab bar
-use navy (`#141d3b`); pages are pale paper (`#f3f5f8`), and night mode is a near-neutral
-charcoal (`#10131a`). Raspberry (`#e8336d`) is the
+use navy (`#141d3b`); pages are pale paper (`#f3f5f8`), and night mode is a neutral
+dark grey (`#141414`). Raspberry (`#e8336d`) is the
 brand colour: the logo, link underlines and the header rule. Other colours act like a
 route map: yellow for what is happening now and the main action, and sea, sky, yellow,
 orange and raspberry, in that order, for grades from best to worst. TTC line colours are

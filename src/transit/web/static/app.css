@@ -143,19 +143,19 @@
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #10131a;
-  --surface: #181c25;
-  --surface-2: #222733;
+  --bg: #141414;
+  --surface: #1c1c1c;
+  --surface-2: #262626;
   --text: #eef1f8;
-  --muted: #a6adbd;
-  --faint: #8b92a3;
-  --border: #2d3240;
+  --muted: #acacac;
+  --faint: #8f8f8f;
+  --border: #333333;
   --rule: #eef1f8;
   --accent: #ff6f9a;
   --accent-soft: rgba(255, 111, 154, 0.14);
-  --on-accent: #10131a;
+  --on-accent: #141414;
   --selected: #eef1f8;
-  --on-selected: #10131a;
+  --on-selected: #141414;
   --ok: #4fd1b5;
   --ok-bg: rgba(43, 179, 154, 0.16);
   --warn: #ffc83d;
@@ -164,29 +164,29 @@
   --bad-bg: rgba(255, 111, 154, 0.14);
   --gap: rgba(255, 111, 154, 0.16);
   --bar: #58a6f0;
-  --grey: #6b7283;
-  --map-bg: #10131a;
-  --control-bg: #1b1f29;
-  --control-edge: #464d5e;
-  --sign: #0b0d13;
-  --sign-muted: #a6adbd;
+  --grey: #707070;
+  --map-bg: #141414;
+  --control-bg: #1e1e1e;
+  --control-edge: #4d4d4d;
+  --sign: #0e0e0e;
+  --sign-muted: #acacac;
 }
 /* Before theme.js runs (or without it), follow the device. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --bg: #10131a;
-    --surface: #181c25;
-    --surface-2: #222733;
+    --bg: #141414;
+    --surface: #1c1c1c;
+    --surface-2: #262626;
     --text: #eef1f8;
-    --muted: #a6adbd;
-    --faint: #8b92a3;
-    --border: #2d3240;
+    --muted: #acacac;
+    --faint: #8f8f8f;
+    --border: #333333;
     --rule: #eef1f8;
     --accent: #ff6f9a;
     --accent-soft: rgba(255, 111, 154, 0.14);
-    --on-accent: #10131a;
+    --on-accent: #141414;
     --selected: #eef1f8;
-    --on-selected: #10131a;
+    --on-selected: #141414;
     --ok: #4fd1b5;
     --ok-bg: rgba(43, 179, 154, 0.16);
     --warn: #ffc83d;
@@ -195,12 +195,12 @@
     --bad-bg: rgba(255, 111, 154, 0.14);
     --gap: rgba(255, 111, 154, 0.16);
     --bar: #58a6f0;
-    --grey: #6b7283;
-    --map-bg: #10131a;
-    --control-bg: #1b1f29;
-    --control-edge: #464d5e;
-    --sign: #0b0d13;
-    --sign-muted: #a6adbd;
+    --grey: #707070;
+    --map-bg: #141414;
+    --control-bg: #1e1e1e;
+    --control-edge: #4d4d4d;
+    --sign: #0e0e0e;
+    --sign-muted: #acacac;
   }
 }
 * { box-sizing: border-box; }
