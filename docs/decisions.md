@@ -24,6 +24,13 @@
   still be missing most of its runs or be loading old data. The pipeline page checks the
   share of expected runs completed and the age of the newest record as well as the time
   since the last success ([site and API](site.md)).
+- **Slow models are found from recorded build times.** Every build stores each dbt
+  node's execution time in `ops.transformation_runs`, so the slowest models can be
+  ranked from the database. In November 2026 this showed one model,
+  `ttc_surface_trips_daily`, taking 291 of the 302 seconds a build averaged, about
+  eight hours of database time a day. Rewriting a per-trip lookup as one join cut it
+  to about two seconds with identical results, checked by running both versions on
+  the same snapshot ([reliability](reliability.md#buses-and-streetcars)).
 
 ## Bike Share collection
 

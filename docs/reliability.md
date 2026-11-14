@@ -127,6 +127,13 @@ seen, and 99.3% of the trip IDs vehicles reported matched the timetable. Where t
 exists, the report shows this count in place of the stop-based estimate; the monthly
 report card still uses the estimate, which covers October.
 
+Each scheduled trip is matched to the reported trips with one grouped join on trip ID.
+The first version looked up each trip separately in an unindexed intermediate result,
+which took about five minutes of every fifteen-minute build; the join returns the same
+rows in about two seconds. In an outer join, `least()` and `greatest()` ignore the
+missing side, so the overlap is only taken where a reported trip matched; otherwise an
+unseen trip would count as fully run.
+
 Days with and without road restrictions along each route are compared in
 `ttc_surface_closure_effect`; see [road restrictions](roads.md#closures-and-bus-reliability).
 
