@@ -189,7 +189,8 @@ def test_map_points_search_and_premises_history(settings):
     with connect(url) as conn:
         food_inspections.load(conn, premises, inspections, infractions, NOW)
         # E1 passed its latest inspection but had a crucial infraction in September.
-        assert sorted(food_inspections.points(conn, NOW.date())) == [
+        listed = food_inspections._listed(conn, NOW.date())
+        assert sorted(food_inspections._point(r) for r in listed) == [
             ["E1", 43.6455, -79.3807, 0, 0],
             ["E2", 43.7, -79.4, 2, 0],
             ["E3", 43.66, -79.39, 0, 1],
@@ -223,7 +224,6 @@ def test_map_points_search_and_premises_history(settings):
         300.0,
     )
     assert body["listed"] and body["inspections_total"] == 2
-    assert client.get("/api/food").json()["statuses"] == ["Pass", "Conditional Pass", "Closed"]
     assert (
         client.get("/api/food/search", params={"q": "bakery"}).json()["premises"][0]["name"]
         == "Bakery Two"

@@ -47,7 +47,6 @@ entirely when the device asks for reduced motion.
 | `/api/routes/{route_id}` | A surface route with the paths of its main patterns, for drawing it on the map. |
 | `/api/docks/{id}/trips` | A Bike Share dock's trips over the last 12 months of published ridership: totals, weekday hours and top destinations. |
 | `/api/events` | City of Toronto festivals and events from today to 7 days ahead; see [events](events.md). |
-| `/api/food` | Every food premises in the city's current list with its latest inspection result, as `[premises ID, lat, lon, result code, clean record]`; see [food inspections](food.md#on-the-site). |
 | `/api/food/places` | The food map: places to eat from OpenStreetMap as `[lon, lat, name, kind code, premises ID, result code, clean record]`, and the inspected premises matched to none; see [food inspections](food.md#on-the-site). |
 | `/api/food/search?q=` | Food premises whose name contains every word of `q`, with the latest result; `near=lat,lon` puts the nearest first. |
 | `/api/food/{premises ID}` | One premises with its latest 10 inspections, newest first, and the infractions of each. |
@@ -125,8 +124,6 @@ map opens. On top of the streets:
   orange, faded outside their working hours ([road restrictions](roads.md)).
 - **Events** this week from the city's calendar, today's solid, and a station panel's
   "Events nearby today" ([events](events.md)).
-- **Food inspections** (off until switched on) from zoom 15: each restaurant and food shop
-  coloured by its latest Toronto Public Health result ([food inspections](food.md)).
 - **Station entrances** from zoom 15, step-free ones in their own colour, with their
   names from zoom 16.5. Tapping one shows its street side and whether it is step-free,
   automatic or exit only.

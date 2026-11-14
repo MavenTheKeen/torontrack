@@ -706,20 +706,6 @@ def create_app(
             EVENTS_ATTRIBUTION,
         )
 
-    @app.get("/api/food")
-    def food_points():
-        """Every listed food premises with its latest inspection result, for the map:
-        [premises ID, lat, lon, result code] (transit.food_inspections.points)."""
-        return cached(
-            "food",
-            lambda conn, now: {
-                "statuses": list(food_inspections.STATUS_CODES),
-                "premises": food_inspections.points(conn, now.astimezone(regional.TORONTO).date()),
-            },
-            FOOD_ATTRIBUTION,
-            store=slow,
-        )
-
     @app.get("/api/food/places")
     def food_places():
         """The food map: places to eat from OpenStreetMap, each with its matched inspection

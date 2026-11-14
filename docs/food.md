@@ -68,12 +68,6 @@ institutional kitchens and places missing from OpenStreetMap. The city's list gi
 of premises, so they are kept apart. Search lists food premises first. The data has no
 ratings or reviews; no open source of them exists for Toronto.
 
-On the transit map, the **Food inspections** layer (off until switched on) shows, from zoom 15, every
-premises in the newest load, coloured by its latest result: Pass, Conditional Pass, Closed
-or another status. Premises that have left the city's file are not drawn; they have closed
-or changed hands. The layer's data (`/api/food`, about 20,000 premises) is loaded the first
-time the layer is switched on and cached on the server for an hour.
-
 Typing three or more letters in the map search also lists up to four premises whose name
 contains every word typed, names starting with the text first, then the nearest. Each shows
 its latest result and date.

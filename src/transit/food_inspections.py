@@ -303,11 +303,6 @@ def _point(r) -> list:
     return [r["premises_id"], round(r["lat"], 5), round(r["lon"], 5), r["code"], r["clean"]]
 
 
-def points(conn, today: date) -> list[list]:
-    """[premises ID, lat, lon, latest result code, clean record] for every listed premises."""
-    return [_point(r) for r in _listed(conn, today)]
-
-
 # The food map shows places to eat from OpenStreetMap (transit.places.eating_places), each
 # matched to the inspected premises of the same name within MATCH_M. The city's list has no
 # type of premises, so grocers, institutional kitchens and the like are kept apart.
