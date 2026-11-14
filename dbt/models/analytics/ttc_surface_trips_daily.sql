@@ -59,20 +59,26 @@ scheduled as (
             where g.gap_start < sc.ends_at and g.gap_end > sc.starts_at
         )
 ), matched as (
+    -- One join on trip ID instead of a lookup per scheduled trip: the materialized `seen`
+    -- has no index, so a per-trip lookup scanned it once for every trip.
+    -- A trip after midnight can be recorded under the next service day.
     select
-        m.*,
-        r.reported_seconds
+        m.service_date,
+        m.route_id,
+        m.direction_id,
+        m.scheduled_seconds,
+        -- least() and greatest() skip nulls, so an unmatched trip must stay null here.
+        max(extract(epoch from least(x.last_seen_at, m.ends_at)
+            - greatest(x.first_seen_at, m.starts_at)))
+            filter (where x.trip_id is not null) as reported_seconds
     from measurable m
-    left join lateral (
-        -- A trip after midnight can be recorded under the next service day.
-        select max(extract(epoch from least(x.last_seen_at, m.ends_at)
-                   - greatest(x.first_seen_at, m.starts_at))) as reported_seconds
-        from seen x
-        where x.trip_id = m.trip_id
-            and x.service_date in (m.service_date, m.service_date + 1)
-            and x.first_seen_at < m.ends_at + interval '1 hour'
-            and x.last_seen_at > m.starts_at - interval '1 hour'
-    ) r on true
+    left join seen x
+        on x.trip_id = m.trip_id
+        and x.service_date in (m.service_date, m.service_date + 1)
+        and x.first_seen_at < m.ends_at + interval '1 hour'
+        and x.last_seen_at > m.starts_at - interval '1 hour'
+    group by m.service_date, m.trip_id, m.route_id, m.direction_id, m.scheduled_seconds,
+        m.starts_at, m.ends_at
 )
 select
     service_date,
