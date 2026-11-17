@@ -181,7 +181,12 @@ def changes(conn, now: datetime) -> list[dict]:
         r["line"]: r["status"]
         for r in conn.execute("SELECT line, status FROM push.line_state").fetchall()
     }
-    first = not conn.execute("SELECT 1 FROM push.line_state LIMIT 1").fetchone()
+    # A marker, not the state table: with no alerts active that table is rightly empty.
+    first = not conn.execute("SELECT 1 FROM push.config WHERE name = 'seeded'").fetchone()
+    if first:
+        conn.execute(
+            "INSERT INTO push.config (name, value) VALUES ('seeded', %s)", (now.isoformat(),)
+        )
     messages = []
     for line in sorted(set(current) | set(known)):
         new = current[line]["status"] if line in current else "normal"
