@@ -237,6 +237,7 @@ services:
   planner:
     image: opentripplanner/opentripplanner:2.10.0@sha256:8d54e5c589186707ee365417f2202dc878c451fa3001b8edff07019531100933
     profiles: ["planner"]
+    security_opt: ["no-new-privileges:true"]
     entrypoint: ["/bin/bash", "/planner.sh"]
     environment:
       JAVA_OPTS: ${PLANNER_JAVA_OPTS:--Xmx3g}

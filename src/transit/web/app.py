@@ -102,6 +102,9 @@ REGIONAL_ATTRIBUTION = (
 
 
 ROBOTS = "User-agent: *\nDisallow: /api/\nDisallow: /map-data/\n"
+# Where to report a security problem (RFC 9116); the same address as SECURITY.md.
+SECURITY_CONTACT = "https://github.com/MavenTheKeen/torontrack/security/advisories/new"
+SECURITY_POLICY = "https://github.com/MavenTheKeen/torontrack/blob/main/SECURITY.md"
 PERMISSIONS_POLICY = ", ".join(
     [
         "geolocation=(self)",
@@ -1188,6 +1191,16 @@ def create_app(
     @app.api_route("/robots.txt", methods=["GET", "HEAD"], include_in_schema=False)
     def robots():
         return PlainTextResponse(ROBOTS, headers={"Cache-Control": "public, max-age=86400"})
+
+    # The expiry is always half a year ahead, so the file cannot go stale between deploys.
+    @app.api_route("/.well-known/security.txt", methods=["GET", "HEAD"], include_in_schema=False)
+    def security_txt():
+        expires = (datetime.now(UTC) + timedelta(days=180)).strftime("%Y-%m-%dT00:00:00Z")
+        body = (
+            f"Contact: {SECURITY_CONTACT}\nExpires: {expires}\n"
+            f"Preferred-Languages: en\nPolicy: {SECURITY_POLICY}\n"
+        )
+        return PlainTextResponse(body, headers={"Cache-Control": "public, max-age=86400"})
 
     # Browsers and feed readers ask for /favicon.ico whatever the page says; PNG is fine.
     @app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)

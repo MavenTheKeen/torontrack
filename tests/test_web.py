@@ -580,6 +580,9 @@ def test_head_robots_and_favicon():
     assert {client.head(p).status_code for p in ("/", "/robots.txt", "/favicon.ico")} == {200}
     robots = client.get("/robots.txt")
     assert robots.status_code == 200 and "Disallow: /api/" in robots.text
+    contact = client.get("/.well-known/security.txt")
+    assert contact.status_code == 200
+    assert "Contact: https://" in contact.text and "Expires: 20" in contact.text
     icon = client.get("/favicon.ico")
     assert icon.status_code == 200 and icon.headers["content-type"] == "image/png"
 

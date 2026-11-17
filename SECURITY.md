@@ -5,7 +5,8 @@
 Please report security problems privately through GitHub's
 [private vulnerability reporting](https://github.com/MavenTheKeen/torontrack/security/advisories/new)
 rather than in a public issue. Reports are acknowledged within a week. Only the current
-`main` branch and the live site are supported.
+`main` branch and the live site are supported. The site gives the same address at
+`/.well-known/security.txt`.
 
 ## Design
 
