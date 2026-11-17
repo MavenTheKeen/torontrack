@@ -7,6 +7,7 @@ before it was at most GAP ago; a failed check, or a silence longer than GAP (the
 or the monitor itself was down), counts as unavailable.
 """
 
+import time
 from datetime import datetime, timedelta
 
 import httpx
@@ -21,10 +22,11 @@ DAYS_SHOWN = 90
 def record(conn, client: httpx.Client, site_url: str, now: datetime) -> bool:
     """Check the site once and store the result."""
     ok, ms = False, None
+    started = time.monotonic()
     try:
         response = client.get(site_url.rstrip("/") + CHECK_PATH, timeout=TIMEOUT_SECONDS)
         ok = response.status_code == 200
-        ms = round(response.elapsed.total_seconds() * 1000)
+        ms = round((time.monotonic() - started) * 1000)
     except httpx.HTTPError:
         pass
     conn.execute(

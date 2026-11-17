@@ -1156,8 +1156,8 @@ def create_app(
             if body.lines is None:
                 kept = push_call("SELECT push.lines(%s) AS result", (body.endpoint,))
                 return {"available": True, "key": key, "lines": kept}
-            known = {line["id"] for line in with_conn(schedule)["lines"]}
-            lines = sorted({line for line in body.lines if line in known})
+            # Line numbers by form; one that does not exist simply never has news.
+            lines = sorted({line for line in body.lines if line.isdigit() and len(line) <= 3})
             if lines and (
                 body.keys is None or not push.valid_keys(body.keys.p256dh, body.keys.auth)
             ):
