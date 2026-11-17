@@ -986,6 +986,10 @@ details.month[open] > summary { color: var(--text); }
 .heat-strip { display: grid; grid-template-columns: repeat(21, 1fr); gap: 3px; }
 .heat-cell { display: block; height: 22px; border-radius: 2px; background: var(--surface-2); }
 .heat-cell.empty { background: repeating-linear-gradient(135deg, var(--surface-2) 0 4px, transparent 4px 7px); }
+.uptime-strip { display: grid; grid-template-columns: repeat(30, 1fr); gap: 3px; margin: 10px 0; max-width: 620px; }
+.uptime-strip .heat-cell { height: 18px; }
+.notify-note { flex-basis: 100%; text-align: right; }
+.notify-note:empty { display: none; }
 .heat-strip.mini { margin-top: 8px; max-width: 360px; gap: 2px; }
 .heat-strip.mini .heat-cell { height: 8px; border-radius: 2px; }
 .heat-axis { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted); }

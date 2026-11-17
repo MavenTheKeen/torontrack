@@ -12,8 +12,18 @@ rather than in a public issue. Reports are acknowledged within a week. Only the 
 
 ### Web application
 
-- The site only reads. In production it connects with a read-only database login that
-  cannot see the raw feed tables.
+- The site reads, with one exception. In production it connects with a read-only
+  database login that cannot see the raw feed tables. The exception is a visitor's
+  notification subscription: the login may call three functions in the `push` schema
+  (set a subscription's lines, read them, read the public key) and cannot read or write
+  the tables behind them.
+- A subscription is an address this server later sends requests to, so only the browser
+  makers' push services are accepted (Google, Mozilla, Apple, Microsoft), over HTTPS,
+  checked when offered and again before each send. The table is capped at 5,000 rows and
+  the endpoint shares the trip planner's lower rate limit.
+- Notifications are encrypted for the one browser (RFC 8291) and signed with the site's
+  key (RFC 8292). The private key is a secret file read only by the alerts process, not
+  by the public web process.
 - Database queries use parameterized values; dynamic database names use quoted SQL
   identifiers. Path and query parameters are checked for length and format before use.
 - Every response carries a strict Content Security Policy with no outside origins, a

@@ -15,6 +15,7 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 
+from transit import push, uptime
 from transit.db import connect
 from transit.web.pipeline import LIMITS, pipeline_status
 
@@ -162,11 +163,36 @@ def check(database_url: str, client: httpx.Client, ntfy_url: str | None, now: da
     return due
 
 
+def extras(database_url: str, client: httpx.Client, site_url, push_key, now: datetime) -> None:
+    """The availability check and visitors' notifications, each on its own so that a
+    failure in one never stops the other or the health alerts."""
+    if site_url:
+        try:
+            with connect(database_url) as conn:
+                uptime.record(conn, client, site_url, now)
+        except Exception as exc:
+            _log({"error": f"Site check failed: {type(exc).__name__}"})
+    if push_key:
+        try:
+            with connect(database_url) as conn:
+                result = push.run_once(conn, client, push_key, now)
+            if result["sent"]:
+                _log({"notifications_sent": result["sent"]})
+        except Exception as exc:
+            _log({"error": f"Notifications failed: {type(exc).__name__}"})
+
+
 def run(
-    database_url: str, ntfy_url: str | None, heartbeat_url: str | None, once: bool = False
+    database_url: str,
+    ntfy_url: str | None,
+    heartbeat_url: str | None,
+    once: bool = False,
+    site_url: str | None = None,
+    vapid_private_key: str | None = None,
 ) -> None:
     if not ntfy_url:
         _log({"warning": "NTFY_URL is not set: alerts are recorded in ops.alerts, not sent"})
+    push_key = push.load_key(vapid_private_key) if vapid_private_key else None
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     with httpx.Client(timeout=15) as client:
@@ -178,6 +204,7 @@ def run(
                     client.get(heartbeat_url)
             except Exception as exc:  # Keep monitoring; the heartbeat stops meanwhile.
                 _log({"error": f"Check failed: {type(exc).__name__}"})
+            extras(database_url, client, site_url, push_key, datetime.now(UTC))
             if once:
                 return
             stop.wait(CHECK_SECONDS)

@@ -30,6 +30,40 @@ notifies you (including through ntfy) when the pings stop. When monitoring resum
 more than 5 minutes, the service also sends "Monitoring resumed" with the length of the
 gap, since nothing was collected during it.
 
+## Site availability
+
+With `SITE_URL` set in `.env` (the public address, for example
+`https://torontrack.example`), each check also requests `/api/lines` through that address,
+so the proxy, the web process and the database are all on the path, and records the result
+in `ops.site_checks` (kept 120 days). The pipeline page shows the last 90 days, one square
+per day, from `/api/uptime`.
+
+Time counts as available when a check succeeded and the one before it was at most 3
+minutes earlier. A failed check counts as unavailable, and so does a longer silence: the
+server or this monitor was down, and from the record the two cannot be told apart. Each
+update restarts the site for about a minute, which shows as that much unavailability.
+
+## Notifications for visitors
+
+A line's page has a **Notify me** button where the browser supports push notifications
+(on an iPhone, after the site is added to the Home Screen). The browser asks permission,
+then hands the site a subscription: an address at its maker's push service and two keys.
+The site stores that and the lines chosen (`push.subscriptions`), with no account, address
+or name. Turning the last line off deletes the row.
+
+Each check compares every line's reported status (the most severe active TTC service
+alert) with the last one seen (`push.line_state`) and sends one message per change to the
+subscriptions for that line, including the return to normal service. Nothing is sent while
+TTC's alert feed is stale, and the first check after a fresh install only records. A new
+subscription gets one confirmation message within a minute. A subscription the push service
+reports as ended is deleted; one that fails five times in a row is deleted too.
+
+Messages are encrypted for the one browser and signed with the site's key
+(`secrets/vapid_private_key`, a P-256 key in PEM form). `deploy/make_secrets.sh` creates
+the key once with `openssl`; with an empty file the feature is off and the button hidden.
+Replacing the key ends every existing subscription. The implementation
+(`transit.push`) is checked against the worked example in RFC 8291.
+
 ## Records
 
 `ops.alert_state` holds each component's current status, when it began and what the last

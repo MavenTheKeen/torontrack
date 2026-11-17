@@ -26,6 +26,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 from transit import (
     air_quality,
@@ -38,8 +39,10 @@ from transit import (
     neighbourhood,
     patios,
     places,
+    push,
     recreation,
     roads,
+    uptime,
     waste,
     weather_now,
 )
@@ -182,6 +185,19 @@ class TTLCache:
                 if len(self.items) > 500:  # Unknown station keys cannot grow memory unbounded.
                     self.items = {k: v for k, v in self.items.items() if v[0] > now}
         return value
+
+
+class PushKeys(BaseModel):
+    p256dh: str = Field(max_length=200)
+    auth: str = Field(max_length=60)
+
+
+class PushSubscription(BaseModel):
+    """A browser's push subscription and the lines it wants to hear about."""
+
+    endpoint: str = Field(max_length=1000)
+    keys: PushKeys | None = None
+    lines: list[str] | None = Field(default=None, max_length=push.MAX_LINES)
 
 
 def client_key(host: str) -> str:
@@ -1108,6 +1124,65 @@ def create_app(
     @app.get("/api/pipeline")
     def pipeline_health():
         return cached("pipeline", lambda conn, now: pipeline.pipeline_status(conn, now))
+
+    @app.get("/api/uptime")
+    def site_uptime():
+        """The site's own availability by day (transit.uptime)."""
+        return cached("uptime", lambda conn, now: {"uptime": uptime.daily(conn, now)})
+
+    def push_call(statement: str, values: tuple):
+        # The site's login is read-only by default and may write only through the
+        # functions of the push schema.
+        with connect(db_url()) as conn, conn.transaction():
+            conn.execute("SET TRANSACTION READ WRITE")
+            return conn.execute(statement, values).fetchone()["result"]
+
+    @app.post("/api/push")
+    def push_subscription(request: Request, body: PushSubscription):
+        """Browser notifications (transit.push). With `lines`, set the lines this
+        subscription hears about (none ends it); without, report the ones it has. POST
+        throughout, so that a subscription's address never appears in a URL."""
+        client = request.client.host if request.client else "unknown"
+        if not plan_limiter.allow(client):
+            return JSONResponse(
+                {"detail": "Too many requests"}, status_code=429, headers={"Retry-After": "60"}
+            )
+        if not push.allowed_endpoint(body.endpoint):
+            raise HTTPException(status_code=422, detail="Not a push service address")
+        try:
+            key = push_call("SELECT push.public_key() AS result", ())
+            if key is None:
+                return {"available": False, "key": None, "lines": []}
+            if body.lines is None:
+                kept = push_call("SELECT push.lines(%s) AS result", (body.endpoint,))
+                return {"available": True, "key": key, "lines": kept}
+            known = {line["id"] for line in with_conn(schedule)["lines"]}
+            lines = sorted({line for line in body.lines if line in known})
+            if lines and (
+                body.keys is None or not push.valid_keys(body.keys.p256dh, body.keys.auth)
+            ):
+                raise HTTPException(status_code=422, detail="Invalid subscription keys")
+            keys = body.keys or PushKeys(p256dh="", auth="")
+            kept = push_call(
+                "SELECT push.subscribe(%s, %s, %s, %s) AS result",
+                (body.endpoint, keys.p256dh, keys.auth, lines),
+            )
+            return {"available": True, "key": key, "lines": kept}
+        except psycopg.errors.ConfigurationLimitExceeded:
+            raise HTTPException(status_code=503, detail="Notifications are full") from None
+        except (psycopg.errors.UndefinedFunction, psycopg.errors.InvalidSchemaName):
+            return {"available": False, "key": None, "lines": []}
+
+    @app.get("/api/push")
+    def push_key():
+        """Whether notifications are offered, and the key to subscribe with."""
+        try:
+            key = with_conn(
+                lambda conn: conn.execute("SELECT push.public_key() AS result").fetchone()["result"]
+            )
+        except psycopg.Error:
+            key = None
+        return {"available": key is not None, "key": key}
 
     @app.get("/api/findings")
     def findings_page():

@@ -383,7 +383,12 @@ def main():
                 result = {"agencies_collector": "healthy"}
             elif args.command == "alerts":
                 alerts.run(
-                    settings.database_url, settings.ntfy_url, settings.heartbeat_url, args.once
+                    settings.database_url,
+                    settings.ntfy_url,
+                    settings.heartbeat_url,
+                    args.once,
+                    site_url=settings.site_url,
+                    vapid_private_key=settings.vapid_private_key,
                 )
                 return 0
             elif args.command == "export":

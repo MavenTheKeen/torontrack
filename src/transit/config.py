@@ -31,6 +31,10 @@ class Settings:
     metrolinx_api_key: str | None = field(default=None, repr=False)
     ntfy_url: str | None = field(default=None, repr=False)
     heartbeat_url: str | None = field(default=None, repr=False)
+    # The site's public address, checked once a minute for the availability record.
+    site_url: str | None = None
+    # Signs browser notifications (docs/alerts.md); without it they are switched off.
+    vapid_private_key: str | None = field(default=None, repr=False)
     # TTC collector (docs/ttc.md).
     ttc_poll_seconds: float = 30
     ttc_fast_poll_seconds: float = 10
@@ -89,6 +93,8 @@ class Settings:
             metrolinx_api_key=secret("METROLINX_API_KEY"),
             ntfy_url=secret("NTFY_URL"),
             heartbeat_url=secret("HEARTBEAT_URL"),
+            site_url=text("SITE_URL"),
+            vapid_private_key=secret("VAPID_PRIVATE_KEY"),
             ttc_poll_seconds=number("TTC_POLL_SECONDS", float),
             ttc_fast_poll_seconds=number("TTC_FAST_POLL_SECONDS", float),
             ttc_raw_retention_days=number("TTC_RAW_RETENTION_DAYS", int),

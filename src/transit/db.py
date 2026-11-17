@@ -94,3 +94,6 @@ def ensure_readonly_role(database_url, role: str, password: str):
                     "ALTER DEFAULT PRIVILEGES IN SCHEMA {} GRANT SELECT ON TABLES TO {}"
                 ).format(s, name)
             )
+        # Notification subscriptions: the functions only, never the tables behind them.
+        conn.execute(sql.SQL("GRANT USAGE ON SCHEMA push TO {}").format(name))
+        conn.execute(sql.SQL("GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA push TO {}").format(name))

@@ -65,6 +65,8 @@ entirely when the device asks for reduced motion.
 | `/api/trains` | Every line's estimated train positions for the map: each train's position is a fractional index into the line's station list, as on the line diagrams. |
 | `/api/report` | The reliability report over every measured day: excess wait time, regular and long-gap shares by line and day type, by time of day on weekdays, by weather, by day, and the ten platforms with the most extra wait (at least 150 measured gaps). `available: false` until the first build. |
 | `/api/reliability` | Longest gaps today, regular-headway share by hour (today and 7 days), and elevator/escalator outages, from the dbt models. `available: false` until the first build. |
+| `/api/uptime` | The site's own availability by day for the last 90 days, from a check a minute through the public address ([alerts](alerts.md#site-availability)). |
+| `/api/push` | `GET`: whether notifications are offered, and the key to subscribe with. `POST` with a subscription: set the lines it hears about (none ends it) or, without `lines`, read them ([alerts](alerts.md#notifications-for-visitors)). The only request that stores anything. |
 | `/api/pipeline` | Health of each TTC feed, Bike Share collection and the dbt build (`ok`, `delayed` or `failing` by time since the last success), today's feed dropout rate, the latest data-quality checks and data volume. Shown at `#/pipeline`. |
 | `/api/report-card`, `/api/report-card/{month}` | Finished months with measurements, and one month's graded lines and routes, service seen, elevator outages and comparison with TTC's delay log. See [report card](reliability.md#monthly-report-card). |
 | `/api/stats` | Running totals (train and surface gaps measured, feed polls, Bike Share readings and trips) and days collecting, as exact or estimated `counts` and rounded-down `display` text. Refreshed hourly; the README badges read it. |
@@ -182,7 +184,8 @@ appears. "Near me" also lists the closest stops.
   their own, lower limit ([trip planner](planner.md)).
 - A strict Content Security Policy allows only same-origin scripts, styles and requests.
   The page has no cookies, analytics or third-party resources, and renders API text with
-  `textContent` only.
+  `textContent` only. The one thing a visitor can have stored on the server is a
+  notification subscription they asked for.
 
 ## Accessibility
 

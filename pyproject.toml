@@ -22,6 +22,7 @@ dependencies = [
   "pmtiles==3.8.1",
   "ijson==3.6.0", # Streams the 225 MB city events feed instead of loading it whole.
   "osmium==4.3.2", # Reads the OpenStreetMap extract for station entrances and parking.
+  "cryptography==50.0.2", # Browser notifications (transit.push).
 ]
 
 [project.scripts]

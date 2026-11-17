@@ -170,6 +170,12 @@ with its date and infractions, a timeline of earlier results, and the earlier in
 
 ![The food map: places to eat by kind, clustered when zoomed out](screenshots/map-food.png)
 
+## Notifications
+
+A line's page offers **Notify me**: the browser shows a notification when that line's
+reported status changes and when it returns to normal, with no account
+([alerts](alerts.md#notifications-for-visitors)).
+
 ## Pipeline status
 
 The pipeline page shows the health of every feed and job: when each last succeeded, how

@@ -214,6 +214,7 @@ function activeAlerts(active, lines) {
 }
 
 // Saved stations, stops and lines, kept only in this browser: no account, nothing sent.
+// (Notifications, further down, are the one thing kept on the server, when asked for.)
 const SAVED_KEY = "torontrack-saved";
 const SAVED_MAX = 12;
 
@@ -254,7 +255,95 @@ function saveButton(kind, id, name) {
   return button;
 }
 
-const titleRow = (heading, kind, id, name) => el("div", { class: "title-row" }, heading, saveButton(kind, id, name));
+// Notifications when a line's status changes, through the browser's own push service.
+// The lines chosen are kept with the subscription on the server and mirrored here so the
+// button shows its state at once.
+const NOTIFY_KEY = "torontrack-notify";
+const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+
+function notifyLines() {
+  try {
+    const lines = JSON.parse(localStorage.getItem(NOTIFY_KEY) || "[]");
+    return Array.isArray(lines) ? lines.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setNotifyLines(lines) {
+  try {
+    localStorage.setItem(NOTIFY_KEY, JSON.stringify(lines));
+  } catch {
+    /* Storage off (private window): the server still has the lines. */
+  }
+}
+
+async function pushPost(body) {
+  const response = await fetch("/api/push", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body) });
+  if (!response.ok) throw new Error(`The data service returned ${response.status}`);
+  return response.json();
+}
+
+const keyBytes = (text) => Uint8Array.from(atob(text.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+
+// "Notify me" / "Notifying" toggle for a line. Hidden where the browser has no push
+// (an iPhone needs the site added to the Home Screen first) or the server has no key.
+function notifyButton(line) {
+  if (!pushSupported()) return null;
+  const button = el("button", { type: "button", class: "save-button notify-button" });
+  const note = el("span", { class: "muted small notify-note", role: "status" });
+  button.hidden = true;
+  let key = null;
+  const show = () => {
+    const on = notifyLines().includes(line);
+    button.setAttribute("aria-pressed", String(on));
+    button.textContent = on ? "Notifying ✓" : "Notify me";
+  };
+  show();
+  const subscription = () => navigator.serviceWorker.ready.then((registration) => registration.pushManager.getSubscription());
+  api("/api/push")
+    .then(async (info) => {
+      if (!info.available) return;
+      key = info.key;
+      button.hidden = false;
+      // The browser can end a subscription by itself (permission withdrawn, data cleared).
+      const current = await subscription();
+      setNotifyLines(current ? (await pushPost({ endpoint: current.endpoint })).lines : []);
+      show();
+    })
+    .catch(() => {});
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    note.textContent = "";
+    try {
+      const want = !notifyLines().includes(line);
+      if (want && (await Notification.requestPermission()) !== "granted") {
+        note.textContent = "Notifications are blocked for this site in your browser's settings.";
+        return;
+      }
+      const registration = await navigator.serviceWorker.ready;
+      let current = await registration.pushManager.getSubscription();
+      if (!current && want) current = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) });
+      if (!current) {
+        setNotifyLines([]);
+        return;
+      }
+      const lines = want ? [...new Set([...notifyLines(), line])] : notifyLines().filter((l) => l !== line);
+      const result = await pushPost({ endpoint: current.endpoint, keys: current.toJSON().keys, lines });
+      setNotifyLines(result.lines);
+      if (!result.lines.length) await current.unsubscribe();
+      note.textContent = want ? "On. A confirmation arrives within a minute." : "Off for this line.";
+    } catch {
+      note.textContent = "Notifications could not be changed. Try again.";
+    } finally {
+      button.disabled = false;
+      show();
+    }
+  });
+  return [button, note];
+}
+
+const titleRow = (heading, kind, id, name) => el("div", { class: "title-row" }, heading, kind === "line" ? notifyButton(String(id)) : null, saveButton(kind, id, name));
 
 // The next two trains each way at a saved station.
 async function savedStation(item) {
@@ -4886,8 +4975,26 @@ function checkDetail(check) {
   return null;
 }
 
+// The site's own availability: one square per day, from a check a minute through the
+// public address.
+function uptimeSection(up) {
+  if (!up || !up.available) return null;
+  const colour = (pct) => (pct >= 99.9 ? "var(--rel-1)" : pct >= 99 ? "var(--rel-2)" : pct >= 95 ? "var(--rel-3)" : pct >= 90 ? "var(--rel-4)" : "var(--rel-5)");
+  const day = (iso) => longDayFmt.format(new Date(`${iso}T12:00:00-05:00`));
+  const worst = up.days.filter((d) => d.down_minutes > 0).sort((a, b) => b.down_minutes - a.down_minutes).slice(0, 3);
+  return [
+    el("h2", {}, "This site"),
+    el("div", { class: "card" },
+      el("p", {}, el("strong", {}, `${up.pct}% available`), ` since ${day(up.since)}`),
+      el("div", { class: "uptime-strip", role: "img", "aria-label": `Availability by day: ${up.pct}% over ${up.days.length} days` },
+        up.days.map((d) => el("span", { class: "heat-cell", title: `${day(d.day)}: ${d.pct}%${d.down_minutes ? `, ${d.down_minutes} min unavailable` : ""}`, style: { background: colour(d.pct) } }))),
+      worst.length ? el("p", { class: "small" }, "Most time unavailable: ", worst.map((d) => `${day(d.day)} (${d.down_minutes} min)`).join(", "), ".") : null,
+      el("p", { class: "muted small" }, "One square per day, up to 90. A live data request is made through the public address once a minute; a failed request, or more than 3 minutes without one, counts as unavailable. Updates to the site restart it for about a minute.")),
+  ];
+}
+
 async function renderPipeline() {
-  const data = await api("/api/pipeline");
+  const [data, uptime] = await Promise.all([api("/api/pipeline"), api("/api/uptime").catch(() => null)]);
   const { ttc, bikeshare: bikes, dbt, data: volume } = data;
   const drops = ttc.dropouts_today;
   const latest = dbt.latest;
@@ -4900,6 +5007,7 @@ async function renderPipeline() {
       "Health of the data pipelines behind this site, read from the records each step writes as it runs. ",
       "Healthy means the last success is recent; delayed or failing means data on this site may be out of date.",
     ),
+    uptimeSection(uptime && uptime.uptime),
     el("h2", {}, "TTC realtime feeds"),
     el("p", { class: "muted small" }, "Subway predictions and vehicle positions are polled every 10 seconds, alerts every 30."),
     ttc.feeds.map((f) =>

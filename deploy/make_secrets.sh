@@ -20,7 +20,7 @@ random() {
 
 for pair in postgres_password:POSTGRES_PASSWORD web_db_password:WEB_DB_PASSWORD \
   ticketmaster_api_key:TICKETMASTER_API_KEY metrolinx_api_key:METROLINX_API_KEY \
-  ntfy_url:NTFY_URL heartbeat_url:HEARTBEAT_URL; do
+  ntfy_url:NTFY_URL heartbeat_url:HEARTBEAT_URL vapid_private_key:VAPID_PRIVATE_KEY; do
   file="secrets/${pair%%:*}"
   name="${pair#*:}"
   if [ -e "$file" ]; then
@@ -30,6 +30,10 @@ for pair in postgres_password:POSTGRES_PASSWORD web_db_password:WEB_DB_PASSWORD 
   value=$(from_env "$name")
   case "$name" in
     *_PASSWORD) [ -n "$value" ] || value=$(random) ;;
+    # The key that signs browser notifications: made here once, and never replaced, or
+    # every existing subscription would stop working.
+    VAPID_PRIVATE_KEY)
+      [ -n "$value" ] || value=$(openssl ecparam -name prime256v1 -genkey -noout 2>/dev/null || true) ;;
   esac
   printf '%s' "$value" > "$file"
   # The directory keeps other users out; the files must be readable by the containers'

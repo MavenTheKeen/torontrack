@@ -102,6 +102,7 @@ reads it through a `NAME_FILE` variable holding that path (`transit.config`):
 | `ticketmaster_api_key` | Airflow | Optional ([events](events.md)) |
 | `metrolinx_api_key` | `agencies-collector` | Optional; live regional trains ([regional trains](regional.md#live-trains)) |
 | `ntfy_url`, `heartbeat_url` | `alerts` | Optional ([alerts](alerts.md)) |
+| `vapid_private_key` | `alerts` | Signs visitors' notifications; created by the script, empty switches them off ([alerts](alerts.md#notifications-for-visitors)) |
 
 `deploy/make_secrets.sh` creates the missing files: a value still in `.env` (an
 install from before 2026-10-15) is moved into its file, missing passwords are

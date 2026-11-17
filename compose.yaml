@@ -142,7 +142,11 @@ services:
       # Phone notifications (see docs/alerts.md); without NTFY_URL they are only recorded.
       NTFY_URL_FILE: /run/secrets/ntfy_url
       HEARTBEAT_URL_FILE: /run/secrets/heartbeat_url
-    secrets: [postgres_password, ntfy_url, heartbeat_url]
+      # The public address, checked once a minute for the availability record.
+      SITE_URL: ${SITE_URL:-}
+      # Signs visitors' browser notifications; with an empty file they are switched off.
+      VAPID_PRIVATE_KEY_FILE: /run/secrets/vapid_private_key
+    secrets: [postgres_password, ntfy_url, heartbeat_url, vapid_private_key]
     depends_on:
       postgres:
         condition: service_healthy
@@ -368,6 +372,8 @@ secrets:
     file: ./secrets/ntfy_url
   heartbeat_url:
     file: ./secrets/heartbeat_url
+  vapid_private_key:
+    file: ./secrets/vapid_private_key
 
 volumes:
   postgres-data:

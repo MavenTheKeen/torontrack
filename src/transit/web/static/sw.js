@@ -6,7 +6,7 @@
 // network fails or takes over DATA_WAIT_MS; that copy carries X-Torontrack-Saved-At, so
 // the page says it is not live. Moving vehicles, the map's data and trip plans are never
 // served from a copy. Map tiles are left to the browser's own HTTP cache (range requests).
-const SHELL_CACHE = "torontrack-shell-v70";
+const SHELL_CACHE = "torontrack-shell-v71";
 const DATA_CACHE = "torontrack-data-v1";
 const DATA_WAIT_MS = 8000;
 const CACHED_DATA = /^\/api\/(alerts|lines(\/[^/]+)?|stations\/[^/]+|stops\/[^/]+|reliability|report|report-card(\/[^/]+)?|datasets|events|agenda|regional\/stations\/[^/]+)$/;
@@ -90,3 +90,35 @@ function dataResponse(request) {
     (first) => first || network.catch(() => stored().then((hit) => hit || Response.error())),
   );
 }
+
+// Notifications for a line's status (transit.push): shown as they arrive, and a tap opens
+// the line's page in a window that is already open, or a new one.
+self.addEventListener("push", (event) => {
+  let message = {};
+  try {
+    message = event.data.json();
+  } catch {
+    /* A message that cannot be read still has to show something. */
+  }
+  event.waitUntil(
+    self.registration.showNotification(message.title || "Torontrack", {
+      body: message.body || "",
+      tag: message.tag,
+      data: { url: message.url || "/" },
+      icon: "/static/icon-192.png",
+      badge: "/static/icon-192.png",
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || "/", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      const open = windows.find((w) => "focus" in w);
+      if (!open) return self.clients.openWindow(url);
+      return open.navigate(url).then((w) => (w || open).focus()).catch(() => open.focus());
+    }),
+  );
+});

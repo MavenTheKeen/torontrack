@@ -24,7 +24,8 @@ def settings():
         conn.execute("TRUNCATE raw.payload_bodies, normalized.station_versions CASCADE")
         conn.execute("TRUNCATE raw.ttc_delay_files, ops.ttc_delay_refreshes CASCADE")
         conn.execute("TRUNCATE ops.source_backoff, ops.transformation_runs")
-        conn.execute("TRUNCATE ops.alert_state, ops.alerts")
+        conn.execute("TRUNCATE ops.alert_state, ops.alerts, ops.site_checks")
+        conn.execute("TRUNCATE push.subscriptions, push.line_state, push.config")
         conn.execute(
             "TRUNCATE normalized.ttc_vehicles, normalized.ttc_surface_passages, "
             "normalized.ttc_surface_trips_seen, "
