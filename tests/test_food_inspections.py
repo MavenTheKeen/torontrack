@@ -117,10 +117,13 @@ def test_refresh_loads_replaces_infractions_and_keeps_old_inspections(settings, 
     )
     # The 2025 inspection has left the file; the 2026 one was corrected to no infraction.
     second = export([row("c", day="2026-10-01")])
-    client = FakeClient([first, first, second])
+    # The 2025 finding is reissued, twice in the file, under a new inspection with its id.
+    third = export([row("a", day="2026-10-02", infraction="Old finding")] * 2)
+    client = FakeClient([first, first, second, third])
     url = settings.database_url
     assert food_inspections.refresh(url, client, NOW)["infractions"] == 2
     assert food_inspections.refresh(url, client, NOW)["status"] == "unchanged"
+    assert food_inspections.refresh(url, client, NOW)["status"] == "loaded"
     assert food_inspections.refresh(url, client, NOW)["status"] == "loaded"
     with connect(url) as conn:
         kept = conn.execute(
@@ -129,8 +132,9 @@ def test_refresh_loads_replaces_infractions_and_keeps_old_inspections(settings, 
                GROUP BY 1 ORDER BY 1"""
         ).fetchall()
         assert [(r["inspected_on"], r["found"]) for r in kept] == [
-            (date(2025, 1, 10), 1),
+            (date(2025, 1, 10), 0),
             (date(2026, 10, 1), 0),
+            (date(2026, 10, 2), 1),
         ]
         health = pipeline.food_inspections(conn, datetime.now(UTC))
     assert (health["status"], health["premises"]) == ("ok", 1)

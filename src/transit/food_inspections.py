@@ -134,15 +134,27 @@ def load(conn, premises: dict, inspections: dict, infractions: list, now: dateti
                ON CONFLICT (premises_id, inspected_on) DO UPDATE SET status = EXCLUDED.status"""
         )
         cur.execute(
+            """CREATE TEMP TABLE infractions_in (LIKE normalized.food_infractions)
+               ON COMMIT DROP"""
+        )
+        # The city reissues a finding under another inspection with the same id, and a
+        # file can carry an id twice; the last row for an id is the one kept.
+        latest = {row[0]: row for row in infractions}
+        with cur.copy(
+            """COPY infractions_in (infraction_id, premises_id, inspected_on,
+                   infraction, category, severity, outcome, outcome_on, fine) FROM STDIN"""
+        ) as copy:
+            for row in latest.values():
+                copy.write_row(row)
+        cur.execute(
             """DELETE FROM normalized.food_infractions f USING inspections_in i
                WHERE f.premises_id = i.premises_id AND f.inspected_on = i.inspected_on"""
         )
-        with cur.copy(
-            """COPY normalized.food_infractions (infraction_id, premises_id, inspected_on,
-                   infraction, category, severity, outcome, outcome_on, fine) FROM STDIN"""
-        ) as copy:
-            for row in infractions:
-                copy.write_row(row)
+        cur.execute(
+            """DELETE FROM normalized.food_infractions f USING infractions_in n
+               WHERE f.infraction_id = n.infraction_id"""
+        )
+        cur.execute("INSERT INTO normalized.food_infractions SELECT * FROM infractions_in")
 
 
 def _resource_url(meta: dict) -> str:
